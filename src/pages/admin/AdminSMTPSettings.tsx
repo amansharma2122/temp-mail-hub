@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { storage } from "@/lib/storage";
-import { Cog, Save, Eye, EyeOff, Send, CheckCircle, XCircle, Loader2, AlertTriangle, ExternalLink } from "lucide-react";
+import { Cog, Save, Eye, EyeOff, Send, CheckCircle, XCircle, Loader2, AlertTriangle, ExternalLink, Wifi, WifiOff } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
-const SMTP_SETTINGS_KEY = 'trashmails_smtp_settings';
+const SMTP_SETTINGS_KEY = 'smtp_settings';
 
 interface SMTPSettings {
   host: string;
@@ -61,6 +61,13 @@ const AdminSMTPSettings = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [connectivityResult, setConnectivityResult] = useState<{
+    dnsResolved: boolean;
+    tcpConnected: boolean;
+    resolvedIp?: string;
+    responseTime?: number;
+    error?: string;
+  } | null>(null);
   const [testEmailDialogOpen, setTestEmailDialogOpen] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -94,25 +101,47 @@ const AdminSMTPSettings = () => {
     }, 500);
   };
 
-  const handleTestConnection = () => {
-    if (!settings.host || !settings.username || !settings.password) {
-      toast.error("Please fill in all required fields before testing");
+  const handleTestConnection = async () => {
+    if (!settings.host || !settings.port) {
+      toast.error("Please enter SMTP host and port before testing");
       return;
     }
 
     setIsTesting(true);
     setConnectionStatus('idle');
+    setConnectivityResult(null);
     
-    setTimeout(() => {
-      setIsTesting(false);
-      if (settings.host && settings.username && settings.password) {
+    try {
+      const { data, error } = await supabase.functions.invoke('smtp-connectivity-test', {
+        body: {
+          host: settings.host,
+          port: settings.port,
+        },
+      });
+
+      if (error) throw error;
+
+      setConnectivityResult(data);
+
+      if (data.success) {
         setConnectionStatus('success');
-        toast.success("SMTP settings validated!");
+        toast.success(`Connection successful! Resolved to ${data.resolvedIp} in ${data.responseTime}ms`);
       } else {
         setConnectionStatus('error');
-        toast.error("Please fill in all required fields.");
+        toast.error(data.error || "Connection failed");
       }
-    }, 1000);
+    } catch (error: any) {
+      console.error("Connectivity test error:", error);
+      setConnectionStatus('error');
+      setConnectivityResult({
+        dnsResolved: false,
+        tcpConnected: false,
+        error: error.message || "Failed to test connectivity",
+      });
+      toast.error(error.message || "Failed to test connectivity");
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const handleSendTestEmail = async () => {
@@ -181,7 +210,8 @@ const AdminSMTPSettings = () => {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleTestConnection} disabled={isTesting}>
-            {isTesting ? 'Testing...' : 'Test Connection'}
+            {isTesting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wifi className="w-4 h-4 mr-2" />}
+            {isTesting ? 'Testing...' : 'Test Connectivity'}
           </Button>
           <Dialog open={testEmailDialogOpen} onOpenChange={setTestEmailDialogOpen}>
             <DialogTrigger asChild>
@@ -310,19 +340,47 @@ const AdminSMTPSettings = () => {
       </Card>
 
       {connectionStatus !== 'idle' && (
-        <div className={`flex items-center gap-2 p-4 rounded-lg ${
-          connectionStatus === 'success' ? 'bg-green-500/10 text-green-500' : 'bg-destructive/10 text-destructive'
+        <div className={`p-4 rounded-lg space-y-2 ${
+          connectionStatus === 'success' ? 'bg-green-500/10 border border-green-500/30' : 'bg-destructive/10 border border-destructive/30'
         }`}>
-          {connectionStatus === 'success' ? (
-            <CheckCircle className="w-5 h-5" />
-          ) : (
-            <XCircle className="w-5 h-5" />
+          <div className="flex items-center gap-2">
+            {connectionStatus === 'success' ? (
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : (
+              <XCircle className="w-5 h-5 text-destructive" />
+            )}
+            <span className={connectionStatus === 'success' ? 'text-green-500' : 'text-destructive'}>
+              {connectionStatus === 'success' 
+                ? 'Connection successful! SMTP server is reachable.'
+                : 'Connection failed. Check the details below.'}
+            </span>
+          </div>
+          
+          {connectivityResult && (
+            <div className="ml-7 space-y-1 text-sm">
+              <div className="flex items-center gap-2">
+                {connectivityResult.dnsResolved ? (
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-destructive" />
+                )}
+                <span>DNS Resolution: {connectivityResult.dnsResolved ? `✓ Resolved to ${connectivityResult.resolvedIp}` : '✗ Failed'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {connectivityResult.tcpConnected ? (
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-destructive" />
+                )}
+                <span>TCP Connection: {connectivityResult.tcpConnected ? `✓ Connected in ${connectivityResult.responseTime}ms` : '✗ Failed'}</span>
+              </div>
+              {connectivityResult.error && (
+                <div className="p-2 bg-destructive/10 rounded text-destructive text-xs mt-2">
+                  {connectivityResult.error}
+                </div>
+              )}
+            </div>
           )}
-          <span>
-            {connectionStatus === 'success' 
-              ? 'Connection successful! SMTP server is reachable.'
-              : 'Connection failed. Please verify your credentials and server settings.'}
-          </span>
         </div>
       )}
 
