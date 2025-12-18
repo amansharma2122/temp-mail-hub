@@ -22,6 +22,7 @@ import {
   Database,
   MailOpen,
   UserCog,
+  BarChart3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,6 +50,7 @@ const AdminSidebar = () => {
 
   const mainMenuItems = [
     { title: t('dashboard'), url: "/admin", icon: LayoutDashboard },
+    { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
     { title: t('users'), url: "/admin/users", icon: Users },
     { title: t('emails'), url: "/admin/emails", icon: Mail },
   ];

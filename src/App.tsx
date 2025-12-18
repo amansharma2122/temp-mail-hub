@@ -15,9 +15,13 @@ import Auth from "./pages/Auth";
 import History from "./pages/History";
 import DeployGuide from "./pages/DeployGuide";
 import AdminGuide from "./pages/AdminGuide";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
+import CookiePolicy from "./pages/CookiePolicy";
 import NotFound from "./pages/NotFound";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminDomains from "./pages/admin/AdminDomains";
 import AdminEmails from "./pages/admin/AdminEmails";
@@ -66,10 +70,14 @@ const App = () => (
                 <Route path="/history" element={<History />} />
                 <Route path="/deploy-guide" element={<DeployGuide />} />
                 <Route path="/admin-guide" element={<AdminGuide />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/cookies" element={<CookiePolicy />} />
                 
                 {/* Admin Routes */}
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminDashboard />} />
+                  <Route path="analytics" element={<AdminAnalytics />} />
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="domains" element={<AdminDomains />} />
                   <Route path="custom-domains" element={<AdminCustomDomains />} />
