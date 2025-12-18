@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, RefreshCw, Trash2, Star, Clock, User, ChevronRight, Inbox as InboxIcon, TestTube, Loader2, Bell, Paperclip } from "lucide-react";
+import { Mail, RefreshCw, Trash2, Star, Clock, User, ChevronRight, Inbox as InboxIcon, TestTube, Loader2, Bell, Paperclip, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEmailService, ReceivedEmail } from "@/hooks/useLocalEmailService";
+import { useSecureEmailService, ReceivedEmail } from "@/hooks/useSecureEmailService";
 import { useAuth } from "@/hooks/useSupabaseAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatDistanceToNow } from "date-fns";
@@ -10,6 +10,7 @@ import { storage } from "@/lib/storage";
 import { useRealtimeEmails } from "@/hooks/useRealtimeEmails";
 import EmailAttachments, { Attachment } from "@/components/EmailAttachments";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 interface NotificationPreferences {
   soundEnabled: boolean;
   pushEnabled: boolean;
@@ -24,8 +25,8 @@ const Inbox = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
   
-  // 2. Custom hooks
-  const { receivedEmails, isLoading, markAsRead, saveEmail, currentEmail, simulateIncomingEmail, refetch } = useEmailService();
+  // 2. Custom hooks - Using secure email service with token-based access
+  const { receivedEmails, isLoading, markAsRead, saveEmail, currentEmail, refetch, getAccessToken } = useSecureEmailService();
   
   // 3. All useState hooks together
   const [selectedEmail, setSelectedEmail] = useState<ReceivedEmail | null>(null);
@@ -225,16 +226,11 @@ const Inbox = () => {
                 <span>Auto-refresh off</span>
               )}
             </div>
+            <div className="flex items-center gap-1 text-xs text-green-500">
+              <Shield className="w-3 h-3" />
+              <span>Encrypted</span>
+            </div>
             
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={simulateIncomingEmail}
-              title="Simulate receiving an email (for demo)"
-            >
-              <TestTube className="w-4 h-4" />
-              Test
-            </Button>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -282,10 +278,10 @@ const Inbox = () => {
                 <p className="text-sm text-primary font-mono mt-2">
                   {currentEmail?.address || "..."}
                 </p>
-                <Button variant="outline" className="mt-4 border-primary/30" onClick={simulateIncomingEmail}>
-                  <TestTube className="w-4 h-4 mr-2" />
-                  Send Test Email
-                </Button>
+                <div className="flex items-center justify-center gap-2 mt-2 text-xs text-green-500">
+                  <Shield className="w-3 h-3" />
+                  <span>Token-secured access</span>
+                </div>
                 {autoRefreshEnabled && (
                   <p className="text-xs text-muted-foreground mt-4">
                     Auto-checking every {refreshInterval} seconds...
