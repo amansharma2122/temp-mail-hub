@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,10 +37,38 @@ const defaultSettings: GeneralSettings = {
 };
 
 const AdminGeneralSettings = () => {
-  const [settings, setSettings] = useState<GeneralSettings>(() =>
-    storage.get(GENERAL_SETTINGS_KEY, defaultSettings)
-  );
+  const [settings, setSettings] = useState<GeneralSettings>(defaultSettings);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'general')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          const dbSettings = data.value as unknown as GeneralSettings;
+          setSettings({ ...defaultSettings, ...dbSettings });
+        } else {
+          const localSettings = storage.get<GeneralSettings>(GENERAL_SETTINGS_KEY, defaultSettings);
+          setSettings(localSettings);
+        }
+      } catch (e) {
+        console.error('Error loading settings:', e);
+        const localSettings = storage.get<GeneralSettings>(GENERAL_SETTINGS_KEY, defaultSettings);
+        setSettings(localSettings);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);

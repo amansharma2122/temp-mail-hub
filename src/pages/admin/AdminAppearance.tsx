@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,14 +34,42 @@ const defaultSettings: AppearanceSettings = {
 };
 
 const AdminAppearance = () => {
-  const [settings, setSettings] = useState<AppearanceSettings>(() =>
-    storage.get(APPEARANCE_SETTINGS_KEY, defaultSettings)
-  );
+  const [settings, setSettings] = useState<AppearanceSettings>(defaultSettings);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingFavicon, setIsUploadingFavicon] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'appearance')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          const dbSettings = data.value as unknown as AppearanceSettings;
+          setSettings({ ...defaultSettings, ...dbSettings });
+        } else {
+          const localSettings = storage.get<AppearanceSettings>(APPEARANCE_SETTINGS_KEY, defaultSettings);
+          setSettings(localSettings);
+        }
+      } catch (e) {
+        console.error('Error loading settings:', e);
+        const localSettings = storage.get<AppearanceSettings>(APPEARANCE_SETTINGS_KEY, defaultSettings);
+        setSettings(localSettings);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
