@@ -168,6 +168,19 @@ const Inbox = () => {
     }
   };
 
+  const handleResetLocalStorage = () => {
+    const ok = window.confirm(
+      "This will clear this site's localStorage (including your current temp email session) and reload the page. Continue?"
+    );
+    if (!ok) return;
+    try {
+      localStorage.clear();
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  };
+
   const handleSelectEmail = async (email: ReceivedEmail) => {
     setSelectedEmail(email);
     setAttachments([]);
