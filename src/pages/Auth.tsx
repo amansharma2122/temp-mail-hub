@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { Mail, Lock, User, ArrowRight, Loader2, Chrome } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useLocalAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { z } from "zod";
 import Header from "@/components/Header";
@@ -19,7 +20,8 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user, signIn, signUp, signInWithGoogle } = useAuth();
+  const { user, signIn, signUp, signInWithGoogle, signInWithFacebook } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,23 +54,15 @@ const Auth = () => {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes("Invalid login credentials")) {
-            toast.error("Invalid email or password. Please try again.");
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(error.message);
         } else {
           toast.success("Welcome back!");
           navigate("/");
         }
       } else {
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, name);
         if (error) {
-          if (error.message.includes("already registered")) {
-            toast.error("This email is already registered. Please sign in instead.");
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(error.message);
         } else {
           toast.success("Account created successfully!");
           navigate("/");
@@ -86,6 +80,19 @@ const Auth = () => {
     const { error } = await signInWithGoogle();
     if (error) {
       toast.error(error.message);
+    } else {
+      navigate("/");
+    }
+    setIsSubmitting(false);
+  };
+
+  const handleFacebookSignIn = async () => {
+    setIsSubmitting(true);
+    const { error } = await signInWithFacebook();
+    if (error) {
+      toast.error(error.message);
+    } else {
+      navigate("/");
     }
     setIsSubmitting(false);
   };
@@ -102,18 +109,16 @@ const Auth = () => {
           >
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                {isLogin ? "Welcome Back" : "Create Account"}
+                {isLogin ? t('welcomeBack') : t('createAccount')}
               </h1>
               <p className="text-muted-foreground">
-                {isLogin
-                  ? "Sign in to access your saved emails and history"
-                  : "Join TrashMails to save favorites and sync across devices"}
+                {isLogin ? t('signInDesc') : t('signUpDesc')}
               </p>
             </div>
 
             <div className="glass-card p-8">
               {/* Social Login */}
-              <div className="mb-6">
+              <div className="space-y-3 mb-6">
                 <Button
                   variant="glass"
                   className="w-full"
@@ -121,7 +126,18 @@ const Auth = () => {
                   disabled={isSubmitting}
                 >
                   <Chrome className="w-5 h-5 mr-2" />
-                  Continue with Google
+                  {t('continueWithGoogle')}
+                </Button>
+                <Button
+                  variant="glass"
+                  className="w-full"
+                  onClick={handleFacebookSignIn}
+                  disabled={isSubmitting}
+                >
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  {t('continueWithFacebook')}
                 </Button>
               </div>
 
@@ -130,7 +146,7 @@ const Auth = () => {
                   <div className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-card px-4 text-muted-foreground">or</span>
+                  <span className="bg-card px-4 text-muted-foreground">{t('or')}</span>
                 </div>
               </div>
 
@@ -139,7 +155,7 @@ const Auth = () => {
                 {!isLogin && (
                   <div>
                     <label className="text-sm text-muted-foreground mb-2 block">
-                      Full Name
+                      {t('fullName')}
                     </label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -156,7 +172,7 @@ const Auth = () => {
 
                 <div>
                   <label className="text-sm text-muted-foreground mb-2 block">
-                    Email Address
+                    {t('emailAddress')}
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -173,7 +189,7 @@ const Auth = () => {
 
                 <div>
                   <label className="text-sm text-muted-foreground mb-2 block">
-                    Password
+                    {t('password')}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -198,7 +214,7 @@ const Auth = () => {
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <>
-                      {isLogin ? "Sign In" : "Create Account"}
+                      {isLogin ? t('signIn') : t('createAccount')}
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </>
                   )}
@@ -211,9 +227,7 @@ const Auth = () => {
                   onClick={() => setIsLogin(!isLogin)}
                   className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
-                  {isLogin
-                    ? "Don't have an account? Sign up"
-                    : "Already have an account? Sign in"}
+                  {isLogin ? t('dontHaveAccount') : t('alreadyHaveAccount')}
                 </button>
               </div>
             </div>

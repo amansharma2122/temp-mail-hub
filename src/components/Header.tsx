@@ -1,9 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Mail, Menu, X, User, LogOut, Settings } from "lucide-react";
+import { Mail, Menu, X, User, LogOut, Settings, History, Globe } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useLocalAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,19 +12,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, isAdmin, signOut } = useAuth();
+  const { t, language, setLanguage, languages, isRTL } = useLanguage();
   const navigate = useNavigate();
 
   const navItems = [
-    { label: "Features", href: "/#features" },
-    { label: "How It Works", href: "/#how-it-works" },
-    { label: "FAQ", href: "/#faq" },
-    { label: "Blog", href: "/blog" },
-    { label: "Contact", href: "/contact" },
+    { label: t('features'), href: "/#features" },
+    { label: t('howItWorks'), href: "/#how-it-works" },
+    { label: t('faq'), href: "/#faq" },
+    { label: t('blog'), href: "/blog" },
+    { label: t('contact'), href: "/contact" },
   ];
 
   const handleSignOut = async () => {
@@ -38,7 +47,7 @@ const Header = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-primary/10">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+        <div className={`flex items-center justify-between h-16 ${isRTL ? 'flex-row-reverse' : ''}`}>
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="relative">
@@ -49,7 +58,7 @@ const Header = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className={`hidden md:flex items-center gap-8 ${isRTL ? 'flex-row-reverse' : ''}`}>
             {navItems.map((item) => (
               <a
                 key={item.label}
@@ -61,8 +70,23 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* CTA Buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Right Side */}
+          <div className={`hidden md:flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            {/* Language Selector */}
+            <Select value={language} onValueChange={(value: any) => setLanguage(value)}>
+              <SelectTrigger className="w-[100px] bg-transparent border-border">
+                <Globe className="w-4 h-4 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {languages.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -72,41 +96,37 @@ const Header = () => {
                         {getInitials(user.email || "")}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm max-w-[120px] truncate">{user.email}</span>
+                    <span className="text-sm max-w-[120px] truncate">{user.displayName}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => navigate("/history")}>
-                    <Mail className="w-4 h-4 mr-2" />
+                    <History className="w-4 h-4 mr-2" />
                     Email History
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/saved")}>
-                    <User className="w-4 h-4 mr-2" />
-                    Saved Emails
                   </DropdownMenuItem>
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => navigate("/admin")}>
                         <Settings className="w-4 h-4 mr-2" />
-                        Admin Panel
+                        {t('adminPanel')}
                       </DropdownMenuItem>
                     </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                     <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
+                    {t('signOut')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <>
                 <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
-                  Sign In
+                  {t('signIn')}
                 </Button>
                 <Button variant="neon" size="sm" onClick={() => navigate("/auth")}>
-                  Get Started
+                  {t('getStarted')}
                 </Button>
               </>
             )}
@@ -132,6 +152,21 @@ const Header = () => {
             className="md:hidden glass border-t border-primary/10"
           >
             <nav className="container mx-auto px-4 py-4 flex flex-col gap-4">
+              {/* Language Selector Mobile */}
+              <Select value={language} onValueChange={(value: any) => setLanguage(value)}>
+                <SelectTrigger className="w-full bg-secondary/50">
+                  <Globe className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {lang.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               {navItems.map((item) => (
                 <a
                   key={item.label}
@@ -147,22 +182,25 @@ const Header = () => {
                   <div className="border-t border-border pt-4">
                     <p className="text-sm text-muted-foreground mb-2">{user.email}</p>
                   </div>
+                  <Button variant="glass" onClick={() => { navigate("/history"); setMobileMenuOpen(false); }}>
+                    Email History
+                  </Button>
                   {isAdmin && (
                     <Button variant="glass" onClick={() => { navigate("/admin"); setMobileMenuOpen(false); }}>
-                      Admin Panel
+                      {t('adminPanel')}
                     </Button>
                   )}
                   <Button variant="destructive" onClick={handleSignOut}>
-                    Sign Out
+                    {t('signOut')}
                   </Button>
                 </>
               ) : (
                 <div className="flex gap-3 pt-4 border-t border-border">
                   <Button variant="ghost" className="flex-1" onClick={() => { navigate("/auth"); setMobileMenuOpen(false); }}>
-                    Sign In
+                    {t('signIn')}
                   </Button>
                   <Button variant="neon" className="flex-1" onClick={() => { navigate("/auth"); setMobileMenuOpen(false); }}>
-                    Get Started
+                    {t('getStarted')}
                   </Button>
                 </div>
               )}
