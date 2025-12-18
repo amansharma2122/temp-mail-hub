@@ -8,6 +8,8 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/components/NotificationSystem";
 import { initializeDefaultData } from "@/lib/storage";
+import { EmailServiceProvider } from "@/contexts/EmailServiceContext";
+import CacheRefresh from "@/components/CacheRefresh";
 import Index from "./pages/Index";
 import Blog from "./pages/Blog";
 import Contact from "./pages/Contact";
@@ -64,65 +66,71 @@ const App = () => (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <NotificationProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/blog" element={<Blog />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/history" element={<History />} />
-                <Route path="/deploy-guide" element={<DeployGuide />} />
-                <Route path="/admin-guide" element={<AdminGuide />} />
-                <Route path="/privacy" element={<PrivacyPolicy />} />
-                <Route path="/terms" element={<TermsOfService />} />
-                <Route path="/cookies" element={<CookiePolicy />} />
-                <Route path="/profile" element={<Profile />} />
-                
-                {/* Admin Routes */}
-                <Route path="/admin" element={<AdminLayout />}>
-                  <Route index element={<AdminDashboard />} />
-                  <Route path="analytics" element={<AdminAnalytics />} />
-                  <Route path="users" element={<AdminUsers />} />
-                  <Route path="domains" element={<AdminDomains />} />
-                  <Route path="custom-domains" element={<AdminCustomDomains />} />
-                  <Route path="emails" element={<AdminEmails />} />
-                  <Route path="blogs" element={<AdminBlogs />} />
-                  <Route path="pages" element={<AdminPages />} />
-                  <Route path="themes" element={<AdminThemes />} />
-                  <Route path="settings" element={<AdminSettings />} />
-                  <Route path="general-settings" element={<AdminGeneralSettings />} />
-                  <Route path="smtp" element={<AdminSMTPSettings />} />
-                  <Route path="imap" element={<AdminIMAPSettings />} />
-                  <Route path="email-setup" element={<AdminEmailSetup />} />
-                  <Route path="deploy-guide" element={<AdminDeployGuide />} />
-                  <Route path="appearance" element={<AdminAppearance />} />
-                  <Route path="user-settings" element={<AdminUserSettings />} />
-                  <Route path="admins" element={<AdminAdmins />} />
-                  <Route path="seo" element={<AdminSEO />} />
-                  <Route path="blog-settings" element={<AdminBlogSettings />} />
-                  <Route path="email-templates" element={<AdminEmailTemplates />} />
-                  <Route path="languages" element={<AdminLanguages />} />
-                  <Route path="ads" element={<AdminAds />} />
-                  <Route path="captcha" element={<AdminCaptcha />} />
-                  <Route path="api" element={<AdminAPI />} />
-                  <Route path="cron" element={<AdminCron />} />
-                  <Route path="cache" element={<AdminCache />} />
-                  <Route path="advanced" element={<AdminAdvancedSettings />} />
-                  <Route path="banners" element={<AdminBanners />} />
-                  <Route path="audit-logs" element={<AdminAuditLogs />} />
-                  <Route path="rate-limits" element={<AdminRateLimits />} />
-                  <Route path="role-approvals" element={<AdminRoleApprovals />} />
-                </Route>
+          {/* Ensures old caches are cleared once per version for all users */}
+          <CacheRefresh />
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </NotificationProvider>
+          {/* Provide email service to ALL routes (Index, History, Profile, Admin, etc.) */}
+          <EmailServiceProvider>
+            <NotificationProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/blog" element={<Blog />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/history" element={<History />} />
+                    <Route path="/deploy-guide" element={<DeployGuide />} />
+                    <Route path="/admin-guide" element={<AdminGuide />} />
+                    <Route path="/privacy" element={<PrivacyPolicy />} />
+                    <Route path="/terms" element={<TermsOfService />} />
+                    <Route path="/cookies" element={<CookiePolicy />} />
+                    <Route path="/profile" element={<Profile />} />
+
+                    {/* Admin Routes */}
+                    <Route path="/admin" element={<AdminLayout />}>
+                      <Route index element={<AdminDashboard />} />
+                      <Route path="analytics" element={<AdminAnalytics />} />
+                      <Route path="users" element={<AdminUsers />} />
+                      <Route path="domains" element={<AdminDomains />} />
+                      <Route path="custom-domains" element={<AdminCustomDomains />} />
+                      <Route path="emails" element={<AdminEmails />} />
+                      <Route path="blogs" element={<AdminBlogs />} />
+                      <Route path="pages" element={<AdminPages />} />
+                      <Route path="themes" element={<AdminThemes />} />
+                      <Route path="settings" element={<AdminSettings />} />
+                      <Route path="general-settings" element={<AdminGeneralSettings />} />
+                      <Route path="smtp" element={<AdminSMTPSettings />} />
+                      <Route path="imap" element={<AdminIMAPSettings />} />
+                      <Route path="email-setup" element={<AdminEmailSetup />} />
+                      <Route path="deploy-guide" element={<AdminDeployGuide />} />
+                      <Route path="appearance" element={<AdminAppearance />} />
+                      <Route path="user-settings" element={<AdminUserSettings />} />
+                      <Route path="admins" element={<AdminAdmins />} />
+                      <Route path="seo" element={<AdminSEO />} />
+                      <Route path="blog-settings" element={<AdminBlogSettings />} />
+                      <Route path="email-templates" element={<AdminEmailTemplates />} />
+                      <Route path="languages" element={<AdminLanguages />} />
+                      <Route path="ads" element={<AdminAds />} />
+                      <Route path="captcha" element={<AdminCaptcha />} />
+                      <Route path="api" element={<AdminAPI />} />
+                      <Route path="cron" element={<AdminCron />} />
+                      <Route path="cache" element={<AdminCache />} />
+                      <Route path="advanced" element={<AdminAdvancedSettings />} />
+                      <Route path="banners" element={<AdminBanners />} />
+                      <Route path="audit-logs" element={<AdminAuditLogs />} />
+                      <Route path="rate-limits" element={<AdminRateLimits />} />
+                      <Route path="role-approvals" element={<AdminRoleApprovals />} />
+                    </Route>
+
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </BrowserRouter>
+              </TooltipProvider>
+            </NotificationProvider>
+          </EmailServiceProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

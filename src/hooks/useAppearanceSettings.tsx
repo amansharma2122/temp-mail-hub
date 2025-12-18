@@ -33,18 +33,21 @@ export const useAppearanceSettings = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        // Try to load from Supabase app_settings first
+        // Try to load from backend first (use latest row, tolerate 0 rows)
         const { data, error } = await supabase
           .from('app_settings')
-          .select('value')
+          .select('value, updated_at')
           .eq('key', 'appearance')
-          .single();
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         if (!error && data?.value) {
           const dbSettings = data.value as unknown as AppearanceSettings;
-          setSettings({ ...defaultSettings, ...dbSettings });
+          const merged = { ...defaultSettings, ...dbSettings };
+          setSettings(merged);
           // Also update localStorage for quick access
-          storage.set(APPEARANCE_SETTINGS_KEY, { ...defaultSettings, ...dbSettings });
+          storage.set(APPEARANCE_SETTINGS_KEY, merged);
         } else {
           // Fallback to localStorage
           const localSettings = storage.get<AppearanceSettings>(APPEARANCE_SETTINGS_KEY, defaultSettings);
