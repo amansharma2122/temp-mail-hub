@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { storage, generateId } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { Languages, Plus, Trash2, Save, Check } from "lucide-react";
 import {
   Table,
@@ -45,15 +46,72 @@ const defaultLanguages: Language[] = [
 ];
 
 const AdminLanguages = () => {
-  const [languages, setLanguages] = useState<Language[]>(() =>
-    storage.get(LANGUAGES_KEY, defaultLanguages)
-  );
+  const [languages, setLanguages] = useState<Language[]>(defaultLanguages);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newLang, setNewLang] = useState({ code: '', name: '', nativeName: '', rtl: false });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const saveLanguages = (updated: Language[]) => {
+  useEffect(() => {
+    const loadLanguages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'languages')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          const dbLanguages = data.value as unknown as Language[];
+          setLanguages(dbLanguages);
+        } else {
+          const localLanguages = storage.get<Language[]>(LANGUAGES_KEY, defaultLanguages);
+          setLanguages(localLanguages);
+        }
+      } catch (e) {
+        console.error('Error loading languages:', e);
+        const localLanguages = storage.get<Language[]>(LANGUAGES_KEY, defaultLanguages);
+        setLanguages(localLanguages);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadLanguages();
+  }, []);
+
+  const saveLanguages = async (updated: Language[]) => {
     storage.set(LANGUAGES_KEY, updated);
     setLanguages(updated);
+
+    try {
+      const { data: existing } = await supabase
+        .from('app_settings')
+        .select('id')
+        .eq('key', 'languages')
+        .maybeSingle();
+
+      const languagesJson = JSON.parse(JSON.stringify(updated));
+
+      if (existing) {
+        await supabase
+          .from('app_settings')
+          .update({
+            value: languagesJson,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('key', 'languages');
+      } else {
+        await supabase
+          .from('app_settings')
+          .insert([{
+            key: 'languages',
+            value: languagesJson,
+          }]);
+      }
+    } catch (e) {
+      console.error('Error saving languages to database:', e);
+    }
   };
 
   const addLanguage = () => {

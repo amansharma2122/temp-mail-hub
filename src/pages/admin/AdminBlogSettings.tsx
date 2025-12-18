@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { storage } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
 import { Newspaper, Save } from "lucide-react";
 
 const BLOG_SETTINGS_KEY = 'trashmails_blog_settings';
@@ -35,18 +36,84 @@ const defaultSettings: BlogSettings = {
 };
 
 const AdminBlogSettings = () => {
-  const [settings, setSettings] = useState<BlogSettings>(() =>
-    storage.get(BLOG_SETTINGS_KEY, defaultSettings)
-  );
+  const [settings, setSettings] = useState<BlogSettings>(defaultSettings);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleSave = () => {
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'blog')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          const dbSettings = data.value as unknown as BlogSettings;
+          setSettings({ ...defaultSettings, ...dbSettings });
+        } else {
+          const localSettings = storage.get<BlogSettings>(BLOG_SETTINGS_KEY, defaultSettings);
+          setSettings(localSettings);
+        }
+      } catch (e) {
+        console.error('Error loading settings:', e);
+        const localSettings = storage.get<BlogSettings>(BLOG_SETTINGS_KEY, defaultSettings);
+        setSettings(localSettings);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
     setIsSaving(true);
-    storage.set(BLOG_SETTINGS_KEY, settings);
-    setTimeout(() => {
+    try {
+      storage.set(BLOG_SETTINGS_KEY, settings);
+      
+      const { data: existing } = await supabase
+        .from('app_settings')
+        .select('id')
+        .eq('key', 'blog')
+        .maybeSingle();
+
+      const settingsJson = JSON.parse(JSON.stringify(settings));
+
+      let error;
+      if (existing) {
+        const result = await supabase
+          .from('app_settings')
+          .update({
+            value: settingsJson,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('key', 'blog');
+        error = result.error;
+      } else {
+        const result = await supabase
+          .from('app_settings')
+          .insert([{
+            key: 'blog',
+            value: settingsJson,
+          }]);
+        error = result.error;
+      }
+
+      if (error) {
+        console.error('Error saving to database:', error);
+        toast.error('Settings saved locally but failed to sync to database');
+      } else {
+        toast.success("Blog settings saved!");
+      }
+    } catch (e) {
+      console.error('Error saving settings:', e);
+      toast.error('Failed to save settings');
+    } finally {
       setIsSaving(false);
-      toast.success("Blog settings saved!");
-    }, 500);
+    }
   };
 
   const updateSetting = <K extends keyof BlogSettings>(key: K, value: BlogSettings[K]) => {
