@@ -267,9 +267,10 @@ const Inbox = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-xs min-w-0">
-              <span className="text-muted-foreground shrink-0">Current Email:</span>
-              <span className="font-mono text-foreground truncate">{currentEmail?.address || "..."}</span>
+            {/* Synced Active Address — always matches the Generator via shared EmailServiceContext */}
+            <div className="flex items-center gap-2 text-xs min-w-0 bg-secondary/40 px-2.5 py-1 rounded-md border border-border/50">
+              <span className="text-muted-foreground shrink-0">Inbox for:</span>
+              <span className="font-mono text-primary font-medium truncate">{currentEmail?.address || "..."}</span>
             </div>
           </div>
 
@@ -385,10 +386,11 @@ const Inbox = () => {
                 <p className="text-sm text-muted-foreground">
                   {t('waitingForMessages')}
                 </p>
-                <p className="text-sm text-primary font-mono mt-2">
-                  {currentEmail?.address || "..."}
-                </p>
-                <div className="flex items-center justify-center gap-2 mt-2 text-xs text-green-500">
+                <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg bg-secondary/60 border border-primary/20">
+                  <span className="text-xs text-muted-foreground">Inbox for:</span>
+                  <span className="font-mono text-primary font-medium">{currentEmail?.address || "..."}</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 mt-3 text-xs text-green-500">
                   <Shield className="w-3 h-3" />
                   <span>Token-secured access</span>
                 </div>
