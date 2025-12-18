@@ -10,6 +10,18 @@ import {
   Palette,
   Newspaper,
   Link as LinkIcon,
+  Cog,
+  Paintbrush,
+  Shield,
+  Search,
+  Languages,
+  Megaphone,
+  ShieldCheck,
+  Key,
+  Clock,
+  Database,
+  MailOpen,
+  UserCog,
 } from "lucide-react";
 import {
   Sidebar,
@@ -27,6 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const AdminSidebar = () => {
   const location = useLocation();
@@ -34,22 +47,71 @@ const AdminSidebar = () => {
   const { t } = useLanguage();
   const collapsed = state === "collapsed";
 
-  const menuItems = [
+  const mainMenuItems = [
     { title: t('dashboard'), url: "/admin", icon: LayoutDashboard },
     { title: t('users'), url: "/admin/users", icon: Users },
+    { title: t('emails'), url: "/admin/emails", icon: Mail },
+  ];
+
+  const domainMenuItems = [
     { title: t('domains'), url: "/admin/domains", icon: Globe },
     { title: "Custom Domains", url: "/admin/custom-domains", icon: LinkIcon },
-    { title: t('emails'), url: "/admin/emails", icon: Mail },
+  ];
+
+  const contentMenuItems = [
     { title: t('blogs'), url: "/admin/blogs", icon: Newspaper },
     { title: t('pages'), url: "/admin/pages", icon: FileText },
+    { title: "Email Templates", url: "/admin/email-templates", icon: MailOpen },
+  ];
+
+  const settingsMenuItems = [
+    { title: "General", url: "/admin/general-settings", icon: Settings },
+    { title: "Appearance", url: "/admin/appearance", icon: Paintbrush },
     { title: t('themes'), url: "/admin/themes", icon: Palette },
-    { title: t('settings'), url: "/admin/settings", icon: Settings },
+    { title: "User & Guest", url: "/admin/user-settings", icon: UserCog },
+    { title: "Admins", url: "/admin/admins", icon: Shield },
+    { title: "SMTP", url: "/admin/smtp", icon: Cog },
+    { title: "SEO", url: "/admin/seo", icon: Search },
+    { title: "Blog Settings", url: "/admin/blog-settings", icon: Newspaper },
+    { title: "Languages", url: "/admin/languages", icon: Languages },
+  ];
+
+  const advancedMenuItems = [
+    { title: "Ads", url: "/admin/ads", icon: Megaphone },
+    { title: "Captcha", url: "/admin/captcha", icon: ShieldCheck },
+    { title: "API", url: "/admin/api", icon: Key },
+    { title: "Cron Jobs", url: "/admin/cron", icon: Clock },
+    { title: "Cache", url: "/admin/cache", icon: Database },
   ];
 
   const isActive = (path: string) => {
     if (path === "/admin") return location.pathname === "/admin";
     return location.pathname.startsWith(path);
   };
+
+  const renderMenuItems = (items: typeof mainMenuItems) => (
+    <SidebarMenu>
+      {items.map((item) => (
+        <SidebarMenuItem key={item.url}>
+          <SidebarMenuButton asChild>
+            <NavLink
+              to={item.url}
+              end={item.url === "/admin"}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
+                isActive(item.url)
+                  ? "bg-primary/20 text-primary font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+            >
+              <item.icon className="w-4 h-4" />
+              {!collapsed && <span className="text-sm">{item.title}</span>}
+            </NavLink>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  );
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -68,32 +130,42 @@ const AdminSidebar = () => {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Management</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/admin"}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors",
-                        isActive(item.url)
-                          ? "bg-primary/20 text-primary font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                      )}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <ScrollArea className="h-[calc(100vh-180px)]">
+          <SidebarGroup>
+            <SidebarGroupLabel>Main</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {renderMenuItems(mainMenuItems)}
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Domains</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {renderMenuItems(domainMenuItems)}
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Content</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {renderMenuItems(contentMenuItems)}
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Settings</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {renderMenuItems(settingsMenuItems)}
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Advanced</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {renderMenuItems(advancedMenuItems)}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </ScrollArea>
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-border">
