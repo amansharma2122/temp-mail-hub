@@ -417,6 +417,19 @@ serve(async (req: Request): Promise<Response> => {
         }
 
         // Store the email
+        const receivedAtIso = (() => {
+          const fallback = new Date().toISOString();
+          const rawDate = dateMatch?.[1]?.trim();
+          if (!rawDate) return fallback;
+
+          const parsed = new Date(rawDate);
+          if (Number.isNaN(parsed.getTime())) {
+            console.warn(`[IMAP] Msg ${msgId} - Invalid Date header: "${rawDate}" (using now)`);
+            return fallback;
+          }
+          return parsed.toISOString();
+        })();
+
         const { error: insertError } = await supabase
           .from("received_emails")
           .insert({
@@ -426,7 +439,7 @@ serve(async (req: Request): Promise<Response> => {
             body: finalTextBody.substring(0, 10000),
             html_body: finalHtmlBody ? finalHtmlBody.substring(0, 50000) : null,
             is_read: false,
-            received_at: dateMatch?.[1] ? new Date(dateMatch[1]).toISOString() : new Date().toISOString(),
+            received_at: receivedAtIso,
           });
 
         if (insertError) {
