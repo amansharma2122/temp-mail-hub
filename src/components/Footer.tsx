@@ -23,6 +23,7 @@ const Footer = () => {
     Support: [
       { label: "Help Center", href: "/help" },
       { label: "FAQ", href: "#faq" },
+      { label: "Deploy Guide", href: "/deploy-guide" },
       { label: "Status", href: "/status" },
     ],
   };
@@ -70,12 +71,21 @@ const Footer = () => {
               <ul className="space-y-2">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      {link.label}
-                    </a>
+                    {link.href.startsWith('#') || link.href.startsWith('http') ? (
+                      <a
+                        href={link.href}
+                        className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.href}
+                        className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
