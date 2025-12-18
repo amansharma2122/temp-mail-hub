@@ -26,7 +26,7 @@ const Inbox = () => {
   const { t } = useLanguage();
   
   // 2. Custom hooks - Using secure email service with token-based access
-  const { receivedEmails, isLoading, markAsRead, saveEmail, currentEmail, refetch, getAccessToken } = useSecureEmailService();
+  const { receivedEmails, isLoading, markAsRead, saveEmail, currentEmail, refetch, getAccessToken, triggerImapFetch } = useSecureEmailService();
   
   // 3. All useState hooks together
   const [selectedEmail, setSelectedEmail] = useState<ReceivedEmail | null>(null);
@@ -38,6 +38,7 @@ const Inbox = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [isCheckingMail, setIsCheckingMail] = useState(false);
   
   // 4. All useRef hooks together
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -109,14 +110,28 @@ const Inbox = () => {
     setIsRefreshing(true);
     setCountdown(refreshInterval);
     
-    // Simulate refresh delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Refresh from database
+    await refetch();
     
     setIsRefreshing(false);
     
     if (!isAuto) {
       // Reset countdown on manual refresh
       setCountdown(refreshInterval);
+    }
+  };
+
+  // Check for new emails from IMAP server
+  const handleCheckMail = async () => {
+    setIsCheckingMail(true);
+    try {
+      await triggerImapFetch();
+      toast.success('Checked for new emails from mail server');
+    } catch (error) {
+      console.error('Error checking mail:', error);
+      toast.error('Failed to check for new emails');
+    } finally {
+      setIsCheckingMail(false);
     }
   };
 
@@ -230,6 +245,17 @@ const Inbox = () => {
               <Shield className="w-3 h-3" />
               <span>Encrypted</span>
             </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCheckMail}
+              disabled={isCheckingMail}
+              className="border-primary/30 hover:bg-primary/10"
+            >
+              <Mail className={`w-4 h-4 mr-1 ${isCheckingMail ? 'animate-pulse' : ''}`} />
+              {isCheckingMail ? 'Checking...' : 'Check Mail'}
+            </Button>
             
             <Button 
               variant="ghost" 

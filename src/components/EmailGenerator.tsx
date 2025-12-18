@@ -32,6 +32,7 @@ const EmailGenerator = () => {
     currentEmail, 
     isGenerating, 
     generateEmail, 
+    generateCustomEmail,
     changeDomain,
     addCustomDomain,
   } = useSecureEmailService();
@@ -83,7 +84,7 @@ const EmailGenerator = () => {
     }
   };
 
-  const handleCreateCustomEmail = () => {
+  const handleCreateCustomEmail = async () => {
     if (!customUsername.trim()) {
       toast.error("Please enter a username");
       return;
@@ -105,29 +106,14 @@ const EmailGenerator = () => {
       return;
     }
 
-    const domain = domains.find(d => d.id === domainId);
-    if (domain) {
-      const customEmails = JSON.parse(localStorage.getItem("nullsto_temp_emails") || "[]");
-      const newEmail = {
-        id: `custom_${Date.now()}`,
-        user_id: user?.id || null,
-        address: `${customUsername}${domain.name}`,
-        domain_id: domainId,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        is_active: true,
-        is_custom: true,
-        created_at: new Date().toISOString(),
-      };
-      customEmails.push(newEmail);
-      localStorage.setItem("nullsto_temp_emails", JSON.stringify(customEmails));
-      
-      generateEmail(domainId);
-      toast.success(`Custom email created: ${customUsername}${domain.name}`);
+    // Use the generateCustomEmail function from the hook to properly create in database
+    const success = await generateCustomEmail(customUsername, domainId);
+    
+    if (success) {
+      setCustomUsername("");
+      setSelectedCustomDomain("");
+      setCustomEmailDialog(false);
     }
-
-    setCustomUsername("");
-    setSelectedCustomDomain("");
-    setCustomEmailDialog(false);
   };
 
   const currentDomain = domains.find(d => d.id === currentEmail?.domain_id);

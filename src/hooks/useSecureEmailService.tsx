@@ -107,7 +107,7 @@ export const useSecureEmailService = () => {
   }, [user]);
 
   // Generate new email with secret token
-  const generateEmail = useCallback(async (domainId?: string) => {
+  const generateEmail = useCallback(async (domainId?: string, customUsername?: string) => {
     if (domains.length === 0) return;
 
     setIsGenerating(true);
@@ -122,11 +122,14 @@ export const useSecureEmailService = () => {
         return;
       }
 
-      // Generate random username
-      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-      let username = '';
-      for (let i = 0; i < 10; i++) {
-        username += chars.charAt(Math.floor(Math.random() * chars.length));
+      // Generate random username if not provided
+      let username = customUsername;
+      if (!username) {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        username = '';
+        for (let i = 0; i < 10; i++) {
+          username += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
       }
       const address = username + selectedDomain.name;
 
@@ -148,11 +151,13 @@ export const useSecureEmailService = () => {
         // Check for rate limit error
         if (error.message?.includes('Rate limit exceeded')) {
           toast.error('Rate limit exceeded. Please wait before creating more emails.');
+        } else if (error.code === '23505') {
+          toast.error('This email address already exists. Please try a different username.');
         } else {
           toast.error('Failed to create email. Please try again.');
         }
         setIsGenerating(false);
-        return;
+        return false;
       }
 
       // Store the token securely in localStorage
@@ -167,15 +172,22 @@ export const useSecureEmailService = () => {
         setEmailHistory(prev => [newEmail, ...prev]);
       }
 
-      toast.success('New secure email created!');
+      toast.success(customUsername ? `Custom email created: ${address}` : 'New secure email created!');
+      return true;
     } catch (error) {
       console.error('Error generating email:', error);
       toast.error('Failed to create email');
+      return false;
     } finally {
       setIsGenerating(false);
       setIsLoading(false);
     }
   }, [domains, user]);
+
+  // Generate custom email with specific username
+  const generateCustomEmail = useCallback(async (username: string, domainId: string) => {
+    return generateEmail(domainId, username);
+  }, [generateEmail]);
 
   // Initial email generation
   useEffect(() => {
@@ -224,9 +236,29 @@ export const useSecureEmailService = () => {
     }
   }, [currentEmail, fetchSecureEmails]);
 
-  // Refetch emails
-  const refetch = useCallback(() => {
-    fetchSecureEmails();
+  // Trigger IMAP fetch from mail server
+  const triggerImapFetch = useCallback(async () => {
+    try {
+      console.log('Triggering IMAP fetch...');
+      const { data, error } = await supabase.functions.invoke('fetch-imap-emails', {
+        body: {},
+      });
+
+      if (error) {
+        console.error('IMAP fetch error:', error);
+        throw error;
+      }
+
+      console.log('IMAP fetch result:', data);
+      
+      // Refetch emails after IMAP poll
+      await fetchSecureEmails();
+      
+      return data;
+    } catch (error) {
+      console.error('Error triggering IMAP fetch:', error);
+      throw error;
+    }
   }, [fetchSecureEmails]);
 
   // Mark email as read using secure edge function
@@ -343,12 +375,14 @@ export const useSecureEmailService = () => {
     isLoading,
     isGenerating,
     generateEmail,
+    generateCustomEmail,
     changeDomain,
     markAsRead,
     saveEmail,
     addCustomDomain,
     loadFromHistory,
-    refetch,
+    refetch: fetchSecureEmails,
+    triggerImapFetch,
     getAccessToken,
   };
 };
