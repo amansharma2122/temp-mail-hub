@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 const CACHE_REFRESH_KEY = "nullsto_cache_refresh_version";
-const CACHE_REFRESH_VERSION = "2025-12-18-01";
+const CACHE_REFRESH_VERSION = "2025-12-18-02";
 
 export default function CacheRefresh() {
   useEffect(() => {
