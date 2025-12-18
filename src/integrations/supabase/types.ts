@@ -220,6 +220,13 @@ export type Database = {
             referencedRelation: "temp_emails"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "email_forwarding_temp_email_id_fkey"
+            columns: ["temp_email_id"]
+            isOneToOne: true
+            referencedRelation: "temp_emails_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -291,6 +298,13 @@ export type Database = {
             referencedRelation: "temp_emails"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "push_subscriptions_temp_email_id_fkey"
+            columns: ["temp_email_id"]
+            isOneToOne: false
+            referencedRelation: "temp_emails_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       rate_limits: {
@@ -360,6 +374,13 @@ export type Database = {
             columns: ["temp_email_id"]
             isOneToOne: false
             referencedRelation: "temp_emails"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "received_emails_temp_email_id_fkey"
+            columns: ["temp_email_id"]
+            isOneToOne: false
+            referencedRelation: "temp_emails_public"
             referencedColumns: ["id"]
           },
         ]
@@ -457,7 +478,44 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      temp_emails_public: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          domain_id: string | null
+          expires_at: string | null
+          id: string | null
+          is_active: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          domain_id?: string | null
+          expires_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          domain_id?: string | null
+          expires_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "temp_emails_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       admin_get_all_profiles: {

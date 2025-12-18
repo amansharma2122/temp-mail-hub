@@ -6,6 +6,52 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Encryption helper functions
+const ENCRYPTION_KEY = Deno.env.get('EMAIL_ENCRYPTION_KEY') || 'default-key-change-in-production';
+
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32)),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+  
+  return await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('temp-email-salt'),
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptText(text: string): Promise<{ encrypted: string; iv: string }> {
+  if (!text) return { encrypted: '', iv: '' };
+  
+  const key = await getEncryptionKey();
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encoder.encode(text)
+  );
+  
+  return {
+    encrypted: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
+    iv: btoa(String.fromCharCode(...iv))
+  };
+}
+
 interface MailgunInboundEmail {
   recipient: string;
   sender: string;
@@ -156,16 +202,29 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Insert the received email
+    // Encrypt email content before storing
+    console.log("Encrypting email content...");
+    const [encryptedSubject, encryptedBody, encryptedHtml] = await Promise.all([
+      encryptText(emailData.subject || ''),
+      encryptText(emailData.body || ''),
+      encryptText(emailData.htmlBody || '')
+    ]);
+
+    // Store encryption IVs for decryption
+    const encryptionKeyId = `${encryptedSubject.iv}|${encryptedBody.iv}|${encryptedHtml.iv}`;
+
+    // Insert the received email with encrypted content
     const { data: insertedEmail, error: insertError } = await supabase
       .from("received_emails")
       .insert({
         temp_email_id: tempEmail.id,
         from_address: emailData.sender,
-        subject: emailData.subject,
-        body: emailData.body,
-        html_body: emailData.htmlBody,
+        subject: encryptedSubject.encrypted,
+        body: encryptedBody.encrypted,
+        html_body: encryptedHtml.encrypted,
         is_read: false,
+        is_encrypted: true,
+        encryption_key_id: encryptionKeyId,
       })
       .select()
       .single();
@@ -175,7 +234,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw insertError;
     }
 
-    console.log("Email saved successfully:", insertedEmail.id);
+    console.log("Email saved and encrypted successfully:", insertedEmail.id);
 
     // Process attachments
     const savedAttachments: string[] = [];
