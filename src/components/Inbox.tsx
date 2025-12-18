@@ -12,6 +12,7 @@ import { useRealtimeEmails } from "@/hooks/useRealtimeEmails";
 import EmailAttachments, { Attachment } from "@/components/EmailAttachments";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import InboxDiagnostics, { saveImapFetchStats } from "@/components/InboxDiagnostics";
 interface NotificationPreferences {
   soundEnabled: boolean;
   pushEnabled: boolean;
@@ -144,9 +145,21 @@ const Inbox = () => {
   // Use 'latest' mode to avoid huge UNSEEN scans on mailboxes with many unseen messages.
   const handleCheckMail = async () => {
     setIsCheckingMail(true);
+    const startTime = Date.now();
     try {
       const result = await triggerImapFetch({ mode: "latest", limit: 20 });
       const stats = result?.stats;
+      
+      // Save stats for diagnostics panel
+      saveImapFetchStats({
+        scanned: stats?.scanned || 0,
+        matched: stats?.matched || 0,
+        stored: stats?.stored || 0,
+        noMatch: stats?.noMatch || 0,
+        failed: stats?.failed || 0,
+        duration: Date.now() - startTime,
+      });
+      
       if (stats?.stored > 0) {
         toast.success(`Found ${stats.stored} new email${stats.stored > 1 ? 's' : ''}!`);
       } else if (stats?.noMatch > 0) {
@@ -154,8 +167,17 @@ const Inbox = () => {
       } else {
         toast.info('No new emails found');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking mail:', error);
+      saveImapFetchStats({
+        scanned: 0,
+        matched: 0,
+        stored: 0,
+        noMatch: 0,
+        failed: 1,
+        duration: Date.now() - startTime,
+        error: error?.message || 'Failed to check for new emails',
+      });
       toast.error('Failed to check for new emails');
     } finally {
       setIsCheckingMail(false);
@@ -219,10 +241,22 @@ const Inbox = () => {
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       toast.loading('Checking for new mail...');
+      const fetchStart = Date.now();
       const result = await triggerImapFetch({ mode: "latest", limit: 20 });
       toast.dismiss();
 
       const stats = result?.stats;
+      
+      // Save stats for diagnostics panel
+      saveImapFetchStats({
+        scanned: stats?.scanned || 0,
+        matched: stats?.matched || 0,
+        stored: stats?.stored || 0,
+        noMatch: stats?.noMatch || 0,
+        failed: stats?.failed || 0,
+        duration: Date.now() - fetchStart,
+      });
+      
       if (stats?.stored > 0) {
         toast.success(`Email received! ${stats.stored} new message${stats.stored > 1 ? 's' : ''}`);
       } else if (stats?.noMatch > 0) {
@@ -562,6 +596,9 @@ const Inbox = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Diagnostics Panel */}
+        <InboxDiagnostics />
       </div>
     </motion.div>
   );

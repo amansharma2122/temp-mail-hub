@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.encrypt-incoming-email]
 verify_jwt = false
+
+[functions.smtp-connectivity-test]
+verify_jwt = false
