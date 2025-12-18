@@ -72,6 +72,16 @@ export const useSecureEmailService = () => {
   // Ref to prevent duplicate initialization
   const initStartedRef = useRef(false);
 
+  // Refs to avoid stale async updates when switching addresses
+  const currentEmailRef = useRef<TempEmail | null>(null);
+  const activeEmailIdRef = useRef<string | null>(null);
+  const fetchSeqRef = useRef(0);
+
+  useEffect(() => {
+    currentEmailRef.current = currentEmail;
+    activeEmailIdRef.current = currentEmail?.id ?? null;
+  }, [currentEmail]);
+
   // Debug logs
   useEffect(() => {
     console.info(`[email-service:${instanceIdRef.current}] mounted`);
@@ -179,6 +189,9 @@ export const useSecureEmailService = () => {
         return false;
       }
 
+      // Invalidate any in-flight inbox fetches before switching address
+      fetchSeqRef.current++;
+
       // Store the token securely in localStorage
       if (newEmail.secret_token) {
         storeToken(newEmail.id, newEmail.secret_token);
@@ -225,7 +238,7 @@ export const useSecureEmailService = () => {
         setIsLoading(false);
         return;
       }
-      
+
       // Mark initialization as started immediately
       initStartedRef.current = true;
 
@@ -297,28 +310,32 @@ export const useSecureEmailService = () => {
       await generateEmail();
     };
 
-    initializeEmail();
-  }, [domains, currentEmail, isGenerating]);
+    void initializeEmail();
+  }, [domains, currentEmail, generateEmail]);
 
-  // Fetch emails using secure edge function
-  const fetchSecureEmails = useCallback(async () => {
-    if (!currentEmail) return;
+  // Fetch emails using secure backend function
+  const fetchSecureEmailsFor = useCallback(async (email: TempEmail) => {
+    const token = getStoredToken(email.id) || email.secret_token;
 
-    const token = getStoredToken(currentEmail.id) || currentEmail.secret_token;
-    
     if (!token) {
       console.error('No token available for this email');
       return;
     }
 
+    // Sequence guard: only the most recent fetch may update state
+    const seq = ++fetchSeqRef.current;
+
     try {
       const { data, error } = await supabase.functions.invoke('secure-email-access', {
         body: {
           action: 'get_emails',
-          tempEmailId: currentEmail.id,
-          token: token,
+          tempEmailId: email.id,
+          token,
         },
       });
+
+      if (seq !== fetchSeqRef.current) return;
+      if (activeEmailIdRef.current !== email.id) return;
 
       if (error) {
         console.error('Error fetching emails:', error);
@@ -331,14 +348,20 @@ export const useSecureEmailService = () => {
     } catch (error) {
       console.error('Error in fetchSecureEmails:', error);
     }
-  }, [currentEmail]);
+  }, []);
+
+  const fetchSecureEmails = useCallback(async () => {
+    const email = currentEmailRef.current;
+    if (!email) return;
+    await fetchSecureEmailsFor(email);
+  }, [fetchSecureEmailsFor]);
 
   // Load emails when current email changes
   useEffect(() => {
     if (currentEmail) {
-      fetchSecureEmails();
+      void fetchSecureEmails();
     }
-  }, [currentEmail, fetchSecureEmails]);
+  }, [currentEmail?.id, fetchSecureEmails]);
 
   // Trigger IMAP fetch from mail server
   const triggerImapFetch = useCallback(
@@ -359,7 +382,7 @@ export const useSecureEmailService = () => {
 
         console.log('IMAP fetch result:', data);
 
-        // Refetch emails after IMAP poll
+        // Always refetch emails for the latest active address after IMAP poll
         await fetchSecureEmails();
 
         return data;
@@ -463,18 +486,26 @@ export const useSecureEmailService = () => {
   };
 
   // Load a previous email from history
-  const loadFromHistory = useCallback(async (emailId: string) => {
-    const email = emailHistory.find(e => e.id === emailId);
-    if (email) {
-      try {
-        localStorage.setItem(CURRENT_EMAIL_ID_KEY, email.id);
-      } catch {
-        // ignore
+  const loadFromHistory = useCallback(
+    async (emailId: string) => {
+      const email = emailHistory.find((e) => e.id === emailId);
+      if (email) {
+        // Invalidate any in-flight inbox fetches before switching address
+        fetchSeqRef.current++;
+
+        try {
+          localStorage.setItem(CURRENT_EMAIL_ID_KEY, email.id);
+        } catch {
+          // ignore
+        }
+
+        setCurrentEmail(email);
+        setReceivedEmails([]);
+        // The fetchSecureEmails will be triggered by the useEffect
       }
-      setCurrentEmail(email);
-      // The fetchSecureEmails will be triggered by the useEffect
-    }
-  }, [emailHistory]);
+    },
+    [emailHistory]
+  );
 
   // Get the access token for the current email (for sharing or other uses)
   const getAccessToken = useCallback(() => {
