@@ -141,6 +141,8 @@ serve(async (req: Request): Promise<Response> => {
     // ignore (e.g. empty body)
   }
 
+  console.log(`[IMAP] Starting fetch - mode: ${mode}, limit: ${limit}`);
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -152,7 +154,7 @@ serve(async (req: Request): Promise<Response> => {
     const password = Deno.env.get("IMAP_PASSWORD");
 
     if (!host || !username || !password) {
-      console.log("IMAP configuration incomplete");
+      console.log("[IMAP] Configuration incomplete");
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -163,7 +165,7 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Connecting to IMAP server: ${host}:${port}`);
+    console.log(`[IMAP] Connecting to ${host}:${port}`);
 
     // Load allowed domains so we can reliably match recipient emails
     const { data: activeDomains, error: domainsError } = await supabase
@@ -172,13 +174,33 @@ serve(async (req: Request): Promise<Response> => {
       .eq("is_active", true);
 
     if (domainsError) {
-      console.error("Failed to load domains:", domainsError);
+      console.error("[IMAP] Failed to load domains:", domainsError);
     }
 
     const allowedDomainSuffixes = (activeDomains || [])
       .map((d: any) => String(d.name || "").toLowerCase())
       .map((name) => (name.startsWith("@") ? name.slice(1) : name))
       .filter(Boolean);
+
+    console.log(`[IMAP] Allowed domains: ${allowedDomainSuffixes.join(', ')}`);
+
+    // Load ALL active temp_emails for matching
+    const { data: activeTempEmails, error: tempEmailsError } = await supabase
+      .from("temp_emails")
+      .select("id, address")
+      .eq("is_active", true);
+
+    if (tempEmailsError) {
+      console.error("[IMAP] Failed to load temp emails:", tempEmailsError);
+    }
+
+    const tempEmailMap = new Map<string, string>();
+    (activeTempEmails || []).forEach((te: any) => {
+      const addr = String(te.address || "").toLowerCase().trim();
+      if (addr) tempEmailMap.set(addr, te.id);
+    });
+
+    console.log(`[IMAP] Active temp emails (${tempEmailMap.size}): ${Array.from(tempEmailMap.keys()).slice(0, 5).join(', ')}${tempEmailMap.size > 5 ? '...' : ''}`);
 
     const conn = await Deno.connect({
       hostname: host,
@@ -196,7 +218,12 @@ serve(async (req: Request): Promise<Response> => {
     const sendCommand = async (command: string, tagNum: number): Promise<string> => {
       const tag = `A${tagNum.toString().padStart(4, '0')}`;
       const fullCommand = `${tag} ${command}\r\n`;
-      console.log(`> ${fullCommand.trim()}`);
+      
+      // Don't log password
+      const logCmd = command.startsWith('LOGIN') 
+        ? `LOGIN "${username}" ****` 
+        : command;
+      console.log(`[IMAP] > ${tag} ${logCmd}`);
       
       await secureConn.write(encoder.encode(fullCommand));
       
@@ -215,13 +242,13 @@ serve(async (req: Request): Promise<Response> => {
         }
       }
       
-      console.log(`< Response length: ${response.length} chars`);
+      console.log(`[IMAP] < Response: ${response.length} chars`);
       return response;
     };
 
     const greeting = new Uint8Array(1024);
     await secureConn.read(greeting);
-    console.log("Server greeting received");
+    console.log("[IMAP] Server greeting received");
 
     let tagNum = 1;
 
@@ -230,6 +257,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("IMAP login failed: " + loginResponse);
     }
 
+    // SELECT INBOX to get fresh message count
     const selectResponse = await sendCommand("SELECT INBOX", tagNum++);
     if (!selectResponse.includes("OK")) {
       throw new Error("Failed to select INBOX: " + selectResponse);
@@ -237,25 +265,41 @@ serve(async (req: Request): Promise<Response> => {
 
     const existsMatch = selectResponse.match(/\* (\d+) EXISTS/);
     const messageCount = existsMatch ? parseInt(existsMatch[1]) : 0;
-    console.log(`Found ${messageCount} messages in INBOX`);
+    console.log(`[IMAP] Found ${messageCount} total messages in INBOX`);
 
-    const storedCount = { success: 0, failed: 0, skipped: 0 };
+    const storedCount = { success: 0, failed: 0, skipped: 0, noMatch: 0 };
 
     let newestMessageIds: string[] = [];
 
     if (mode === 'unseen') {
+      // Search for UNSEEN messages specifically
       const searchResponse = await sendCommand("SEARCH UNSEEN", tagNum++);
       const unseenMatch = searchResponse.match(/\* SEARCH ([\d\s]+)/);
       const unseenIds = unseenMatch ? unseenMatch[1].trim().split(/\s+/).filter(id => id) : [];
-      console.log(`Found ${unseenIds.length} unseen messages`);
+      console.log(`[IMAP] Found ${unseenIds.length} UNSEEN messages`);
       newestMessageIds = unseenIds.slice(-limit).reverse();
-      console.log(`Processing ${newestMessageIds.length} newest unseen messages`);
+      console.log(`[IMAP] Processing ${newestMessageIds.length} newest UNSEEN: [${newestMessageIds.join(', ')}]`);
     } else {
-      // Super-fast mode: only look at the latest N message sequence numbers, and skip those already seen.
+      // Latest mode: check the most recent N messages AND any UNSEEN
+      // First, get UNSEEN to ensure we don't miss newly arrived mail
+      const searchResponse = await sendCommand("SEARCH UNSEEN", tagNum++);
+      const unseenMatch = searchResponse.match(/\* SEARCH ([\d\s]+)/);
+      const unseenIds = unseenMatch ? unseenMatch[1].trim().split(/\s+/).filter(id => id) : [];
+      console.log(`[IMAP] Found ${unseenIds.length} UNSEEN in latest mode`);
+
+      // Also get the last N by sequence number
       const start = Math.max(1, messageCount - limit + 1);
-      newestMessageIds = [];
-      for (let i = messageCount; i >= start; i--) newestMessageIds.push(String(i));
-      console.log(`Latest mode: scanning last ${newestMessageIds.length} messages`);
+      const latestIds: string[] = [];
+      for (let i = messageCount; i >= start; i--) latestIds.push(String(i));
+
+      // Merge: unseen first (priority), then latest (may overlap)
+      const idSet = new Set<string>();
+      for (const id of unseenIds) idSet.add(id);
+      for (const id of latestIds) idSet.add(id);
+      
+      // Sort descending (newest first)
+      newestMessageIds = Array.from(idSet).sort((a, b) => parseInt(b) - parseInt(a)).slice(0, limit);
+      console.log(`[IMAP] Latest+UNSEEN mode: processing ${newestMessageIds.length} messages: [${newestMessageIds.join(', ')}]`);
     }
 
     for (const msgId of newestMessageIds) {
@@ -264,7 +308,12 @@ serve(async (req: Request): Promise<Response> => {
         const headerResponse = await sendCommand(`FETCH ${msgId} (FLAGS BODY[HEADER])`, tagNum++);
 
         const isSeen = /FLAGS\s*\([^)]*\\Seen/i.test(headerResponse);
-        if (mode === 'latest' && isSeen) {
+        
+        // In latest mode, skip already-seen messages UNLESS they were in unseen list
+        // Actually for simplicity: always process if in our list (we merged unseen)
+        // But skip if seen to avoid reprocessing old messages
+        if (isSeen) {
+          console.log(`[IMAP] Msg ${msgId}: already seen, skipping`);
           storedCount.skipped++;
           continue;
         }
@@ -289,11 +338,41 @@ serve(async (req: Request): Promise<Response> => {
           ...headerEmails
         ].map((e) => e.toLowerCase().trim());
 
-        const domainMatched = allowedDomainSuffixes.length
-          ? allEmails.findLast((e) => allowedDomainSuffixes.some((suffix) => e.endsWith(suffix)))
-          : undefined;
+        // Find ALL emails that match our allowed domains
+        const domainMatchedEmails = allowedDomainSuffixes.length
+          ? allEmails.filter((e) => allowedDomainSuffixes.some((suffix) => e.endsWith(suffix)))
+          : [];
 
-        const recipientEmail = (domainMatched || headerEmails[0] || '').toLowerCase().trim();
+        console.log(`[IMAP] Msg ${msgId} - To header: "${toAddress}"`);
+        console.log(`[IMAP] Msg ${msgId} - Extracted emails: [${allEmails.slice(0, 5).join(', ')}]`);
+        console.log(`[IMAP] Msg ${msgId} - Domain-matched emails: [${domainMatchedEmails.join(', ')}]`);
+
+        // Try to find a matching temp_email
+        let matchedTempEmailId: string | null = null;
+        let matchedRecipient: string | null = null;
+
+        for (const candidateEmail of domainMatchedEmails) {
+          const tempId = tempEmailMap.get(candidateEmail);
+          if (tempId) {
+            matchedTempEmailId = tempId;
+            matchedRecipient = candidateEmail;
+            console.log(`[IMAP] Msg ${msgId} - MATCHED temp_email: ${candidateEmail} -> ${tempId}`);
+            break;
+          }
+        }
+
+        if (!matchedTempEmailId) {
+          // Try header emails as fallback
+          for (const candidateEmail of headerEmails) {
+            const tempId = tempEmailMap.get(candidateEmail);
+            if (tempId) {
+              matchedTempEmailId = tempId;
+              matchedRecipient = candidateEmail;
+              console.log(`[IMAP] Msg ${msgId} - MATCHED (fallback) temp_email: ${candidateEmail} -> ${tempId}`);
+              break;
+            }
+          }
+        }
 
         // Extract sender email (clean it up)
         let fromAddress = fromMatch?.[1]?.trim() || "unknown@unknown.com";
@@ -317,92 +396,77 @@ serve(async (req: Request): Promise<Response> => {
           }
         }
 
-        if (!recipientEmail) {
-          console.log(`Could not resolve recipient for msg ${msgId}; marking seen`);
-          storedCount.skipped++;
+        if (!matchedTempEmailId) {
+          console.log(`[IMAP] Msg ${msgId} - NO MATCH found. Subject: "${subject}", From: "${fromAddress}"`);
+          console.log(`[IMAP] Msg ${msgId} - Candidates tried: [${domainMatchedEmails.concat(headerEmails).join(', ')}]`);
+          storedCount.noMatch++;
+          // Mark as seen to avoid re-processing
           await sendCommand(`STORE ${msgId} +FLAGS (\\Seen)`, tagNum++);
           continue;
         }
 
-        // Find the matching temp_email
-        const { data: tempEmail } = await supabase
-          .from("temp_emails")
-          .select("id")
-          .eq("address", recipientEmail)
-          .eq("is_active", true)
-          .single();
+        // Fetch body (bigger)
+        const bodyResponse = await sendCommand(`FETCH ${msgId} (BODY[TEXT])`, tagNum++);
 
-        if (tempEmail) {
-          // Fetch body (bigger)
-          const bodyResponse = await sendCommand(`FETCH ${msgId} (BODY[TEXT])`, tagNum++);
+        // Extract body content from BODY[TEXT] {n}\r\n... using the IMAP byte count
+        let rawBody = '';
+        const bodyMarker = /BODY\[TEXT\]\s*\{(\d+)\}\r?\n/i.exec(bodyResponse);
 
-          // Extract body content from BODY[TEXT] {n}\r\n... using the IMAP byte count
-          let rawBody = '';
-          const bodyMarker = /BODY\[TEXT\]\s*\{(\d+)\}\r?\n/i.exec(bodyResponse);
+        if (bodyMarker && typeof bodyMarker.index === 'number') {
+          const bodyLength = parseInt(bodyMarker[1], 10);
+          const bodyStartIndex = bodyMarker.index + bodyMarker[0].length;
+          rawBody = bodyResponse.slice(bodyStartIndex, bodyStartIndex + bodyLength);
+        } else {
+          const bodyStart = bodyResponse.lastIndexOf('\r\n\r\n');
+          rawBody = bodyStart > -1 ? bodyResponse.substring(bodyStart + 4) : bodyResponse;
+        }
 
-          if (bodyMarker && typeof bodyMarker.index === 'number') {
-            const bodyLength = parseInt(bodyMarker[1], 10);
-            const bodyStartIndex = bodyMarker.index + bodyMarker[0].length;
-            rawBody = bodyResponse.slice(bodyStartIndex, bodyStartIndex + bodyLength);
+        // Parse MIME content (also strips IMAP protocol artifacts)
+        const { text, html } = parseMimeContent(rawBody);
+
+        // Use text body or extract from HTML
+        let finalTextBody = text;
+        let finalHtmlBody = html;
+
+        if (!finalTextBody && finalHtmlBody) {
+          finalTextBody = extractTextFromHtml(finalHtmlBody);
+        }
+
+        if (!finalTextBody && !finalHtmlBody) {
+          finalTextBody = rawBody.trim();
+        }
+
+        // Store the email
+        const { error: insertError } = await supabase
+          .from("received_emails")
+          .insert({
+            temp_email_id: matchedTempEmailId,
+            from_address: fromAddress,
+            subject: subject,
+            body: finalTextBody.substring(0, 10000),
+            html_body: finalHtmlBody ? finalHtmlBody.substring(0, 50000) : null,
+            is_read: false,
+            received_at: dateMatch?.[1] ? new Date(dateMatch[1]).toISOString() : new Date().toISOString(),
+          });
+
+        if (insertError) {
+          if (insertError.code === '23505') {
+            console.log(`[IMAP] Msg ${msgId} - Duplicate, already exists for ${matchedRecipient}`);
+            storedCount.skipped++;
           } else {
-            const bodyStart = bodyResponse.lastIndexOf('\r\n\r\n');
-            rawBody = bodyStart > -1 ? bodyResponse.substring(bodyStart + 4) : bodyResponse;
+            console.error(`[IMAP] Msg ${msgId} - Insert error:`, insertError);
+            storedCount.failed++;
           }
-
-          // Parse MIME content (also strips IMAP protocol artifacts)
-          const { text, html } = parseMimeContent(rawBody);
-
-          // Use text body or extract from HTML
-          let finalTextBody = text;
-          let finalHtmlBody = html;
-
-          if (!finalTextBody && finalHtmlBody) {
-            finalTextBody = extractTextFromHtml(finalHtmlBody);
-          }
-
-          if (!finalTextBody && !finalHtmlBody) {
-            finalTextBody = rawBody.trim();
-          }
-
-          // Store the email
-          const { error: insertError } = await supabase
-            .from("received_emails")
-            .insert({
-              temp_email_id: tempEmail.id,
-              from_address: fromAddress,
-              subject: subject,
-              body: finalTextBody.substring(0, 10000),
-              html_body: finalHtmlBody ? finalHtmlBody.substring(0, 50000) : null,
-              is_read: false,
-              received_at: dateMatch?.[1] ? new Date(dateMatch[1]).toISOString() : new Date().toISOString(),
-            });
-
-           if (insertError) {
-             if (insertError.code === '23505') {
-               console.log(`Email already exists for ${recipientEmail}`);
-               storedCount.skipped++;
-               // Mark as seen to avoid re-processing the same message forever
-               await sendCommand(`STORE ${msgId} +FLAGS (\\Seen)`, tagNum++);
-             } else {
-               console.error("Error storing email:", insertError);
-               storedCount.failed++;
-             }
-           } else {
-             storedCount.success++;
-             console.log(`Stored email for ${recipientEmail}: "${subject}"`);
-             
-             // Mark as seen in IMAP
-             await sendCommand(`STORE ${msgId} +FLAGS (\\Seen)`, tagNum++);
-           }
-         } else {
-           console.log(`No matching temp email found for ${recipientEmail}`);
-           storedCount.skipped++;
-           // Mark as seen so we can move past irrelevant/old messages and keep polling fast
-           await sendCommand(`STORE ${msgId} +FLAGS (\\Seen)`, tagNum++);
-         }
+        } else {
+          storedCount.success++;
+          console.log(`[IMAP] Msg ${msgId} - STORED for ${matchedRecipient}: "${subject}"`);
+        }
+        
+        // Mark as seen in IMAP
+        await sendCommand(`STORE ${msgId} +FLAGS (\\Seen)`, tagNum++);
 
       } catch (emailError) {
-        console.error(`Error processing message ${msgId}:`, emailError);
+        console.error(`[IMAP] Error processing message ${msgId}:`, emailError);
         storedCount.failed++;
       }
     }
@@ -410,19 +474,21 @@ serve(async (req: Request): Promise<Response> => {
     await sendCommand("LOGOUT", tagNum++);
     secureConn.close();
 
-    console.log(`Fetch complete: ${storedCount.success} stored, ${storedCount.failed} failed, ${storedCount.skipped} skipped`);
+    console.log(`[IMAP] Complete: ${storedCount.success} stored, ${storedCount.failed} failed, ${storedCount.skipped} skipped, ${storedCount.noMatch} no-match`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Fetched and processed ${newestMessageIds.length} emails`,
+        message: `Processed ${newestMessageIds.length} emails`,
         stats: {
           mode,
           limit,
           totalMessages: messageCount,
+          processed: newestMessageIds.length,
           stored: storedCount.success,
           failed: storedCount.failed,
           skipped: storedCount.skipped,
+          noMatch: storedCount.noMatch,
           fetchedAt: new Date().toISOString()
         }
       }),
@@ -430,7 +496,7 @@ serve(async (req: Request): Promise<Response> => {
     );
 
   } catch (error: any) {
-    console.error("IMAP fetch error:", error);
+    console.error("[IMAP] Fetch error:", error);
     
     let errorMessage = error.message || "Failed to fetch emails";
     

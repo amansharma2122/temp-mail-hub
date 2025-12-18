@@ -140,12 +140,20 @@ const Inbox = () => {
   }, [currentEmail?.id]);
 
 
-  // Check for new emails from IMAP server
+  // Check for new emails from IMAP server - use 'unseen' mode for manual checks
   const handleCheckMail = async () => {
     setIsCheckingMail(true);
     try {
-      await triggerImapFetch({ mode: "latest", limit: 10 });
-      toast.success('Checked for new emails from mail server');
+      // Use 'unseen' mode for manual check to specifically target unread messages
+      const result = await triggerImapFetch({ mode: "unseen", limit: 20 });
+      const stats = result?.stats;
+      if (stats?.stored > 0) {
+        toast.success(`Found ${stats.stored} new email${stats.stored > 1 ? 's' : ''}!`);
+      } else if (stats?.noMatch > 0) {
+        toast.info(`${stats.noMatch} emails found but none matched your temp address`);
+      } else {
+        toast.info('No new emails found');
+      }
     } catch (error) {
       console.error('Error checking mail:', error);
       toast.error('Failed to check for new emails');
@@ -173,9 +181,23 @@ const Inbox = () => {
 
       if (error) throw error;
 
-      toast.success('Test email sent. Fetching new mail…');
-      await triggerImapFetch({ mode: "latest", limit: 10 });
-      toast.success('Inbox updated');
+      toast.success('Test email sent! Waiting for delivery...');
+      
+      // Wait a few seconds for SMTP delivery before fetching
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      toast.loading('Checking for new mail...');
+      const result = await triggerImapFetch({ mode: "unseen", limit: 20 });
+      toast.dismiss();
+      
+      const stats = result?.stats;
+      if (stats?.stored > 0) {
+        toast.success(`Email received! ${stats.stored} new message${stats.stored > 1 ? 's' : ''}`);
+      } else if (stats?.noMatch > 0) {
+        toast.warning('Email arrived but did not match your temp address. Check the logs.');
+      } else {
+        toast.info('No new emails yet. Try clicking Check Mail again in a few seconds.');
+      }
     } catch (error: any) {
       console.error('Error sending test email:', error);
       toast.error(error?.message || 'Failed to send test email');
