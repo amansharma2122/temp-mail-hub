@@ -1,21 +1,22 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, RefreshCw, Trash2, Star, Clock, User, ChevronRight, Inbox as InboxIcon } from "lucide-react";
+import { Mail, RefreshCw, Trash2, Star, Clock, User, ChevronRight, Inbox as InboxIcon, TestTube } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEmailService, ReceivedEmail } from "@/hooks/useEmailService";
-import { useAuth } from "@/hooks/useAuth";
+import { useEmailService, ReceivedEmail } from "@/hooks/useLocalEmailService";
+import { useAuth } from "@/hooks/useLocalAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { formatDistanceToNow } from "date-fns";
 
 const Inbox = () => {
   const { user } = useAuth();
-  const { receivedEmails, isLoading, markAsRead, saveEmail, generateEmail, currentEmail } = useEmailService();
+  const { t } = useLanguage();
+  const { receivedEmails, isLoading, markAsRead, saveEmail, currentEmail, simulateIncomingEmail } = useEmailService();
   const [selectedEmail, setSelectedEmail] = useState<ReceivedEmail | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [savedEmails, setSavedEmails] = useState<Set<string>>(new Set());
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Just trigger a re-render, real-time handles updates
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
@@ -28,7 +29,7 @@ const Inbox = () => {
 
   const handleSave = async (emailId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const success = await saveEmail(emailId);
+    const success = saveEmail(emailId);
     if (success) {
       setSavedEmails(prev => new Set([...prev, emailId]));
     }
@@ -50,20 +51,31 @@ const Inbox = () => {
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <Mail className="w-5 h-5 text-primary" />
-            <h2 className="font-semibold text-foreground">Inbox</h2>
+            <h2 className="font-semibold text-foreground">{t('inbox')}</h2>
             <span className="bg-primary/20 text-primary text-xs px-2 py-1 rounded-full">
               {receivedEmails.filter(e => !e.is_read).length} new
             </span>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={simulateIncomingEmail}
+              title="Simulate receiving an email (for demo)"
+            >
+              <TestTube className="w-4 h-4" />
+              Test
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {t('refresh')}
+            </Button>
+          </div>
         </div>
 
         {/* Email List */}
@@ -81,13 +93,17 @@ const Inbox = () => {
                 className="p-12 text-center"
               >
                 <InboxIcon className="w-16 h-16 mx-auto text-muted-foreground mb-4 opacity-50" />
-                <p className="text-foreground font-medium mb-2">No emails yet</p>
+                <p className="text-foreground font-medium mb-2">{t('noEmails')}</p>
                 <p className="text-sm text-muted-foreground">
-                  Waiting for incoming messages at:
+                  {t('waitingForMessages')}
                 </p>
-                <p className="text-sm text-primary font-mono mt-1">
+                <p className="text-sm text-primary font-mono mt-2">
                   {currentEmail?.address || "..."}
                 </p>
+                <Button variant="glass" className="mt-4" onClick={simulateIncomingEmail}>
+                  <TestTube className="w-4 h-4 mr-2" />
+                  Send Test Email
+                </Button>
               </motion.div>
             ) : (
               receivedEmails.map((email, index) => (
@@ -103,12 +119,10 @@ const Inbox = () => {
                   } ${selectedEmail?.id === email.id ? 'bg-secondary/50' : ''}`}
                 >
                   <div className="flex items-start gap-4">
-                    {/* Avatar */}
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
                       <User className="w-5 h-5 text-primary" />
                     </div>
 
-                    {/* Email Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <span className={`text-sm truncate ${!email.is_read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
@@ -120,14 +134,13 @@ const Inbox = () => {
                         </div>
                       </div>
                       <p className={`text-sm truncate ${!email.is_read ? 'font-medium text-foreground' : 'text-foreground/80'}`}>
-                        {email.subject || "(No subject)"}
+                        {email.subject || t('noSubject')}
                       </p>
                       <p className="text-xs text-muted-foreground truncate mt-1">
-                        {email.body?.slice(0, 100) || "(No content)"}
+                        {email.body?.slice(0, 100) || t('noContent')}
                       </p>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       {user && (
                         <button
@@ -160,10 +173,10 @@ const Inbox = () => {
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-foreground">
-                    {selectedEmail.subject || "(No subject)"}
+                    {selectedEmail.subject || t('noSubject')}
                   </h3>
                   <Button variant="ghost" size="sm" onClick={() => setSelectedEmail(null)}>
-                    Close
+                    {t('close')}
                   </Button>
                 </div>
                 <div className="flex items-center gap-3 mb-4">
@@ -182,7 +195,7 @@ const Inbox = () => {
                       dangerouslySetInnerHTML={{ __html: selectedEmail.html_body }} 
                     />
                   ) : (
-                    <p className="text-foreground/80 whitespace-pre-wrap">{selectedEmail.body || "(No content)"}</p>
+                    <p className="text-foreground/80 whitespace-pre-wrap">{selectedEmail.body || t('noContent')}</p>
                   )}
                 </div>
               </div>

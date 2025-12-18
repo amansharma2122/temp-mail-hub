@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useLocalAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -10,6 +11,7 @@ import { Loader2 } from "lucide-react";
 
 const AdminLayout = () => {
   const { user, isAdmin, isLoading } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,9 +29,20 @@ const AdminLayout = () => {
     );
   }
 
-  if (!user || !isAdmin) {
-    return null;
-  }
+  if (!user || !isAdmin) return null;
+
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (path === "/admin") return t('dashboard');
+    if (path.includes("users")) return t('users');
+    if (path.includes("domains")) return t('domains');
+    if (path.includes("emails")) return t('emails');
+    if (path.includes("blogs")) return t('blogs');
+    if (path.includes("pages")) return t('pages');
+    if (path.includes("themes")) return t('themes');
+    if (path.includes("settings")) return t('settings');
+    return "";
+  };
 
   return (
     <SidebarProvider>
@@ -38,13 +51,7 @@ const AdminLayout = () => {
         <div className="flex-1 flex flex-col">
           <header className="h-14 border-b border-border flex items-center px-4 bg-card/50 backdrop-blur-xl sticky top-0 z-10">
             <SidebarTrigger className="mr-4" />
-            <h1 className="text-lg font-semibold text-foreground">
-              {location.pathname === "/admin" && "Dashboard"}
-              {location.pathname === "/admin/users" && "User Management"}
-              {location.pathname === "/admin/domains" && "Domain Management"}
-              {location.pathname === "/admin/emails" && "Email Statistics"}
-              {location.pathname === "/admin/settings" && "Settings"}
-            </h1>
+            <h1 className="text-lg font-semibold text-foreground">{getPageTitle()}</h1>
           </header>
           <main className="flex-1 p-6 overflow-auto">
             <Outlet />

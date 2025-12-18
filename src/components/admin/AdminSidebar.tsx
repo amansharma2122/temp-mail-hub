@@ -6,6 +6,9 @@ import {
   Mail,
   Settings,
   ArrowLeft,
+  FileText,
+  Palette,
+  Newspaper,
 } from "lucide-react";
 import {
   Sidebar,
@@ -22,24 +25,27 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const menuItems = [
-  { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-  { title: "Users", url: "/admin/users", icon: Users },
-  { title: "Domains", url: "/admin/domains", icon: Globe },
-  { title: "Emails", url: "/admin/emails", icon: Mail },
-  { title: "Settings", url: "/admin/settings", icon: Settings },
-];
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const AdminSidebar = () => {
   const location = useLocation();
   const { state } = useSidebar();
+  const { t } = useLanguage();
   const collapsed = state === "collapsed";
 
+  const menuItems = [
+    { title: t('dashboard'), url: "/admin", icon: LayoutDashboard },
+    { title: t('users'), url: "/admin/users", icon: Users },
+    { title: t('domains'), url: "/admin/domains", icon: Globe },
+    { title: t('emails'), url: "/admin/emails", icon: Mail },
+    { title: t('blogs'), url: "/admin/blogs", icon: Newspaper },
+    { title: t('pages'), url: "/admin/pages", icon: FileText },
+    { title: t('themes'), url: "/admin/themes", icon: Palette },
+    { title: t('settings'), url: "/admin/settings", icon: Settings },
+  ];
+
   const isActive = (path: string) => {
-    if (path === "/admin") {
-      return location.pathname === "/admin";
-    }
+    if (path === "/admin") return location.pathname === "/admin";
     return location.pathname.startsWith(path);
   };
 
@@ -53,7 +59,7 @@ const AdminSidebar = () => {
           {!collapsed && (
             <div>
               <p className="font-semibold text-foreground">TrashMails</p>
-              <p className="text-xs text-muted-foreground">Admin Panel</p>
+              <p className="text-xs text-muted-foreground">{t('adminPanel')}</p>
             </div>
           )}
         </div>
@@ -92,7 +98,7 @@ const AdminSidebar = () => {
         <Button variant="ghost" className="w-full justify-start" asChild>
           <NavLink to="/" className="flex items-center gap-2">
             <ArrowLeft className="w-4 h-4" />
-            {!collapsed && <span>Back to Site</span>}
+            {!collapsed && <span>{t('backToSite')}</span>}
           </NavLink>
         </Button>
       </SidebarFooter>

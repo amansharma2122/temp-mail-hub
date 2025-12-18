@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, RefreshCw, Check, QrCode, Star, Volume2 } from "lucide-react";
+import { Copy, RefreshCw, Check, QrCode, Star, Volume2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -11,21 +12,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useEmailService } from "@/hooks/useEmailService";
-import { useAuth } from "@/hooks/useAuth";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useEmailService } from "@/hooks/useLocalEmailService";
+import { useAuth } from "@/hooks/useLocalAuth";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const EmailGenerator = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { 
     domains, 
     currentEmail, 
     isGenerating, 
     generateEmail, 
-    changeDomain 
+    changeDomain,
+    addCustomDomain,
   } = useEmailService();
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [customDomainDialog, setCustomDomainDialog] = useState(false);
+  const [newDomain, setNewDomain] = useState("");
 
   const copyToClipboard = async () => {
     if (!currentEmail) return;
@@ -59,6 +72,13 @@ const EmailGenerator = () => {
     toast.success(soundEnabled ? "Sound notifications disabled" : "Sound notifications enabled");
   };
 
+  const handleAddCustomDomain = () => {
+    if (addCustomDomain(newDomain)) {
+      setNewDomain("");
+      setCustomDomainDialog(false);
+    }
+  };
+
   const currentDomain = domains.find(d => d.id === currentEmail?.domain_id);
 
   return (
@@ -70,7 +90,7 @@ const EmailGenerator = () => {
     >
       <div className="glass-card p-6 md:p-8">
         <div className="text-center mb-6">
-          <p className="text-muted-foreground text-sm mb-2">Your Temporary Email Address</p>
+          <p className="text-muted-foreground text-sm mb-2">{t('yourTempEmail')}</p>
         </div>
 
         {/* Email Display */}
@@ -87,7 +107,7 @@ const EmailGenerator = () => {
           </motion.div>
           
           {/* Domain Selector */}
-          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
             <Select 
               value={currentDomain?.id || ""} 
               onValueChange={changeDomain}
@@ -99,11 +119,21 @@ const EmailGenerator = () => {
               <SelectContent>
                 {domains.map((domain) => (
                   <SelectItem key={domain.id} value={domain.id}>
-                    {domain.name} {domain.is_premium && "⭐"}
+                    {domain.name} {domain.is_premium && "⭐"} {domain.is_custom && "🔧"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {user && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCustomDomainDialog(true)}
+                title="Add custom domain"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -118,11 +148,11 @@ const EmailGenerator = () => {
           >
             {copied ? (
               <>
-                <Check className="w-4 h-4" /> Copied!
+                <Check className="w-4 h-4" /> {t('copied')}
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4" /> Copy
+                <Copy className="w-4 h-4" /> {t('copy')}
               </>
             )}
           </Button>
@@ -134,7 +164,7 @@ const EmailGenerator = () => {
             disabled={isGenerating}
           >
             <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-            New Email
+            {t('newEmail')}
           </Button>
 
           <Button
@@ -144,12 +174,12 @@ const EmailGenerator = () => {
             disabled={!currentEmail}
           >
             <QrCode className="w-4 h-4" />
-            QR Code
+            {t('qrCode')}
           </Button>
 
           <Button variant="glass" size="lg" onClick={handleSave}>
             <Star className="w-4 h-4" />
-            Save
+            {t('save')}
           </Button>
 
           <Button 
@@ -158,7 +188,7 @@ const EmailGenerator = () => {
             onClick={toggleSound}
           >
             <Volume2 className="w-4 h-4" />
-            Sound
+            {t('sound')}
           </Button>
         </div>
 
@@ -179,10 +209,35 @@ const EmailGenerator = () => {
         {/* Expiration Notice */}
         {currentEmail && (
           <p className="text-center text-xs text-muted-foreground mt-4">
-            This email will expire in 1 hour. {!user && "Sign in to extend duration."}
+            {t('expiresIn')} {!user && t('signInToExtend')}
           </p>
         )}
       </div>
+
+      {/* Custom Domain Dialog */}
+      <Dialog open={customDomainDialog} onOpenChange={setCustomDomainDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Custom Domain</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-2 block">Domain Name</label>
+            <Input
+              placeholder="@yourdomain.com"
+              value={newDomain}
+              onChange={(e) => setNewDomain(e.target.value)}
+              className="bg-secondary/50"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Note: Custom domains work for demo purposes. In production, DNS configuration would be required.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCustomDomainDialog(false)}>Cancel</Button>
+            <Button variant="neon" onClick={handleAddCustomDomain}>Add Domain</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };
