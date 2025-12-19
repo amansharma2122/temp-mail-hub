@@ -62,6 +62,7 @@ import AdminRateLimits from "./pages/admin/AdminRateLimits";
 import AdminRoleApprovals from "./pages/admin/AdminRoleApprovals";
 import AdminSettingsOverview from "./pages/admin/AdminSettingsOverview";
 import AdminRegistration from "./pages/admin/AdminRegistration";
+import AdminPayments from "./pages/admin/AdminPayments";
 
 // Initialize default data on app load
 initializeDefaultData();
@@ -150,6 +151,7 @@ const App = () => (
                       <Route path="appearance" element={<AdminAppearance />} />
                       <Route path="user-settings" element={<AdminUserSettings />} />
                       <Route path="registration" element={<AdminRegistration />} />
+                      <Route path="payments" element={<AdminPayments />} />
                       <Route path="admins" element={<AdminAdmins />} />
                       <Route path="seo" element={<AdminSEO />} />
                       <Route path="blog-settings" element={<AdminBlogSettings />} />

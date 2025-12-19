@@ -12,6 +12,7 @@ import { Settings, Save } from "lucide-react";
 
 const GENERAL_SETTINGS_KEY = 'trashmails_general_settings';
 
+// Site Status settings moved to AdminRegistration.tsx to avoid duplicates
 interface GeneralSettings {
   siteName: string;
   siteTagline: string;
@@ -20,8 +21,6 @@ interface GeneralSettings {
   supportEmail: string;
   timezone: string;
   dateFormat: string;
-  maintenanceMode: boolean;
-  registrationEnabled: boolean;
 }
 
 const defaultSettings: GeneralSettings = {
@@ -32,8 +31,6 @@ const defaultSettings: GeneralSettings = {
   supportEmail: 'support@nullsto.com',
   timezone: 'UTC',
   dateFormat: 'YYYY-MM-DD',
-  maintenanceMode: false,
-  registrationEnabled: true,
 };
 
 const AdminGeneralSettings = () => {
@@ -232,34 +229,7 @@ const AdminGeneralSettings = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Site Status</CardTitle>
-            <CardDescription>Control site availability and features</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Maintenance Mode</Label>
-                <p className="text-sm text-muted-foreground">Enable to show maintenance page to visitors</p>
-              </div>
-              <Switch
-                checked={settings.maintenanceMode}
-                onCheckedChange={(checked) => updateSetting('maintenanceMode', checked)}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>User Registration</Label>
-                <p className="text-sm text-muted-foreground">Allow new users to register</p>
-              </div>
-              <Switch
-                checked={settings.registrationEnabled}
-                onCheckedChange={(checked) => updateSetting('registrationEnabled', checked)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Site Status settings are in Registration Control page */}
       </div>
     </div>
   );
