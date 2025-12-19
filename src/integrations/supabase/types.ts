@@ -880,6 +880,13 @@ export type Database = {
       }
     }
     Functions: {
+      add_admin_role: {
+        Args: {
+          target_role: Database["public"]["Enums"]["app_role"]
+          target_user_id: string
+        }
+        Returns: boolean
+      }
       admin_get_all_profiles: {
         Args: never
         Returns: {
@@ -908,7 +915,31 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      delete_user_as_admin: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
+      find_user_by_email: {
+        Args: { search_email: string }
+        Returns: {
+          found_display_name: string
+          found_email: string
+          found_role: string
+          found_user_id: string
+        }[]
+      }
       generate_secret_token: { Args: never; Returns: string }
+      get_admin_users: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          role: string
+          user_id: string
+        }[]
+      }
       get_all_profiles_for_admin: {
         Args: { p_page?: number; p_page_size?: number; p_search?: string }
         Returns: {
@@ -941,6 +972,7 @@ export type Database = {
         }
         Returns: string
       }
+      remove_admin_role: { Args: { target_user_id: string }; Returns: boolean }
       verify_temp_email_token: {
         Args: { p_temp_email_id: string; p_token: string }
         Returns: boolean

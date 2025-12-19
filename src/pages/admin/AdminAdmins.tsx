@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { storage, generateId } from "@/lib/storage";
-import { Shield, Plus, Trash2, Crown } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Shield, Plus, Trash2, Crown, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -31,71 +31,176 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
-interface Admin {
+interface AdminUser {
   id: string;
-  email: string;
-  name: string;
-  role: 'super_admin' | 'admin' | 'moderator';
-  createdAt: string;
-  lastLogin?: string;
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  role: string;
+  created_at: string;
 }
 
-const ADMINS_KEY = 'trashmails_admins';
-
 const AdminAdmins = () => {
-  const [admins, setAdmins] = useState<Admin[]>(() =>
-    storage.get<Admin[]>(ADMINS_KEY, [
-      { id: '1', email: 'admin@trashmails.io', name: 'Super Admin', role: 'super_admin', createdAt: new Date().toISOString() }
-    ])
-  );
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newAdmin, setNewAdmin] = useState({ email: '', name: '', role: 'admin' as Admin['role'] });
+  const [searchEmail, setSearchEmail] = useState("");
+  const [selectedRole, setSelectedRole] = useState<"admin" | "moderator">("admin");
+  const [isSearching, setIsSearching] = useState(false);
+  const [foundUser, setFoundUser] = useState<{
+    user_id: string;
+    email: string;
+    display_name: string;
+    current_role: string;
+  } | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
 
-  const saveAdmins = (updated: Admin[]) => {
-    storage.set(ADMINS_KEY, updated);
-    setAdmins(updated);
+  const fetchAdmins = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_admin_users');
+
+      if (error) throw error;
+
+      if (data) {
+        setAdmins(data.map((row: any) => ({
+          id: row.id,
+          user_id: row.user_id,
+          email: row.email,
+          display_name: row.display_name,
+          role: row.role,
+          created_at: row.created_at
+        })));
+      }
+    } catch (error: any) {
+      console.error("Error fetching admins:", error);
+      toast.error(error.message || "Failed to load admins");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const addAdmin = () => {
-    if (!newAdmin.email || !newAdmin.name) {
-      toast.error("Please fill all fields");
+  useEffect(() => {
+    fetchAdmins();
+  }, []);
+
+  const searchUser = async () => {
+    if (!searchEmail.trim()) {
+      toast.error("Please enter an email address");
       return;
     }
-    if (admins.find(a => a.email === newAdmin.email)) {
-      toast.error("Admin with this email already exists");
-      return;
+
+    setIsSearching(true);
+    setFoundUser(null);
+
+    try {
+      const { data, error } = await supabase.rpc('find_user_by_email', {
+        search_email: searchEmail.trim()
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const user = data[0];
+        setFoundUser({
+          user_id: user.found_user_id,
+          email: user.found_email,
+          display_name: user.found_display_name,
+          current_role: user.found_role
+        });
+      } else {
+        toast.error("No user found with that email");
+      }
+    } catch (error: any) {
+      console.error("Error searching user:", error);
+      toast.error(error.message || "Failed to search user");
+    } finally {
+      setIsSearching(false);
     }
-    const admin: Admin = {
-      id: generateId(),
-      ...newAdmin,
-      createdAt: new Date().toISOString(),
-    };
-    saveAdmins([...admins, admin]);
-    setNewAdmin({ email: '', name: '', role: 'admin' });
-    setIsDialogOpen(false);
-    toast.success("Admin added successfully!");
   };
 
-  const removeAdmin = (id: string) => {
-    const admin = admins.find(a => a.id === id);
-    if (admin?.role === 'super_admin') {
-      toast.error("Cannot remove super admin");
+  const addAdmin = async () => {
+    if (!foundUser) {
+      toast.error("Please search for a user first");
       return;
     }
-    saveAdmins(admins.filter(a => a.id !== id));
-    toast.success("Admin removed");
+
+    if (foundUser.current_role === 'admin' || foundUser.current_role === 'moderator') {
+      toast.error("This user is already an admin or moderator");
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      const { error } = await supabase.rpc('add_admin_role', {
+        target_user_id: foundUser.user_id,
+        target_role: selectedRole
+      });
+
+      if (error) throw error;
+
+      toast.success(`${foundUser.display_name || foundUser.email} is now a ${selectedRole}`);
+      setIsDialogOpen(false);
+      setSearchEmail("");
+      setFoundUser(null);
+      setSelectedRole("admin");
+      fetchAdmins();
+    } catch (error: any) {
+      console.error("Error adding admin:", error);
+      toast.error(error.message || "Failed to add admin");
+    } finally {
+      setIsAdding(false);
+    }
   };
 
-  const getRoleBadge = (role: Admin['role']) => {
+  const removeAdmin = async (userId: string) => {
+    setRemovingUserId(userId);
+    try {
+      const { error } = await supabase.rpc('remove_admin_role', {
+        target_user_id: userId
+      });
+
+      if (error) throw error;
+
+      toast.success("Admin role removed");
+      fetchAdmins();
+    } catch (error: any) {
+      console.error("Error removing admin:", error);
+      toast.error(error.message || "Failed to remove admin");
+    } finally {
+      setRemovingUserId(null);
+    }
+  };
+
+  const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'super_admin':
-        return <Badge className="bg-yellow-500/20 text-yellow-500"><Crown className="w-3 h-3 mr-1" /> Super Admin</Badge>;
       case 'admin':
-        return <Badge className="bg-blue-500/20 text-blue-500">Admin</Badge>;
+        return <Badge className="bg-blue-500/20 text-blue-500"><Crown className="w-3 h-3 mr-1" /> Admin</Badge>;
+      case 'moderator':
+        return <Badge className="bg-purple-500/20 text-purple-500">Moderator</Badge>;
       default:
-        return <Badge className="bg-gray-500/20 text-gray-500">Moderator</Badge>;
+        return <Badge className="bg-gray-500/20 text-gray-500">{role}</Badge>;
     }
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setSearchEmail("");
+    setFoundUser(null);
+    setSelectedRole("admin");
   };
 
   return (
@@ -108,47 +213,72 @@ const AdminAdmins = () => {
           </h1>
           <p className="text-muted-foreground">Manage admin users and permissions</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => open ? setIsDialogOpen(true) : handleDialogClose()}>
           <DialogTrigger asChild>
             <Button><Plus className="w-4 h-4 mr-2" /> Add Admin</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Admin</DialogTitle>
-              <DialogDescription>Grant admin access to a user</DialogDescription>
+              <DialogDescription>Search for a user by email and grant them admin access</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={newAdmin.name}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
-                />
+                <Label htmlFor="email">User Email</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={searchEmail}
+                    onChange={(e) => {
+                      setSearchEmail(e.target.value);
+                      setFoundUser(null);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && searchUser()}
+                  />
+                  <Button 
+                    variant="secondary" 
+                    onClick={searchUser}
+                    disabled={isSearching}
+                  >
+                    {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newAdmin.email}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={newAdmin.role} onValueChange={(v) => setNewAdmin({ ...newAdmin, role: v as Admin['role'] })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="moderator">Moderator</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
+              {foundUser && (
+                <div className="p-4 border border-border rounded-lg bg-secondary/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{foundUser.display_name || "Unknown"}</p>
+                      <p className="text-sm text-muted-foreground">{foundUser.email}</p>
+                    </div>
+                    <Badge variant="outline">{foundUser.current_role}</Badge>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Assign Role</Label>
+                    <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as "admin" | "moderator")}>
+                      <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="moderator">Moderator</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button onClick={addAdmin}>Add Admin</Button>
+              <Button variant="outline" onClick={handleDialogClose}>Cancel</Button>
+              <Button 
+                onClick={addAdmin} 
+                disabled={!foundUser || isAdding}
+              >
+                {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Add Admin
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -157,39 +287,77 @@ const AdminAdmins = () => {
       <Card>
         <CardHeader>
           <CardTitle>Admin Users</CardTitle>
-          <CardDescription>{admins.length} admin(s) configured</CardDescription>
+          <CardDescription>{admins.length} admin(s) / moderator(s) configured</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Added</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {admins.map((admin) => (
-                <TableRow key={admin.id}>
-                  <TableCell className="font-medium">{admin.name}</TableCell>
-                  <TableCell>{admin.email}</TableCell>
-                  <TableCell>{getRoleBadge(admin.role)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(admin.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {admin.role !== 'super_admin' && (
-                      <Button variant="ghost" size="sm" onClick={() => removeAdmin(admin.id)} className="text-destructive">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </TableCell>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : admins.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No admins found
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Added</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {admins.map((admin) => (
+                  <TableRow key={admin.id}>
+                    <TableCell className="font-medium">{admin.display_name || "Unknown"}</TableCell>
+                    <TableCell>{admin.email || "N/A"}</TableCell>
+                    <TableCell>{getRoleBadge(admin.role)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(admin.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-destructive"
+                            disabled={removingUserId === admin.user_id}
+                          >
+                            {removingUserId === admin.user_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove Admin</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to remove admin privileges from {admin.display_name || admin.email}? They will be demoted to a regular user.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              className="bg-destructive hover:bg-destructive/90"
+                              onClick={() => removeAdmin(admin.user_id)}
+                            >
+                              Remove Admin
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
