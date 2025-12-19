@@ -65,6 +65,7 @@ import AdminRegistration from "./pages/admin/AdminRegistration";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminIPBlocking from "./pages/admin/AdminIPBlocking";
 import Pricing from "./pages/Pricing";
+import BillingHistory from "./pages/BillingHistory";
 
 // Initialize default data on app load
 initializeDefaultData();
@@ -99,6 +100,11 @@ const App = () => (
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/cookies" element={<CookiePolicy />} />
                     <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/billing" element={
+                      <ProtectedRoute requireAuth>
+                        <BillingHistory />
+                      </ProtectedRoute>
+                    } />
                     {/* Protected User Routes - Require Authentication */}
                     <Route path="/history" element={
                       <ProtectedRoute requireAuth>
