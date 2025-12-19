@@ -154,7 +154,12 @@ async function trySendEmail(
       from: `${emailData.siteName} <${config.fromAddress}>`,
       to: emailData.to,
       subject: emailData.subject,
+      content: "auto",
       html: emailData.html,
+      headers: {
+        "MIME-Version": "1.0",
+        "Content-Type": "text/html; charset=UTF-8",
+      },
     });
 
     await client.close();

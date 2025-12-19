@@ -269,16 +269,14 @@ Message-ID: ${messageId}
     await client.send({
       from: `${config.fromName} <${config.fromEmail}>`,
       to: recipientEmail,
-      replyTo: config.fromEmail,
       subject: subject,
-      content: plainTextBody,
+      content: "auto",
       html: emailBody,
       headers: {
         "Message-ID": messageId,
         "X-Mailer": "Nullsto Mail System",
-        "X-Priority": "3",
-        "X-Auto-Response-Suppress": "All",
-        "List-Unsubscribe": `<mailto:${config.fromEmail}?subject=unsubscribe>`,
+        "MIME-Version": "1.0",
+        "Content-Type": "text/html; charset=UTF-8",
       },
     });
 
