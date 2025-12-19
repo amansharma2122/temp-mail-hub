@@ -15,6 +15,15 @@ interface AuthEmailRequest {
   name?: string;
 }
 
+interface MailboxConfig {
+  mailbox_id: string;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_password: string;
+  smtp_from: string;
+}
+
 // Helper to format date
 const formatDate = (): string => {
   return new Date().toLocaleDateString("en-US", {
@@ -87,13 +96,10 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Fetch general settings
-    const { data: settingsData } = await supabase.from("app_settings").select("value").eq("key", "general").single();
+    const { data: settingsData } = await supabase.from("app_settings").select("value").eq("key", "general_settings").single();
 
     const siteName = settingsData?.value?.siteName || "Nullsto";
-    const siteUrl =
-      settingsData?.value?.siteUrl ||
-      Deno.env.get("SUPABASE_URL")?.replace(".supabase.co", "") ||
-      "https://nullsto.com";
+    const siteUrl = settingsData?.value?.siteUrl || "https://nullsto.com";
 
     // Build action URL
     let actionUrl = redirectUrl || siteUrl;
@@ -148,15 +154,38 @@ serve(async (req: Request): Promise<Response> => {
     subject = replaceVariables(subject);
     body = replaceVariables(body);
 
-    // Get SMTP settings
-    const host = Deno.env.get("SMTP_HOST");
-    const port = parseInt(Deno.env.get("SMTP_PORT") || "587");
-    const username = Deno.env.get("SMTP_USER");
-    const password = Deno.env.get("SMTP_PASSWORD");
+    // Get SMTP settings from mailbox load balancer
+    let mailboxConfig: MailboxConfig | null = null;
+    let host: string | undefined;
+    let port: number = 587;
+    let username: string | undefined;
+    let password: string | undefined;
+    let fromAddress: string | undefined;
+
+    // Try to get mailbox from database using load balancer
+    const { data: mailboxData, error: mailboxError } = await supabase.rpc('select_available_mailbox');
+    
+    if (!mailboxError && mailboxData && mailboxData.length > 0) {
+      mailboxConfig = mailboxData[0] as MailboxConfig;
+      host = mailboxConfig.smtp_host;
+      port = mailboxConfig.smtp_port;
+      username = mailboxConfig.smtp_user;
+      password = mailboxConfig.smtp_password;
+      fromAddress = mailboxConfig.smtp_from || username;
+      console.log(`[auth-email-hook] Using mailbox: ${mailboxConfig.mailbox_id}`);
+    } else {
+      // Fallback to environment variables
+      console.log('[auth-email-hook] No mailbox available, falling back to env vars');
+      host = Deno.env.get("SMTP_HOST");
+      port = parseInt(Deno.env.get("SMTP_PORT") || "587");
+      username = Deno.env.get("SMTP_USER");
+      password = Deno.env.get("SMTP_PASSWORD");
+      fromAddress = Deno.env.get("SMTP_FROM") || username;
+    }
 
     if (!host || !username || !password) {
       console.error("[auth-email-hook] Missing SMTP configuration");
-      return new Response(JSON.stringify({ success: false, error: "SMTP configuration incomplete" }), {
+      return new Response(JSON.stringify({ success: false, error: "SMTP configuration incomplete. Please configure a mailbox in Admin > Mailboxes." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -227,21 +256,37 @@ serve(async (req: Request): Promise<Response> => {
       </html>
     `;
 
-    await client.send({
-      from: `${siteName} <${username}>`,
-      to: email,
-      subject: subject,
-      html: htmlBody,
-    });
+    try {
+      await client.send({
+        from: `${siteName} <${fromAddress}>`,
+        to: email,
+        subject: subject,
+        html: htmlBody,
+      });
 
-    await client.close();
+      await client.close();
 
-    console.log(`[auth-email-hook] ${type} email sent successfully to ${email}`);
+      // Increment mailbox usage if using database mailbox
+      if (mailboxConfig) {
+        await supabase.rpc('increment_mailbox_usage', { p_mailbox_id: mailboxConfig.mailbox_id });
+      }
 
-    return new Response(JSON.stringify({ success: true, message: `${type} email sent to ${email}` }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      console.log(`[auth-email-hook] ${type} email sent successfully to ${email}`);
+
+      return new Response(JSON.stringify({ success: true, message: `${type} email sent to ${email}` }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (sendError: any) {
+      // Record error if using database mailbox
+      if (mailboxConfig) {
+        await supabase.rpc('record_mailbox_error', { 
+          p_mailbox_id: mailboxConfig.mailbox_id, 
+          p_error: sendError.message 
+        });
+      }
+      throw sendError;
+    }
   } catch (error: any) {
     console.error("[auth-email-hook] Error:", error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {

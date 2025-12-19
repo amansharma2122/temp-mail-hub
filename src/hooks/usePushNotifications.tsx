@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-
-const VAPID_PUBLIC_KEY = "YOUR_VAPID_PUBLIC_KEY"; // Replace with your VAPID key
+import { supabase } from "@/integrations/supabase/client";
 
 interface PushSubscriptionData {
   endpoint: string;
@@ -14,10 +13,11 @@ export const usePushNotifications = () => {
   const [isPermissionGranted, setIsPermissionGranted] = useState(false);
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [vapidKey, setVapidKey] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSupport = async () => {
-      const supported = "serviceWorker" in navigator && "PushManager" in window;
+      const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
       setIsSupported(supported);
 
       if (supported) {
@@ -25,14 +25,37 @@ export const usePushNotifications = () => {
         setIsPermissionGranted(permission === "granted");
 
         if (permission === "granted") {
-          const registration = await navigator.serviceWorker.ready;
-          const existingSub = await registration.pushManager.getSubscription();
-          setSubscription(existingSub);
+          try {
+            const registration = await navigator.serviceWorker.ready;
+            const existingSub = await registration.pushManager.getSubscription();
+            setSubscription(existingSub);
+          } catch (error) {
+            console.log("Could not get existing subscription:", error);
+          }
         }
       }
     };
 
+    // Try to load VAPID key from settings
+    const loadVapidKey = async () => {
+      try {
+        const { data } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'push_notifications')
+          .single();
+        
+        const value = data?.value as { vapidPublicKey?: string } | null;
+        if (value?.vapidPublicKey) {
+          setVapidKey(value.vapidPublicKey);
+        }
+      } catch (error) {
+        console.log("VAPID key not configured");
+      }
+    };
+
     checkSupport();
+    loadVapidKey();
   }, []);
 
   const requestPermission = async (): Promise<boolean> => {
@@ -48,8 +71,10 @@ export const usePushNotifications = () => {
 
       if (granted) {
         toast.success("Notifications enabled!");
+      } else if (permission === "denied") {
+        toast.error("Notification permission denied. Please enable in browser settings.");
       } else {
-        toast.error("Notification permission denied");
+        toast.info("Notification permission dismissed");
       }
 
       return granted;
@@ -61,7 +86,18 @@ export const usePushNotifications = () => {
   };
 
   const subscribe = useCallback(async (): Promise<PushSubscriptionData | null> => {
-    if (!isSupported || !isPermissionGranted) {
+    if (!isSupported) {
+      toast.error("Push notifications are not supported");
+      return null;
+    }
+
+    if (!isPermissionGranted) {
+      const granted = await requestPermission();
+      if (!granted) return null;
+    }
+
+    if (!vapidKey) {
+      console.log("VAPID key not configured, using local notifications only");
       return null;
     }
 
@@ -82,7 +118,7 @@ export const usePushNotifications = () => {
         // Create new subscription
         sub = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
         });
       }
 
@@ -94,14 +130,20 @@ export const usePushNotifications = () => {
         p256dh: subJson.keys?.p256dh || "",
         auth_key: subJson.keys?.auth || "",
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error subscribing to push:", error);
-      toast.error("Failed to enable push notifications");
+      
+      // Provide more specific error messages
+      if (error.message?.includes("applicationServerKey")) {
+        toast.error("Push notification setup incomplete. VAPID key may be invalid.");
+      } else {
+        toast.error("Failed to enable push notifications");
+      }
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported, isPermissionGranted]);
+  }, [isSupported, isPermissionGranted, vapidKey]);
 
   const unsubscribe = async (): Promise<boolean> => {
     if (!subscription) return true;
@@ -118,32 +160,45 @@ export const usePushNotifications = () => {
     }
   };
 
-  const showNotification = (title: string, options?: NotificationOptions) => {
-    if (!isPermissionGranted) return;
+  const showNotification = useCallback((title: string, options?: NotificationOptions) => {
+    if (!isPermissionGranted) {
+      console.log("Cannot show notification: permission not granted");
+      return;
+    }
 
     try {
-      new Notification(title, {
-        icon: "/favicon.ico",
-        badge: "/favicon.ico",
-        ...options,
-      });
-    } catch (error) {
-      // Fallback for when Notification constructor fails
-      navigator.serviceWorker.ready.then((registration) => {
-        registration.showNotification(title, {
+      // Try service worker notification first (works better on mobile)
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, {
+            icon: "/favicon.ico",
+            badge: "/favicon.ico",
+            ...options,
+          });
+        }).catch(() => {
+          // Fallback to regular notification
+          new Notification(title, {
+            icon: "/favicon.ico",
+            ...options,
+          });
+        });
+      } else {
+        new Notification(title, {
           icon: "/favicon.ico",
-          badge: "/favicon.ico",
           ...options,
         });
-      });
+      }
+    } catch (error) {
+      console.log("Could not show notification:", error);
     }
-  };
+  }, [isPermissionGranted]);
 
   return {
     isSupported,
     isPermissionGranted,
     subscription,
     isLoading,
+    vapidKey,
     requestPermission,
     subscribe,
     unsubscribe,

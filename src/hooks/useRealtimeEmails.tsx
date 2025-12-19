@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useSupabaseAuth";
@@ -27,6 +27,8 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
   const [newEmailCount, setNewEmailCount] = useState(0);
   const [lastEmail, setLastEmail] = useState<ReceivedEmail | null>(null);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   // Check and request push notification permission
   useEffect(() => {
@@ -86,12 +88,53 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
     }
   }, [enablePushNotifications, pushPermission]);
 
-  const playNotificationSound = useCallback(() => {
+  // Get or create audio context
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  // Unlock audio - must be called from user interaction
+  const unlockAudio = useCallback(async () => {
+    try {
+      const audioContext = getAudioContext();
+      
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
+      // Play a silent sound to unlock
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0;
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.001);
+      
+      setAudioUnlocked(true);
+      console.log('[useRealtimeEmails] Audio unlocked');
+      return true;
+    } catch (error) {
+      console.error('[useRealtimeEmails] Failed to unlock audio:', error);
+      return false;
+    }
+  }, [getAudioContext]);
+
+  const playNotificationSound = useCallback(async () => {
     if (!playSound) return;
     
     try {
-      // Create a simple notification sound using Web Audio API
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = getAudioContext();
+      
+      // Resume context if suspended
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
+      // Create a simple notification sound
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -106,10 +149,14 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
       
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
+      
+      if (!audioUnlocked) {
+        setAudioUnlocked(true);
+      }
     } catch (error) {
       console.log('Could not play notification sound:', error);
     }
-  }, [playSound]);
+  }, [playSound, getAudioContext, audioUnlocked]);
 
   useEffect(() => {
     // Build the filter for the channel
@@ -172,6 +219,16 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
     };
   }, [tempEmailId, onNewEmail, showToast, playNotificationSound, showPushNotification]);
 
+  // Cleanup audio context on unmount
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
   const resetCount = useCallback(() => {
     setNewEmailCount(0);
   }, []);
@@ -182,6 +239,8 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
     resetCount,
     pushPermission,
     requestPushPermission,
+    audioUnlocked,
+    unlockAudio,
   };
 };
 

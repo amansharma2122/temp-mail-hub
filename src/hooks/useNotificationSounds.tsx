@@ -8,6 +8,7 @@ interface SoundSettings {
   enabled: boolean;
   tone: SoundTone;
   volume: number;
+  audioUnlocked: boolean;
 }
 
 const SOUND_FREQUENCIES: Record<SoundTone, number[]> = {
@@ -30,6 +31,7 @@ export const useNotificationSounds = () => {
     enabled: true,
     tone: 'default',
     volume: 0.5,
+    audioUnlocked: false,
   });
 
   // Load settings
@@ -39,6 +41,7 @@ export const useNotificationSounds = () => {
       enabled: true,
       tone: 'default',
       volume: 0.5,
+      audioUnlocked: false,
     });
     setSettings(saved);
   }, [user]);
@@ -61,8 +64,36 @@ export const useNotificationSounds = () => {
     return audioContextRef.current;
   }, []);
 
+  // Unlock audio (must be called from user interaction)
+  const unlockAudio = useCallback(async () => {
+    try {
+      const audioContext = getAudioContext();
+      
+      // Resume if suspended
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      
+      // Play a silent sound to unlock
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0; // Silent
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.001);
+      
+      updateSettings({ audioUnlocked: true });
+      console.log('[useNotificationSounds] Audio unlocked successfully');
+      return true;
+    } catch (error) {
+      console.error('[useNotificationSounds] Failed to unlock audio:', error);
+      return false;
+    }
+  }, [getAudioContext, updateSettings]);
+
   // Play notification sound
-  const playSound = useCallback((overrideTone?: SoundTone) => {
+  const playSound = useCallback(async (overrideTone?: SoundTone) => {
     if (!settings.enabled && !overrideTone) return;
     
     const tone = overrideTone || settings.tone;
@@ -76,7 +107,7 @@ export const useNotificationSounds = () => {
       
       // Resume context if suspended (browser autoplay policy)
       if (audioContext.state === 'suspended') {
-        audioContext.resume();
+        await audioContext.resume();
       }
 
       const masterGain = audioContext.createGain();
@@ -104,10 +135,15 @@ export const useNotificationSounds = () => {
         oscillator.start(startTime);
         oscillator.stop(startTime + duration + 0.1);
       });
+      
+      // Mark audio as unlocked if it played successfully
+      if (!settings.audioUnlocked) {
+        updateSettings({ audioUnlocked: true });
+      }
     } catch (error) {
       console.error('Error playing notification sound:', error);
     }
-  }, [settings.enabled, settings.tone, settings.volume, getAudioContext]);
+  }, [settings.enabled, settings.tone, settings.volume, settings.audioUnlocked, getAudioContext, updateSettings]);
 
   // Preview sound (always plays regardless of enabled setting)
   const previewSound = useCallback((tone: SoundTone) => {
@@ -129,6 +165,8 @@ export const useNotificationSounds = () => {
     updateSettings,
     playSound,
     previewSound,
+    unlockAudio,
+    isAudioUnlocked: settings.audioUnlocked,
     availableTones: Object.keys(SOUND_FREQUENCIES) as SoundTone[],
   };
 };
