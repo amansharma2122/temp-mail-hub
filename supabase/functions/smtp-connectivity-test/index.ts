@@ -17,6 +17,7 @@ interface TestResult {
   error?: string;
   resolvedIp?: string;
   responseTime?: number;
+  banner?: string;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -50,81 +51,76 @@ serve(async (req: Request): Promise<Response> => {
       tcpConnected: false,
     };
 
-    // Step 1: DNS Resolution
+    // Direct TCP connection test - this handles DNS internally and avoids
+    // the issue where Deno.resolveDns appends internal domain suffixes
     try {
-      console.log(`[smtp-connectivity-test] Resolving DNS for ${host}...`);
-      const addresses = await Deno.resolveDns(host, "A");
+      console.log(`[smtp-connectivity-test] Attempting direct TCP connection to ${host}:${port}...`);
       
-      if (addresses && addresses.length > 0) {
-        result.dnsResolved = true;
-        result.resolvedIp = addresses[0];
-        console.log(`[smtp-connectivity-test] DNS resolved: ${host} -> ${addresses[0]}`);
-      } else {
-        result.error = `DNS resolution returned no addresses for ${host}`;
-        console.error(`[smtp-connectivity-test] ${result.error}`);
-        return new Response(
-          JSON.stringify(result),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    } catch (dnsError: any) {
-      result.error = `DNS resolution failed: ${dnsError.message}. Check that the hostname is correct and publicly resolvable.`;
-      console.error(`[smtp-connectivity-test] DNS error: ${dnsError.message}`);
-      return new Response(
-        JSON.stringify(result),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Step 2: TCP Connection Test
-    try {
-      console.log(`[smtp-connectivity-test] Testing TCP connection to ${host}:${port}...`);
-      
-      // Try to establish a TCP connection with timeout
+      // Use Deno.connect which handles DNS resolution internally without the suffix issue
       const conn = await Promise.race([
-        Deno.connect({ hostname: host, port }),
+        Deno.connect({ hostname: host, port, transport: "tcp" }),
         new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error("Connection timeout (10s)")), 10000)
+          setTimeout(() => reject(new Error("Connection timeout (15s)")), 15000)
         )
-      ]) as Deno.Conn;
+      ]) as Deno.TcpConn;
 
-      // Read initial SMTP banner (optional, shows server is responding)
+      // If we got here, DNS resolved and TCP connected
+      result.dnsResolved = true;
+      result.tcpConnected = true;
+
+      // Try to read SMTP banner
       try {
         const buffer = new Uint8Array(512);
         const readPromise = conn.read(buffer);
-        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
         
         const bytesRead = await Promise.race([readPromise, timeoutPromise]);
         
         if (bytesRead && typeof bytesRead === 'number') {
-          const banner = new TextDecoder().decode(buffer.subarray(0, bytesRead));
-          console.log(`[smtp-connectivity-test] SMTP Banner: ${banner.trim()}`);
+          const banner = new TextDecoder().decode(buffer.subarray(0, bytesRead)).trim();
+          result.banner = banner;
+          console.log(`[smtp-connectivity-test] SMTP Banner: ${banner}`);
+          
+          // Check if it looks like a valid SMTP response
+          if (banner.startsWith('220')) {
+            console.log(`[smtp-connectivity-test] Valid SMTP 220 response received`);
+          }
         }
       } catch (readError) {
-        // Ignore read errors, connection itself was successful
         console.log(`[smtp-connectivity-test] Could not read banner, but connection succeeded`);
       }
 
       conn.close();
       
-      result.tcpConnected = true;
       result.success = true;
       result.responseTime = Date.now() - startTime;
       
-      console.log(`[smtp-connectivity-test] TCP connection successful in ${result.responseTime}ms`);
+      console.log(`[smtp-connectivity-test] Connection successful in ${result.responseTime}ms`);
 
-    } catch (tcpError: any) {
+    } catch (connError: any) {
+      console.error(`[smtp-connectivity-test] Connection error: ${connError.message}`);
+      
       let hint = "";
-      if (tcpError.message.includes("timeout")) {
-        hint = "The server did not respond in time. It may be blocked by a firewall.";
-      } else if (tcpError.message.includes("refused")) {
-        hint = "Connection was refused. The port may be incorrect or the service is not running.";
-      } else if (tcpError.message.includes("reset")) {
-        hint = "Connection was reset. The server may have rejected the connection.";
+      const msg = connError.message.toLowerCase();
+      
+      // Determine the type of error
+      if (msg.includes("timeout")) {
+        hint = "The server did not respond in time. It may be blocked by a firewall or the port may be wrong.";
+      } else if (msg.includes("refused") || msg.includes("connection refused")) {
+        result.dnsResolved = true; // DNS worked if connection was refused
+        hint = "Connection was refused. The port may be incorrect or the SMTP service is not running.";
+      } else if (msg.includes("reset")) {
+        result.dnsResolved = true;
+        hint = "Connection was reset by the server.";
+      } else if (msg.includes("no such host") || msg.includes("not known") || msg.includes("getaddrinfo")) {
+        hint = `Could not resolve hostname '${host}'. Please verify the SMTP hostname is correct.`;
+      } else if (msg.includes("network is unreachable")) {
+        hint = "Network is unreachable. Check your network configuration.";
+      } else {
+        hint = "Check that the host and port are correct.";
       }
       
-      result.error = `TCP connection failed: ${tcpError.message}. ${hint}`;
-      console.error(`[smtp-connectivity-test] TCP error: ${tcpError.message}`);
+      result.error = `Connection failed: ${connError.message}. ${hint}`;
       
       return new Response(
         JSON.stringify(result),
