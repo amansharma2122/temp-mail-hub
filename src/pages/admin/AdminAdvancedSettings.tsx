@@ -26,15 +26,14 @@ import {
 import { Progress } from "@/components/ui/progress";
 
 const AdminAdvancedSettings = () => {
+  // Rate limiting moved to AdminRateLimits.tsx
+  // Maintenance mode moved to AdminRegistration.tsx
   const [settings, setSettings] = useState({
-    // Security
+    // Security (2FA and session only - rate limiting is in dedicated page)
     twoFactorAuth: false,
     sessionTimeout: "30",
     maxLoginAttempts: "5",
     ipWhitelist: "",
-    rateLimiting: true,
-    rateLimitRequests: "100",
-    rateLimitWindow: "60",
     encryptionKey: "",
     showEncryptionKey: false,
     
@@ -45,14 +44,10 @@ const AdminAdvancedSettings = () => {
     lastBackup: "2024-01-15 14:30:00",
     backupLocation: "local",
     
-    // System
+    // System (no duplicate maintenance mode)
     debugMode: false,
     logLevel: "info",
     maxUploadSize: "10",
-    timezone: "UTC",
-    dateFormat: "YYYY-MM-DD",
-    maintenanceMode: false,
-    maintenanceMessage: "We are currently performing maintenance. Please check back soon.",
     
     // Performance
     cacheEnabled: true,
@@ -164,19 +159,15 @@ const AdminAdvancedSettings = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
-                  <div>
-                    <p className="font-medium text-foreground">Rate Limiting</p>
-                    <p className="text-sm text-muted-foreground">Prevent API abuse</p>
-                  </div>
-                  <Switch
-                    checked={settings.rateLimiting}
-                    onCheckedChange={(checked) => setSettings({ ...settings, rateLimiting: checked })}
-                  />
+                <div className="p-4 bg-secondary/30 rounded-lg">
+                  <p className="font-medium text-foreground">Rate Limiting</p>
+                  <p className="text-sm text-muted-foreground">
+                    Configured in <a href="/admin/rate-limits" className="text-primary hover:underline">Rate Limits</a> page
+                  </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Session Timeout (minutes)</label>
                   <Input
@@ -194,17 +185,6 @@ const AdminAdvancedSettings = () => {
                     value={settings.maxLoginAttempts}
                     onChange={(e) => setSettings({ ...settings, maxLoginAttempts: e.target.value })}
                     className="bg-secondary/50"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Rate Limit (req/min)</label>
-                  <Input
-                    type="number"
-                    value={settings.rateLimitRequests}
-                    onChange={(e) => setSettings({ ...settings, rateLimitRequests: e.target.value })}
-                    className="bg-secondary/50"
-                    disabled={!settings.rateLimiting}
                   />
                 </div>
               </div>
@@ -383,33 +363,15 @@ const AdminAdvancedSettings = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                    <div>
-                      <p className="font-medium text-foreground">Maintenance Mode</p>
-                      <p className="text-sm text-muted-foreground">Disable public access</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={settings.maintenanceMode}
-                    onCheckedChange={(checked) => setSettings({ ...settings, maintenanceMode: checked })}
-                  />
+                <div className="p-4 bg-secondary/30 rounded-lg">
+                  <p className="font-medium text-foreground">Maintenance Mode</p>
+                  <p className="text-sm text-muted-foreground">
+                    Configured in <a href="/admin/registration" className="text-primary hover:underline">Registration Control</a>
+                  </p>
                 </div>
               </div>
 
-              {settings.maintenanceMode && (
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Maintenance Message</label>
-                  <Textarea
-                    value={settings.maintenanceMessage}
-                    onChange={(e) => setSettings({ ...settings, maintenanceMessage: e.target.value })}
-                    className="bg-secondary/50"
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Log Level</label>
                   <Select
@@ -436,25 +398,6 @@ const AdminAdvancedSettings = () => {
                     onChange={(e) => setSettings({ ...settings, maxUploadSize: e.target.value })}
                     className="bg-secondary/50"
                   />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Timezone</label>
-                  <Select
-                    value={settings.timezone}
-                    onValueChange={(value) => setSettings({ ...settings, timezone: value })}
-                  >
-                    <SelectTrigger className="bg-secondary/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="UTC">UTC</SelectItem>
-                      <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                      <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
-                      <SelectItem value="Europe/London">London</SelectItem>
-                      <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </div>

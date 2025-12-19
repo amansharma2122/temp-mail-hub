@@ -24,8 +24,8 @@ import {
   UserCog,
   BarChart3,
   Wand2,
-  Rocket,
   LayoutList,
+  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -75,7 +75,8 @@ const AdminSidebar = () => {
     { title: "Appearance", url: "/admin/appearance", icon: Paintbrush },
     { title: t('themes'), url: "/admin/themes", icon: Palette },
     { title: "User & Guest", url: "/admin/user-settings", icon: UserCog },
-    { title: "Registration", url: "/admin/registration", icon: UserCog },
+    { title: "Registration", url: "/admin/registration", icon: Shield },
+    { title: "Payments", url: "/admin/payments", icon: CreditCard },
     { title: "Admins", url: "/admin/admins", icon: Shield },
     { title: "Email Setup", url: "/admin/email-setup", icon: Wand2 },
     { title: "SMTP", url: "/admin/smtp", icon: Cog },
@@ -86,7 +87,6 @@ const AdminSidebar = () => {
   ];
 
   const advancedMenuItems = [
-    { title: "Deploy Guide", url: "/admin/deploy-guide", icon: Rocket },
     { title: "Audit Logs", url: "/admin/audit-logs", icon: Shield },
     { title: "Rate Limits", url: "/admin/rate-limits", icon: Clock },
     { title: "Role Approvals", url: "/admin/role-approvals", icon: ShieldCheck },

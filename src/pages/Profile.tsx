@@ -34,6 +34,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { storage, STORAGE_KEYS } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
+import TwoFactorSetup from "@/components/TwoFactorSetup";
 import {
   Select,
   SelectContent,
