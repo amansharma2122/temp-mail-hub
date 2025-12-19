@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Gauge, Save, RefreshCw, Trash2 } from "lucide-react";
+import { Gauge, Save, RefreshCw, Trash2, RotateCcw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -37,6 +38,7 @@ const AdminRateLimits = () => {
   const [rateLimits, setRateLimits] = useState<RateLimitRecord[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [resetOnSave, setResetOnSave] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -100,9 +102,27 @@ const AdminRateLimits = () => {
 
     if (error) {
       toast.error("Failed to save settings: " + error.message);
+      setIsSaving(false);
+      return;
+    }
+
+    // Reset all rate limits if option is enabled
+    if (resetOnSave) {
+      const { error: clearError } = await supabase
+        .from("rate_limits")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      
+      if (clearError) {
+        toast.error("Settings saved but failed to reset limits: " + clearError.message);
+      } else {
+        toast.success("Rate limit settings saved and all limits reset!");
+        loadRateLimits();
+      }
     } else {
       toast.success("Rate limit settings saved!");
     }
+    
     setIsSaving(false);
   };
 
@@ -192,9 +212,26 @@ const AdminRateLimits = () => {
                 Time period in minutes for the rate limit window
               </p>
             </div>
-            <div className="pt-4 p-4 bg-secondary/30 rounded-lg">
+            <div className="pt-4 p-4 bg-secondary/30 rounded-lg space-y-3">
               <p className="text-sm">
                 <strong>Current Setting:</strong> {settings.max_requests} emails per {settings.window_minutes} minutes per user/IP
+              </p>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="resetOnSave"
+                  checked={resetOnSave}
+                  onCheckedChange={(checked) => setResetOnSave(checked === true)}
+                />
+                <label
+                  htmlFor="resetOnSave"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset all rate limits on save
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                When enabled, saving settings will clear all existing rate limit records, allowing blocked users to immediately create emails again.
               </p>
             </div>
           </CardContent>
