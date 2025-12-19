@@ -40,6 +40,7 @@ const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const pageSize = 10;
 
   const fetchUsers = async () => {
@@ -101,6 +102,25 @@ const AdminUsers = () => {
     } catch (error) {
       console.error("Error updating role:", error);
       toast.error("Failed to update role");
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    setDeletingUserId(userId);
+    try {
+      const { data, error } = await supabase.rpc('delete_user_as_admin', {
+        target_user_id: userId
+      });
+
+      if (error) throw error;
+
+      toast.success("User deleted successfully");
+      fetchUsers(); // Refresh the list
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      toast.error(error.message || "Failed to delete user");
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -190,7 +210,12 @@ const AdminUsers = () => {
                     <td className="p-4 text-right">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-destructive">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-destructive"
+                            disabled={deletingUserId === user.user_id}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </AlertDialogTrigger>
@@ -198,12 +223,17 @@ const AdminUsers = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete User</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to delete this user? This action cannot be undone.
+                              Are you sure you want to delete {user.display_name || user.email}? This action cannot be undone and will remove all their data.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction className="bg-destructive">Delete</AlertDialogAction>
+                            <AlertDialogAction 
+                              className="bg-destructive hover:bg-destructive/90"
+                              onClick={() => deleteUser(user.user_id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
