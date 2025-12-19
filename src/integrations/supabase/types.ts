@@ -680,6 +680,57 @@ export type Database = {
         }
         Relationships: []
       }
+      user_invoices: {
+        Row: {
+          amount_paid: number
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          invoice_pdf: string | null
+          invoice_url: string | null
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          status: string
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_paid?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          invoice_pdf?: string | null
+          invoice_url?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          invoice_pdf?: string | null
+          invoice_url?: string | null
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
