@@ -295,8 +295,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+  
+  // During HMR, context might temporarily be undefined
+  // Return a safe loading state instead of throwing to prevent crashes
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    if (import.meta.env.DEV) {
+      console.warn('useAuth called outside AuthProvider - returning loading state');
+    }
+    return {
+      user: null,
+      session: null,
+      profile: null,
+      isLoading: true,
+      isAdmin: false,
+      signUp: async () => ({ error: new Error('Auth not ready'), data: null }),
+      signIn: async () => ({ error: new Error('Auth not ready') }),
+      signInWithGoogle: async () => ({ error: new Error('Auth not ready') }),
+      signInWithFacebook: async () => ({ error: new Error('Auth not ready') }),
+      signOut: async () => {},
+      updateProfile: async () => {},
+      resetPassword: async () => ({ error: new Error('Auth not ready') }),
+      updatePassword: async () => ({ error: new Error('Auth not ready') }),
+    };
   }
   return context;
 };
