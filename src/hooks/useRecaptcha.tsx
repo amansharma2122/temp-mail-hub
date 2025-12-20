@@ -13,17 +13,51 @@ declare global {
 export const useRecaptcha = () => {
   const { settings, isLoading } = useCaptchaSettings();
   const [isReady, setIsReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isScriptLoading, setIsScriptLoading] = useState(false);
+
+  const isEnabled = settings.enabled && settings.provider === 'recaptcha' && !!settings.siteKey;
 
   useEffect(() => {
-    if (isLoading || !settings.enabled || settings.provider !== 'recaptcha' || !settings.siteKey) {
+    if (isLoading || !isEnabled) {
       return;
     }
 
     // Check if script already loaded
     if (window.grecaptcha) {
-      window.grecaptcha.ready(() => setIsReady(true));
+      window.grecaptcha.ready(() => {
+        setIsReady(true);
+        setLoadError(null);
+      });
       return;
     }
+
+    // Check if script is already being loaded
+    const existingScript = document.querySelector(`script[src*="recaptcha"]`);
+    if (existingScript) {
+      // Wait for it to load
+      const checkReady = setInterval(() => {
+        if (window.grecaptcha) {
+          clearInterval(checkReady);
+          window.grecaptcha.ready(() => {
+            setIsReady(true);
+            setLoadError(null);
+          });
+        }
+      }, 100);
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkReady);
+        if (!window.grecaptcha) {
+          setLoadError('reCAPTCHA script failed to initialize');
+        }
+      }, 10000);
+      return;
+    }
+
+    setIsScriptLoading(true);
+    setLoadError(null);
 
     // Load reCAPTCHA script
     const script = document.createElement('script');
@@ -32,45 +66,80 @@ export const useRecaptcha = () => {
     script.defer = true;
     
     script.onload = () => {
-      window.grecaptcha.ready(() => setIsReady(true));
+      setIsScriptLoading(false);
+      if (window.grecaptcha) {
+        window.grecaptcha.ready(() => {
+          setIsReady(true);
+          setLoadError(null);
+          console.log('reCAPTCHA v3 loaded successfully');
+        });
+      } else {
+        setLoadError('reCAPTCHA loaded but grecaptcha not available');
+      }
+    };
+
+    script.onerror = () => {
+      setIsScriptLoading(false);
+      setLoadError('Failed to load reCAPTCHA script');
+      console.error('Failed to load reCAPTCHA script');
     };
     
     document.head.appendChild(script);
 
-    return () => {
-      // Clean up script on unmount if needed
-      const existingScript = document.querySelector(`script[src*="recaptcha"]`);
-      if (existingScript) {
-        existingScript.remove();
+    // Cleanup timeout
+    const timeout = setTimeout(() => {
+      if (!isReady && !loadError) {
+        setLoadError('reCAPTCHA script load timeout');
+        setIsScriptLoading(false);
       }
+    }, 15000);
+
+    return () => {
+      clearTimeout(timeout);
     };
-  }, [settings.enabled, settings.provider, settings.siteKey, isLoading]);
+  }, [settings.enabled, settings.provider, settings.siteKey, isLoading, isEnabled, isReady, loadError]);
 
   const executeRecaptcha = useCallback(async (action: string): Promise<string | null> => {
-    if (!settings.enabled || settings.provider !== 'recaptcha' || !settings.siteKey) {
+    // If not enabled, skip verification
+    if (!isEnabled) {
+      console.log('reCAPTCHA not enabled, skipping verification');
+      return 'skip';
+    }
+
+    // If there's a load error, we can't proceed
+    if (loadError) {
+      console.error('reCAPTCHA load error:', loadError);
       return null;
     }
 
+    // Wait for ready state with retry
     if (!isReady || !window.grecaptcha) {
-      console.warn('reCAPTCHA not ready');
-      return null;
+      // Wait a bit and retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (!window.grecaptcha) {
+        console.error('reCAPTCHA not available after waiting');
+        return null;
+      }
     }
 
     try {
       const token = await window.grecaptcha.execute(settings.siteKey, { action });
+      console.log(`reCAPTCHA token generated for action: ${action}`);
       return token;
     } catch (error) {
       console.error('reCAPTCHA execution failed:', error);
       return null;
     }
-  }, [settings.enabled, settings.provider, settings.siteKey, isReady]);
+  }, [isEnabled, settings.siteKey, isReady, loadError]);
 
   return {
     executeRecaptcha,
     isReady,
-    isEnabled: settings.enabled && settings.provider === 'recaptcha' && !!settings.siteKey,
+    isEnabled,
+    isLoading: isLoading || isScriptLoading,
+    loadError,
     settings,
-    isLoading,
   };
 };
 
