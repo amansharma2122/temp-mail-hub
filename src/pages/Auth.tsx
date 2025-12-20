@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, ArrowRight, Loader2, Chrome, KeyRound, AlertTriangle } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Loader2, Chrome, KeyRound, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useSupabaseAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRegistrationSettings } from "@/hooks/useRegistrationSettings";
+import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { toast } from "sonner";
 import { z } from "zod";
 import Header from "@/components/Header";
@@ -32,6 +33,7 @@ const Auth = () => {
   const { user, isAdmin, signIn, signUp, signInWithGoogle, signInWithFacebook, resetPassword, updatePassword } = useAuth();
   const { t } = useLanguage();
   const { settings: regSettings, isLoading: regLoading } = useRegistrationSettings();
+  const { executeRecaptcha, isEnabled: captchaEnabled, settings: captchaSettings } = useRecaptcha();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -75,6 +77,40 @@ const Auth = () => {
     }
   };
 
+  const verifyCaptcha = async (action: string): Promise<boolean> => {
+    // Determine if captcha is needed for this action
+    const needsCaptcha = captchaEnabled && (
+      (action === 'login' && captchaSettings.enableOnLogin) ||
+      (action === 'signup' && captchaSettings.enableOnRegister)
+    );
+
+    if (!needsCaptcha) {
+      return true;
+    }
+
+    const token = await executeRecaptcha(action);
+    if (!token) {
+      toast.error("Please complete the captcha verification");
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-recaptcha', {
+        body: { token, action }
+      });
+
+      if (error || !data?.success) {
+        toast.error(data?.error || "Captcha verification failed");
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Captcha verification error:', error);
+      toast.error("Captcha verification failed");
+      return false;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -89,6 +125,13 @@ const Auth = () => {
           setIsSubmitting(false);
           return;
         }
+        
+        // Verify captcha for login
+        if (!await verifyCaptcha('login')) {
+          setIsSubmitting(false);
+          return;
+        }
+        
         const { error } = await signIn(sanitizedEmail, password);
         if (error) {
           toast.error(error.message);
@@ -108,6 +151,13 @@ const Auth = () => {
           setIsSubmitting(false);
           return;
         }
+        
+        // Verify captcha for signup
+        if (!await verifyCaptcha('signup')) {
+          setIsSubmitting(false);
+          return;
+        }
+        
         const { error, data } = await signUp(sanitizedEmail, password, sanitizedName);
         if (error) {
           toast.error(error.message);

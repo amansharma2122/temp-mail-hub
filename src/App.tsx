@@ -11,7 +11,7 @@ import { NotificationProvider } from "@/components/NotificationSystem";
 import { initializeDefaultData } from "@/lib/storage";
 import { EmailServiceProvider } from "@/contexts/EmailServiceContext";
 import { createQueryClient } from "@/lib/queryClient";
-import CacheRefresh from "@/components/CacheRefresh";
+
 import ErrorBoundary, { PageErrorBoundary } from "@/components/ErrorBoundary";
 import UpdatePrompt from "@/components/UpdatePrompt";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -116,8 +116,6 @@ const App = () => (
       <LanguageProvider>
         <AuthProvider>
           <SettingsProvider>
-            {/* Ensures old caches are cleared once per version for all users */}
-            <CacheRefresh />
             <UpdatePrompt />
 
             {/* Provide email service to ALL routes (Index, History, Profile, Admin, etc.) */}
