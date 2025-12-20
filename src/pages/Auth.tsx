@@ -112,28 +112,35 @@ const Auth = () => {
         if (error) {
           toast.error(error.message);
         } else if (data?.user) {
-          // Use combined edge function that handles both DB insert and email sending
-          // This bypasses RLS using service role key
-          try {
-            const { data: verifyResult, error: verifyError } = await supabase.functions.invoke('create-verification-and-send', {
-              body: {
-                userId: data.user.id,
-                email: sanitizedEmail,
-                name: sanitizedName,
-              },
-            });
+          // Check if email confirmation is required
+          if (regSettings.requireEmailConfirmation) {
+            // Use combined edge function that handles both DB insert and email sending
+            // This bypasses RLS using service role key
+            try {
+              const { data: verifyResult, error: verifyError } = await supabase.functions.invoke('create-verification-and-send', {
+                body: {
+                  userId: data.user.id,
+                  email: sanitizedEmail,
+                  name: sanitizedName,
+                },
+              });
 
-            if (verifyError) {
-              console.error('Failed to send verification email:', verifyError);
-            } else {
-              console.log('Verification email sent:', verifyResult);
+              if (verifyError) {
+                console.error('Failed to send verification email:', verifyError);
+              } else {
+                console.log('Verification email sent:', verifyResult);
+              }
+            } catch (verificationError) {
+              console.error('Failed to send verification email:', verificationError);
             }
-          } catch (verificationError) {
-            console.error('Failed to send verification email:', verificationError);
+            
+            toast.success("Account created! Please check your email to verify.");
+            navigate("/verify-email", { state: { email: sanitizedEmail } });
+          } else {
+            // No email confirmation required - log user in directly
+            toast.success("Account created successfully! Welcome!");
+            navigate("/dashboard");
           }
-          
-          toast.success("Account created! Please check your email to verify.");
-          navigate("/verify-email", { state: { email: sanitizedEmail } });
         }
       } else if (mode === 'forgot') {
         if (!validateInputs(false)) {

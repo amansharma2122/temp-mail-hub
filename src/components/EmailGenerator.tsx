@@ -23,6 +23,7 @@ import { useEmailService } from "@/contexts/EmailServiceContext";
 import { useAuth } from "@/hooks/useSupabaseAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { EmailQRCode } from "@/components/EmailQRCode";
+import EmailExpiryTimer from "@/components/EmailExpiryTimer";
 
 const EmailGenerator = () => {
   const { user } = useAuth();
@@ -295,16 +296,29 @@ const EmailGenerator = () => {
               </motion.div>
             </div>
 
-            {/* Expiration Notice */}
+            {/* Expiration Timer */}
             {currentEmail && (
-              <motion.p 
-                className="text-center text-xs text-muted-foreground mt-6"
+              <motion.div 
+                className="flex flex-col items-center gap-2 mt-6"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8 }}
               >
-                {t('expiresIn')} {!user && <span className="text-primary cursor-pointer hover:underline">{t('signInToExtend')}</span>}
-              </motion.p>
+                <EmailExpiryTimer 
+                  expiresAt={currentEmail.expires_at} 
+                  onExpired={() => {
+                    toast.info("Email expired. Generating a new one...");
+                    refreshEmail();
+                  }}
+                />
+                {!user && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="text-primary cursor-pointer hover:underline" onClick={() => window.location.href = "/auth"}>
+                      {t('signInToExtend')}
+                    </span>
+                  </p>
+                )}
+              </motion.div>
             )}
           </div>
         </div>
