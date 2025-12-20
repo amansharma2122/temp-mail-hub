@@ -33,7 +33,7 @@ const Auth = () => {
   const { user, isAdmin, signIn, signUp, signInWithGoogle, signInWithFacebook, resetPassword, updatePassword } = useAuth();
   const { t } = useLanguage();
   const { settings: regSettings, isLoading: regLoading } = useRegistrationSettings();
-  const { executeRecaptcha, isEnabled: captchaEnabled, settings: captchaSettings } = useRecaptcha();
+  const { executeRecaptcha, isEnabled: captchaEnabled, isReady: captchaReady, isLoading: captchaLoading, loadError: captchaError, settings: captchaSettings } = useRecaptcha();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -90,9 +90,21 @@ const Auth = () => {
       return true;
     }
 
+    // Check for captcha load error
+    if (captchaError) {
+      toast.error("reCAPTCHA failed to load. Please refresh the page.");
+      return false;
+    }
+
     const token = await executeRecaptcha(action);
+    
+    // If token is 'skip', captcha is not enabled
+    if (token === 'skip') {
+      return true;
+    }
+    
     if (!token) {
-      toast.error("Please complete the captcha verification");
+      toast.error("reCAPTCHA verification failed. Please try again.");
       return false;
     }
 
@@ -101,14 +113,20 @@ const Auth = () => {
         body: { token, action }
       });
 
-      if (error || !data?.success) {
+      if (error) {
+        console.error('Captcha verification error:', error);
+        toast.error("Captcha verification failed. Please try again.");
+        return false;
+      }
+      
+      if (!data?.success) {
         toast.error(data?.error || "Captcha verification failed");
         return false;
       }
       return true;
     } catch (error) {
       console.error('Captcha verification error:', error);
-      toast.error("Captcha verification failed");
+      toast.error("Captcha verification failed. Please try again.");
       return false;
     }
   };
@@ -520,6 +538,16 @@ const Auth = () => {
                   </button>
                 )}
               </div>
+              
+              {/* reCAPTCHA Badge */}
+              {captchaEnabled && (
+                <div className="mt-4 pt-4 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <span>Protected by reCAPTCHA</span>
+                  {captchaLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {captchaError && <span className="text-destructive">(Error loading)</span>}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

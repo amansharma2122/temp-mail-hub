@@ -39,7 +39,7 @@ const EmailGenerator = () => {
     changeDomain,
     addCustomDomain,
   } = useEmailService();
-  const { executeRecaptcha, isEnabled: captchaEnabled, settings: captchaSettings } = useRecaptcha();
+  const { executeRecaptcha, isEnabled: captchaEnabled, isReady: captchaReady, loadError: captchaError, settings: captchaSettings } = useRecaptcha();
   const [copied, setCopied] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [customDomainDialog, setCustomDomainDialog] = useState(false);
@@ -54,11 +54,23 @@ const EmailGenerator = () => {
       return true;
     }
 
+    // Check for load error
+    if (captchaError) {
+      toast.error("reCAPTCHA failed to load. Please refresh the page.");
+      return false;
+    }
+
     setIsVerifying(true);
     try {
       const token = await executeRecaptcha(action);
+      
+      // If token is 'skip', captcha is not enabled
+      if (token === 'skip') {
+        return true;
+      }
+      
       if (!token) {
-        toast.error("Please complete the captcha verification");
+        toast.error("reCAPTCHA verification failed. Please try again.");
         return false;
       }
 
@@ -66,14 +78,20 @@ const EmailGenerator = () => {
         body: { token, action }
       });
 
-      if (error || !data?.success) {
+      if (error) {
+        console.error('Captcha verification error:', error);
+        toast.error("Captcha verification failed. Please try again.");
+        return false;
+      }
+      
+      if (!data?.success) {
         toast.error(data?.error || "Captcha verification failed");
         return false;
       }
       return true;
     } catch (error) {
       console.error('Captcha verification error:', error);
-      toast.error("Captcha verification failed");
+      toast.error("Captcha verification failed. Please try again.");
       return false;
     } finally {
       setIsVerifying(false);

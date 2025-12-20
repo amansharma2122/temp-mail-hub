@@ -22,21 +22,43 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { token, action }: VerifyRequest = await req.json();
+    let requestBody: VerifyRequest;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { token, action } = requestBody;
 
     if (!token) {
+      console.log('No token provided in request');
       return new Response(
         JSON.stringify({ success: false, error: "No token provided" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    console.log(`Verifying reCAPTCHA for action: ${action}, token length: ${token.length}`);
+
     // Get captcha settings from database
-    const { data: settingsData } = await supabase
+    const { data: settingsData, error: settingsError } = await supabase
       .from('app_settings')
       .select('value')
       .eq('key', 'captcha_settings')
       .maybeSingle();
+
+    if (settingsError) {
+      console.error('Error fetching captcha settings:', settingsError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to fetch captcha settings" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!settingsData?.value) {
       // Captcha not configured, allow through
@@ -54,6 +76,14 @@ Deno.serve(async (req) => {
       threshold: number;
     };
 
+    console.log('Captcha settings loaded:', {
+      enabled: settings.enabled,
+      provider: settings.provider,
+      hasSecretKey: !!settings.secretKey,
+      secretKeyLength: settings.secretKey?.length || 0,
+      threshold: settings.threshold,
+    });
+
     if (!settings.enabled) {
       console.log('Captcha disabled, allowing request');
       return new Response(
@@ -65,18 +95,30 @@ Deno.serve(async (req) => {
     if (!settings.secretKey) {
       console.error('Captcha enabled but no secret key configured');
       return new Response(
-        JSON.stringify({ success: false, error: "Captcha misconfigured" }),
+        JSON.stringify({ success: false, error: "Captcha misconfigured - no secret key" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Verify with Google reCAPTCHA
     const verifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
+    const verifyBody = `secret=${encodeURIComponent(settings.secretKey)}&response=${encodeURIComponent(token)}`;
+    
+    console.log('Calling Google reCAPTCHA API...');
+    
     const verifyResponse = await fetch(verifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `secret=${encodeURIComponent(settings.secretKey)}&response=${encodeURIComponent(token)}`,
+      body: verifyBody,
     });
+
+    if (!verifyResponse.ok) {
+      console.error('Google reCAPTCHA API returned error status:', verifyResponse.status);
+      return new Response(
+        JSON.stringify({ success: false, error: "reCAPTCHA API error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const verifyData = await verifyResponse.json();
     
@@ -86,20 +128,37 @@ Deno.serve(async (req) => {
       action: verifyData.action,
       expectedAction: action,
       threshold: settings.threshold,
+      hostname: verifyData.hostname,
+      errorCodes: verifyData['error-codes'],
     });
 
     if (!verifyData.success) {
+      const errorCodes = verifyData['error-codes'] || [];
+      console.error('reCAPTCHA verification failed with error codes:', errorCodes);
+      
+      // Provide more specific error messages
+      let errorMessage = "reCAPTCHA verification failed";
+      if (errorCodes.includes('invalid-input-secret')) {
+        errorMessage = "Invalid reCAPTCHA secret key configured";
+      } else if (errorCodes.includes('invalid-input-response')) {
+        errorMessage = "Invalid reCAPTCHA token - please try again";
+      } else if (errorCodes.includes('timeout-or-duplicate')) {
+        errorMessage = "reCAPTCHA token expired - please try again";
+      } else if (errorCodes.includes('bad-request')) {
+        errorMessage = "Bad reCAPTCHA request - please refresh and try again";
+      }
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "reCAPTCHA verification failed",
-          errors: verifyData['error-codes'],
+          error: errorMessage,
+          errors: errorCodes,
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Check score threshold
+    // Check score threshold (reCAPTCHA v3)
     const score = verifyData.score || 0;
     const threshold = settings.threshold || 0.5;
     
@@ -108,17 +167,19 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Suspicious activity detected",
+          error: "Suspicious activity detected. Please try again.",
           score,
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Verify action matches
+    // Verify action matches (optional but logged)
     if (action && verifyData.action !== action) {
       console.warn(`Action mismatch: expected ${action}, got ${verifyData.action}`);
     }
+
+    console.log(`reCAPTCHA verification successful! Score: ${score}`);
 
     return new Response(
       JSON.stringify({ 
