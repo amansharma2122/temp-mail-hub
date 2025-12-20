@@ -1,19 +1,20 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useRegistrationSettings } from "@/hooks/useRegistrationSettings";
-import { UserPlus, Save, Shield, AlertTriangle, Lock } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { UserPlus, Save, Shield, AlertTriangle, Lock, MailCheck, Loader2 } from "lucide-react";
 
 const AdminRegistration = () => {
   const { settings, isLoading, updateSettings } = useRegistrationSettings();
   const [localSettings, setLocalSettings] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncingAuth, setIsSyncingAuth] = useState(false);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -21,9 +22,32 @@ const AdminRegistration = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
+    
+    // Save registration settings
     const result = await updateSettings(localSettings);
+    
     if (result.success) {
-      toast.success("Registration settings saved!");
+      // Sync email confirmation setting with Supabase Auth
+      setIsSyncingAuth(true);
+      try {
+        const { error } = await supabase.functions.invoke('configure-auth', {
+          body: {
+            autoConfirmEmail: !localSettings.requireEmailConfirmation
+          }
+        });
+        
+        if (error) {
+          console.warn('Auth config sync warning:', error);
+          toast.warning("Settings saved, but auth sync may require manual configuration");
+        } else {
+          toast.success("Registration settings saved!");
+        }
+      } catch (e) {
+        console.error('Auth config error:', e);
+        toast.success("Registration settings saved! Auth configuration may need manual update.");
+      } finally {
+        setIsSyncingAuth(false);
+      }
     } else {
       toast.error("Failed to save settings");
     }
@@ -104,6 +128,47 @@ const AdminRegistration = () => {
                   This message will be shown to users trying to register
                 </p>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Email Confirmation Settings */}
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MailCheck className="w-5 h-5 text-primary" />
+              Email Verification
+            </CardTitle>
+            <CardDescription>Configure email verification requirements for new users</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30 border border-border">
+              <div>
+                <Label className="text-base font-medium">Require Email Confirmation</Label>
+                <p className="text-sm text-muted-foreground">
+                  Users must verify their email before accessing the app
+                </p>
+              </div>
+              <Switch
+                checked={localSettings.requireEmailConfirmation}
+                onCheckedChange={(checked) => updateSetting('requireEmailConfirmation', checked)}
+              />
+            </div>
+
+            {localSettings.requireEmailConfirmation ? (
+              <Alert className="border-primary/50 bg-primary/10">
+                <MailCheck className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-primary">
+                  Email confirmation is <strong>mandatory</strong>. New users will receive a verification email and must confirm before logging in.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert className="border-amber-500/50 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-amber-200">
+                  Email confirmation is <strong>optional</strong>. Users can access the app immediately after signing up without verifying their email.
+                </AlertDescription>
+              </Alert>
             )}
           </CardContent>
         </Card>

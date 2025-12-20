@@ -1,24 +1,30 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export interface RegistrationSettings {
-  allowRegistration: boolean;
-  registrationMessage: string;
-  maintenanceMode: boolean;
-  maintenanceMessage: string;
-  requireEmailConfirmation: boolean;
+export interface AnnouncementSettings {
+  isEnabled: boolean;
+  badgeText: string;
+  mainMessage: string;
+  ctaText: string;
+  ctaLink: string;
+  showTelegramButton: boolean;
+  telegramText: string;
+  telegramLink: string;
 }
 
-const defaultSettings: RegistrationSettings = {
-  allowRegistration: true,
-  registrationMessage: 'Registration is currently disabled. Please try again later.',
-  maintenanceMode: false,
-  maintenanceMessage: 'The site is under maintenance. Please check back later.',
-  requireEmailConfirmation: false,
+const defaultSettings: AnnouncementSettings = {
+  isEnabled: true,
+  badgeText: 'New',
+  mainMessage: 'Guest can create 5 free Emails in a day',
+  ctaText: 'Premium Plan is live!',
+  ctaLink: '',
+  showTelegramButton: true,
+  telegramText: 'Contact on Telegram',
+  telegramLink: 'https://t.me/nullstoemail',
 };
 
-export const useRegistrationSettings = () => {
-  const [settings, setSettings] = useState<RegistrationSettings>(defaultSettings);
+export const useAnnouncementSettings = () => {
+  const [settings, setSettings] = useState<AnnouncementSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = async () => {
@@ -26,17 +32,17 @@ export const useRegistrationSettings = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('value')
-        .eq('key', 'registration_settings')
+        .eq('key', 'announcement_settings')
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (!error && data?.value) {
-        const dbSettings = data.value as unknown as RegistrationSettings;
+        const dbSettings = data.value as unknown as AnnouncementSettings;
         setSettings({ ...defaultSettings, ...dbSettings });
       }
     } catch (e) {
-      console.error('Error loading registration settings:', e);
+      console.error('Error loading announcement settings:', e);
     } finally {
       setIsLoading(false);
     }
@@ -46,14 +52,14 @@ export const useRegistrationSettings = () => {
     fetchSettings();
   }, []);
 
-  const updateSettings = async (newSettings: Partial<RegistrationSettings>) => {
+  const updateSettings = async (newSettings: Partial<AnnouncementSettings>) => {
     const updatedSettings = { ...settings, ...newSettings };
     
     try {
       const { data: existing } = await supabase
         .from('app_settings')
         .select('id')
-        .eq('key', 'registration_settings')
+        .eq('key', 'announcement_settings')
         .maybeSingle();
 
       const settingsJson = JSON.parse(JSON.stringify(updatedSettings));
@@ -65,12 +71,12 @@ export const useRegistrationSettings = () => {
             value: settingsJson,
             updated_at: new Date().toISOString(),
           })
-          .eq('key', 'registration_settings');
+          .eq('key', 'announcement_settings');
       } else {
         await supabase
           .from('app_settings')
           .insert([{
-            key: 'registration_settings',
+            key: 'announcement_settings',
             value: settingsJson,
           }]);
       }
@@ -78,7 +84,7 @@ export const useRegistrationSettings = () => {
       setSettings(updatedSettings);
       return { success: true };
     } catch (e) {
-      console.error('Error saving registration settings:', e);
+      console.error('Error saving announcement settings:', e);
       return { success: false, error: e };
     }
   };
@@ -86,4 +92,4 @@ export const useRegistrationSettings = () => {
   return { settings, isLoading, updateSettings, refetch: fetchSettings };
 };
 
-export default useRegistrationSettings;
+export default useAnnouncementSettings;

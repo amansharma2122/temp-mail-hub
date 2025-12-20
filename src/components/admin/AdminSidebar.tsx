@@ -1,4 +1,5 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useState, useMemo } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -30,6 +31,8 @@ import {
   Ban,
   FileWarning,
   Activity,
+  X,
+  Bell,
 } from "lucide-react";
 import {
   Sidebar,
@@ -45,15 +48,19 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { motion, AnimatePresence } from "framer-motion";
 
 const AdminSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { state } = useSidebar();
   const { t } = useLanguage();
   const collapsed = state === "collapsed";
+  const [searchQuery, setSearchQuery] = useState("");
 
   const mainMenuItems = [
     { title: t('dashboard'), url: "/admin", icon: LayoutDashboard },
@@ -94,6 +101,7 @@ const AdminSidebar = () => {
   ];
 
   const advancedMenuItems = [
+    { title: "Announcement", url: "/admin/announcement", icon: Bell },
     { title: "Mailbox Health", url: "/admin/mailbox-health", icon: Activity },
     { title: "Email Logs", url: "/admin/email-logs", icon: FileWarning },
     { title: "Audit Logs", url: "/admin/audit-logs", icon: Clock },
@@ -108,6 +116,23 @@ const AdminSidebar = () => {
     { title: "Cron Jobs", url: "/admin/cron", icon: Clock },
     { title: "Cache", url: "/admin/cache", icon: Database },
   ];
+
+  // Combine all menu items for search
+  const allMenuItems = useMemo(() => [
+    ...mainMenuItems.map(item => ({ ...item, group: "Main" })),
+    ...domainMenuItems.map(item => ({ ...item, group: "Domains" })),
+    ...contentMenuItems.map(item => ({ ...item, group: "Content" })),
+    ...settingsMenuItems.map(item => ({ ...item, group: "Settings" })),
+    ...advancedMenuItems.map(item => ({ ...item, group: "Advanced" })),
+  ], [t]);
+
+  // Filter menu items based on search
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    return allMenuItems.filter(item => 
+      item.title.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery, allMenuItems]);
 
   const isActive = (path: string) => {
     if (path === "/admin") return location.pathname === "/admin";
@@ -138,6 +163,11 @@ const AdminSidebar = () => {
     </SidebarMenu>
   );
 
+  const handleSearchSelect = (url: string) => {
+    setSearchQuery("");
+    navigate(url);
+  };
+
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <SidebarHeader className="p-4 border-b border-border">
@@ -152,6 +182,67 @@ const AdminSidebar = () => {
             </div>
           )}
         </div>
+
+        {/* Search Box */}
+        {!collapsed && (
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search menu..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-8 h-9 bg-secondary/50 border-border/50 text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-secondary rounded"
+              >
+                <X className="w-3 h-3 text-muted-foreground" />
+              </button>
+            )}
+
+            {/* Search Results Dropdown */}
+            <AnimatePresence>
+              {filteredItems && filteredItems.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto"
+                >
+                  {filteredItems.map((item) => (
+                    <button
+                      key={item.url}
+                      onClick={() => handleSearchSelect(item.url)}
+                      className={cn(
+                        "flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-secondary/80 transition-colors",
+                        isActive(item.url) && "bg-primary/10"
+                      )}
+                    >
+                      <item.icon className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">{item.title}</p>
+                        <p className="text-xs text-muted-foreground">{item.group}</p>
+                      </div>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+              {filteredItems && filteredItems.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 p-3 text-center"
+                >
+                  <p className="text-sm text-muted-foreground">No results found</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent>

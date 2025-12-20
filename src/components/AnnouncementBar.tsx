@@ -1,11 +1,59 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Sparkles, Crown, MessageCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface AnnouncementSettings {
+  isEnabled: boolean;
+  badgeText: string;
+  mainMessage: string;
+  ctaText: string;
+  ctaLink: string;
+  showTelegramButton: boolean;
+  telegramText: string;
+  telegramLink: string;
+}
+
+const defaultSettings: AnnouncementSettings = {
+  isEnabled: true,
+  badgeText: 'New',
+  mainMessage: 'Guest can create 5 free Emails in a day',
+  ctaText: 'Premium Plan is live!',
+  ctaLink: '',
+  showTelegramButton: true,
+  telegramText: 'Contact on Telegram',
+  telegramLink: 'https://t.me/nullstoemail',
+};
 
 const AnnouncementBar = () => {
   const [isVisible, setIsVisible] = useState(true);
+  const [settings, setSettings] = useState<AnnouncementSettings>(defaultSettings);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!isVisible) return null;
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'announcement_settings')
+          .maybeSingle();
+
+        if (!error && data?.value) {
+          const dbSettings = data.value as unknown as AnnouncementSettings;
+          setSettings({ ...defaultSettings, ...dbSettings });
+        }
+      } catch (e) {
+        console.error('Error loading announcement settings:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
+  if (isLoading || !settings.isEnabled || !isVisible) return null;
 
   return (
     <AnimatePresence>
@@ -71,31 +119,46 @@ const AnnouncementBar = () => {
                 animate={{ x: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
               >
-                {/* Guest offer */}
+                {/* Main message */}
                 <span className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider">
-                    New
-                  </span>
-                  <span>Guest can create 5 free Emails in a day</span>
+                  {settings.badgeText && (
+                    <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider">
+                      {settings.badgeText}
+                    </span>
+                  )}
+                  <span>{settings.mainMessage}</span>
                 </span>
 
-                {/* Separator */}
-                <span className="hidden sm:inline-block w-px h-4 bg-white/30" />
+                {/* CTA section */}
+                {settings.ctaText && (
+                  <>
+                    {/* Separator */}
+                    <span className="hidden sm:inline-block w-px h-4 bg-white/30" />
 
-                {/* Premium offer */}
-                <span className="flex items-center gap-1.5">
-                  <Crown className="w-4 h-4 text-yellow-300" />
-                  <span>Premium Plan is live!</span>
-                  <a
-                    href="https://t.me/nullstoemail"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span className="font-semibold">Contact on Telegram</span>
-                  </a>
-                </span>
+                    {/* CTA */}
+                    <span className="flex items-center gap-1.5">
+                      <Crown className="w-4 h-4 text-yellow-300" />
+                      {settings.ctaLink ? (
+                        <a href={settings.ctaLink} className="hover:underline">
+                          {settings.ctaText}
+                        </a>
+                      ) : (
+                        <span>{settings.ctaText}</span>
+                      )}
+                      {settings.showTelegramButton && (
+                        <a
+                          href={settings.telegramLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span className="font-semibold">{settings.telegramText}</span>
+                        </a>
+                      )}
+                    </span>
+                  </>
+                )}
               </motion.div>
             </div>
 
