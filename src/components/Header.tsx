@@ -328,37 +328,51 @@ const Header = () => {
                       </div>
                       <DropdownMenuSeparator />
                       
-                      {/* Grouped Themes */}
-                      {categoryOrder.map(category => {
-                        const categoryThemes = groupedThemes[category];
-                        if (!categoryThemes || categoryThemes.length === 0) return null;
-                        
-                        return (
-                          <div key={category}>
-                            <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">
-                              {categoryLabels[category]}
-                            </DropdownMenuLabel>
-                            {categoryThemes.map((t, idx) => (
-                              <DropdownMenuItem
-                                key={t.id}
-                                onClick={() => handleThemeSelect(t.id)}
-                                onMouseEnter={() => handleThemeHover(t.id)}
-                                className={`cursor-pointer flex items-center gap-2 ${theme.id === t.id && !previewThemeId ? 'bg-primary/10' : ''}`}
-                              >
-                                <div 
-                                  className="w-4 h-4 rounded-full border border-border flex-shrink-0"
-                                  style={{ 
-                                    background: `linear-gradient(135deg, ${t.colors.primary} 0%, ${t.colors.accent} 100%)`
-                                  }}
-                                />
-                                <span className="flex-1 truncate">{t.name}</span>
-                                {theme.id === t.id && !previewThemeId && <Check className="w-4 h-4 text-primary" />}
-                                {t.isDark && <Moon className="w-3 h-3 text-muted-foreground" />}
-                              </DropdownMenuItem>
-                            ))}
-                          </div>
-                        );
-                      })}
+                      {/* Grouped Themes with keyboard shortcut hints */}
+                      {(() => {
+                        let globalIndex = 0;
+                        return categoryOrder.map(category => {
+                          const categoryThemes = groupedThemes[category];
+                          if (!categoryThemes || categoryThemes.length === 0) return null;
+                          
+                          return (
+                            <div key={category}>
+                              <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">
+                                {categoryLabels[category]}
+                              </DropdownMenuLabel>
+                              {categoryThemes.map((t) => {
+                                globalIndex++;
+                                const shortcutNum = globalIndex <= 9 ? globalIndex : null;
+                                
+                                return (
+                                  <DropdownMenuItem
+                                    key={t.id}
+                                    onClick={() => handleThemeSelect(t.id)}
+                                    onMouseEnter={() => handleThemeHover(t.id)}
+                                    className={`cursor-pointer flex items-center gap-2 ${theme.id === t.id && !previewThemeId ? 'bg-primary/10' : ''}`}
+                                  >
+                                    {shortcutNum && (
+                                      <span className="w-4 h-4 rounded text-[10px] bg-muted flex items-center justify-center text-muted-foreground font-mono flex-shrink-0">
+                                        {shortcutNum}
+                                      </span>
+                                    )}
+                                    {!shortcutNum && <span className="w-4 flex-shrink-0" />}
+                                    <div 
+                                      className="w-4 h-4 rounded-full border border-border flex-shrink-0"
+                                      style={{ 
+                                        background: `linear-gradient(135deg, ${t.colors.primary} 0%, ${t.colors.accent} 100%)`
+                                      }}
+                                    />
+                                    <span className="flex-1 truncate">{t.name}</span>
+                                    {theme.id === t.id && !previewThemeId && <Check className="w-4 h-4 text-primary" />}
+                                    {t.isDark && <Moon className="w-3 h-3 text-muted-foreground" />}
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </div>
+                          );
+                        });
+                      })()}
                     </ScrollArea>
                   </DropdownMenuContent>
                 </DropdownMenu>
