@@ -38,6 +38,7 @@ import {
   Edit3,
   Check,
   LucideIcon,
+  DollarSign,
 } from "lucide-react";
 import {
   Sidebar,
@@ -61,6 +62,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSidebarIcons } from "@/hooks/useSidebarIcons";
 import FontAwesomeIconPicker from "@/components/admin/FontAwesomeIconPicker";
 import { toast } from "sonner";
+import { usePrefetchAdmin } from "@/hooks/usePrefetchAdmin";
 
 interface MenuItem {
   title: string;
@@ -78,6 +80,7 @@ const AdminSidebar = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingUrl, setEditingUrl] = useState<string | null>(null);
   const { icons, setIcon, getIcon, isSaving } = useSidebarIcons();
+  const { prefetchRoute } = usePrefetchAdmin();
 
   const mainMenuItems: MenuItem[] = [
     { title: t('dashboard'), url: "/admin", icon: LayoutDashboard },
@@ -107,6 +110,7 @@ const AdminSidebar = () => {
     { title: "Registration", url: "/admin/registration", icon: Shield },
     { title: "Payments", url: "/admin/payments", icon: CreditCard },
     { title: "Subscriptions", url: "/admin/subscriptions", icon: Crown },
+    { title: "Pricing", url: "/admin/pricing", icon: DollarSign },
     { title: "Email Restrictions", url: "/admin/email-restrictions", icon: Ban },
     { title: "Admins", url: "/admin/admins", icon: Shield },
     { title: "Email Setup", url: "/admin/email-setup", icon: Wand2 },
@@ -217,6 +221,8 @@ const AdminSidebar = () => {
                     ? "bg-primary/20 text-primary font-medium"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
+                onMouseEnter={() => prefetchRoute(item.url)}
+                onFocus={() => prefetchRoute(item.url)}
               >
                 {renderIcon(item)}
                 {!collapsed && <span className="text-sm">{item.title}</span>}
