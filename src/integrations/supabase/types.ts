@@ -501,6 +501,27 @@ export type Database = {
         }
         Relationships: []
       }
+      email_stats: {
+        Row: {
+          id: string
+          stat_key: string
+          stat_value: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          stat_key: string
+          stat_value?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          stat_key?: string
+          stat_value?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_templates: {
         Row: {
           body: string

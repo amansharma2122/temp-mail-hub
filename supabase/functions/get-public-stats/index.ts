@@ -29,7 +29,7 @@ serve(async (req) => {
       { count: totalEmails },
       { count: activeAddresses },
       { count: totalDomains },
-      { count: totalEmailsGenerated }
+      { data: emailStatsData }
     ] = await Promise.all([
       // Emails received today
       supabase
@@ -55,18 +55,23 @@ serve(async (req) => {
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true),
       
-      // Total temp emails generated all time
+      // Get permanent email count from email_stats table
       supabase
-        .from('temp_emails')
-        .select('*', { count: 'exact', head: true }),
+        .from('email_stats')
+        .select('stat_value')
+        .eq('stat_key', 'total_emails_generated')
+        .maybeSingle(),
     ]);
+
+    // Use the permanent counter from email_stats, fallback to active count if not found
+    const totalEmailsGenerated = emailStatsData?.stat_value || activeAddresses || 0;
 
     const stats = {
       emailsToday: totalEmailsToday || 0,
       totalEmails: totalEmails || 0,
       activeAddresses: activeAddresses || 0,
       activeDomains: totalDomains || 0,
-      totalEmailsGenerated: totalEmailsGenerated || 0,
+      totalEmailsGenerated: Number(totalEmailsGenerated),
       updatedAt: new Date().toISOString(),
     };
 
@@ -85,6 +90,7 @@ serve(async (req) => {
       totalEmails: 0,
       activeAddresses: 0,
       activeDomains: 0,
+      totalEmailsGenerated: 0,
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,43 +42,40 @@ const defaultSettings: WidgetSettings = {
 const FriendlyWebsitesWidget = () => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [websites, setWebsites] = useState<FriendlyWebsite[]>([]);
-  const [settings, setSettings] = useState<WidgetSettings>(defaultSettings);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch settings
-        const { data: settingsData } = await supabase
-          .from('app_settings')
-          .select('value')
-          .eq('key', 'friendly_sites_widget')
-          .maybeSingle();
+  // Fetch settings with React Query for caching and real-time updates
+  const { data: settings = defaultSettings } = useQuery({
+    queryKey: ['app_settings', 'friendly_sites_widget'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'friendly_sites_widget')
+        .maybeSingle();
 
-        if (settingsData?.value) {
-          setSettings({ ...defaultSettings, ...(settingsData.value as Partial<WidgetSettings>) });
-        }
-
-        // Fetch websites
-        const { data: websitesData } = await supabase
-          .from('friendly_websites')
-          .select('*')
-          .eq('is_active', true)
-          .order('display_order', { ascending: true });
-
-        if (websitesData) {
-          setWebsites(websitesData);
-        }
-      } catch (error) {
-        console.error('Error loading friendly websites:', error);
-      } finally {
-        setIsLoading(false);
+      if (data?.value) {
+        return { ...defaultSettings, ...(data.value as Partial<WidgetSettings>) };
       }
-    };
+      return defaultSettings;
+    },
+    staleTime: 1000 * 30, // 30 seconds - will refetch when invalidated
+    refetchOnWindowFocus: true,
+  });
 
-    fetchData();
-  }, []);
+  // Fetch websites with React Query
+  const { data: websites = [], isLoading } = useQuery({
+    queryKey: ['friendly_websites', 'active'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('friendly_websites')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
   // Check visibility permissions
   const isVisible = () => {
@@ -90,7 +88,7 @@ const FriendlyWebsitesWidget = () => {
     return true;
   };
 
-  if (!isVisible() || isLoading) return null;
+  if (isLoading || !isVisible()) return null;
 
   const sizeClasses = {
     small: 'w-48',

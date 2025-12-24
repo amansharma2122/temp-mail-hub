@@ -312,7 +312,9 @@ const AdminFriendlyWebsites = () => {
       }
 
       toast.success('Settings saved successfully');
+      // Invalidate both the general app_settings and the specific widget query
       queryClient.invalidateQueries({ queryKey: ['app_settings'] });
+      queryClient.invalidateQueries({ queryKey: ['app_settings', 'friendly_sites_widget'] });
     } catch (error) {
       console.error('Error saving settings:', error);
       toast.error('Failed to save settings');
