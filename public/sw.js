@@ -1,8 +1,13 @@
 // Enhanced Service Worker for Push Notifications and Offline Support
-const CACHE_NAME = "nullsto-v3";
-const STATIC_CACHE = "nullsto-static-v3";
-const DYNAMIC_CACHE = "nullsto-dynamic-v3";
-const DATA_CACHE = "nullsto-data-v3";
+// VERSION is checked on each build - changing it triggers cache invalidation
+const SW_VERSION = "3.0.1";
+const CACHE_NAME = `nullsto-${SW_VERSION}`;
+const STATIC_CACHE = `nullsto-static-${SW_VERSION}`;
+const DYNAMIC_CACHE = `nullsto-dynamic-${SW_VERSION}`;
+const DATA_CACHE = `nullsto-data-${SW_VERSION}`;
+
+// All cache names for this version
+const CURRENT_CACHES = [CACHE_NAME, STATIC_CACHE, DYNAMIC_CACHE, DATA_CACHE];
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
@@ -21,40 +26,54 @@ const CACHEABLE_API_ROUTES = [
 
 // Install event - cache static assets
 self.addEventListener("install", (event) => {
-  console.log("Service Worker installing...");
+  console.log(`[SW] Installing version ${SW_VERSION}...`);
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
-      console.log("Caching static assets");
+      console.log("[SW] Caching static assets");
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.log("Some static assets failed to cache:", err);
+        console.log("[SW] Some static assets failed to cache:", err);
       });
     })
   );
+  // Force activation of new service worker immediately
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up ALL old caches from previous versions
 self.addEventListener("activate", (event) => {
-  console.log("Service Worker activated.");
+  console.log(`[SW] Activating version ${SW_VERSION}...`);
   event.waitUntil(
     (async () => {
-      // Clean old caches
+      // Get all cache names
       const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-          .filter((name) => {
-            return (
-              name !== STATIC_CACHE &&
-              name !== DYNAMIC_CACHE &&
-              name !== DATA_CACHE
-            );
-          })
-          .map((name) => {
-            console.log("Deleting old cache:", name);
-            return caches.delete(name);
-          })
-      );
+      
+      // Delete any cache that doesn't match current version
+      const deletionPromises = cacheNames
+        .filter((name) => {
+          // Keep only caches that belong to current version
+          const belongsToCurrentVersion = CURRENT_CACHES.includes(name);
+          if (!belongsToCurrentVersion) {
+            console.log(`[SW] Deleting old cache: ${name}`);
+          }
+          return !belongsToCurrentVersion;
+        })
+        .map((name) => caches.delete(name));
+      
+      await Promise.all(deletionPromises);
+      
+      // Notify all clients about the update
+      const clients = await self.clients.matchAll({ type: "window" });
+      clients.forEach((client) => {
+        client.postMessage({
+          type: "SW_UPDATED",
+          version: SW_VERSION,
+          message: "New version available! Page will refresh for latest updates.",
+        });
+      });
+      
+      // Take control of all clients immediately
       await self.clients.claim();
+      console.log(`[SW] Version ${SW_VERSION} now active and controlling all clients`);
     })()
   );
 });
