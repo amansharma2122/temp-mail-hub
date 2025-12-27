@@ -201,11 +201,11 @@ const LiveStatsWidget = () => {
   const statItems = [
     {
       icon: Mail,
-      label: "Emails (24h)",
+      label: "Today (IST)",
       value: stats.emailsToday,
       color: "text-primary",
       bgColor: "bg-primary/20",
-      tooltip: "Emails received in the last 24 hours",
+      tooltip: "Emails received since midnight IST",
     },
     {
       icon: Zap,
