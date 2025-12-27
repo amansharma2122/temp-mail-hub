@@ -110,22 +110,29 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
   }, [enablePushNotifications, pushPermission]);
 
   useEffect(() => {
+    if (!tempEmailId) {
+      console.log('[useRealtimeEmails] No tempEmailId, skipping subscription');
+      return;
+    }
+
     const filterConfig: any = {
       event: 'INSERT',
       schema: 'public',
-      table: 'received_emails'
+      table: 'received_emails',
+      filter: `temp_email_id=eq.${tempEmailId}`
     };
 
-    if (tempEmailId) {
-      filterConfig.filter = `temp_email_id=eq.${tempEmailId}`;
-    }
+    console.log('[useRealtimeEmails] Setting up realtime subscription for', tempEmailId);
 
-    console.log('[useRealtimeEmails] Setting up realtime subscription', filterConfig);
-
-    const channelName = tempEmailId ? `received-emails-${tempEmailId}` : 'received-emails-all';
+    const channelName = `received-emails-${tempEmailId}`;
 
     const channel = supabase
-      .channel(channelName)
+      .channel(channelName, {
+        config: {
+          broadcast: { self: true },
+          presence: { key: tempEmailId },
+        }
+      })
       .on(
         'postgres_changes',
         filterConfig,
@@ -136,9 +143,12 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
           setNewEmailCount(prev => prev + 1);
           setLastEmail(newEmail);
 
-          // Call the callback if provided
+          // Call the callback immediately for instant UI update
           if (onNewEmail) {
-            onNewEmail(newEmail);
+            // Use requestAnimationFrame for faster visual update
+            requestAnimationFrame(() => {
+              onNewEmail(newEmail);
+            });
           }
 
           // Show toast notification
@@ -161,8 +171,11 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[useRealtimeEmails] Subscription status:', status);
+      .subscribe((status, err) => {
+        console.log('[useRealtimeEmails] Subscription status:', status, err ? err : '');
+        if (status === 'SUBSCRIBED') {
+          console.log('[useRealtimeEmails] Successfully subscribed to realtime updates');
+        }
       });
 
     return () => {
