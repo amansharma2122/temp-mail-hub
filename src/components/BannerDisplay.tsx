@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -9,7 +9,7 @@ interface Banner {
   name: string;
   position: string;
   type: "image" | "html" | "script" | "text";
-  content: string;
+  content: string | null;
   image_url: string | null;
   link_url: string | null;
   is_active: boolean;
@@ -25,8 +25,12 @@ interface BannerDisplayProps {
 
 const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchBanners = async () => {
+  const fetchBanners = useCallback(async (attempt = 0) => {
+    const maxRetries = 3;
+    const backoffMs = Math.min(1000 * Math.pow(2, attempt), 5000);
+    
     try {
       const now = new Date().toISOString();
       const { data, error } = await supabase
@@ -37,7 +41,17 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
         .order("priority", { ascending: false });
 
       if (error) {
+        const isRetryable = error.message?.includes('Failed to fetch') || 
+                            error.message?.includes('fetch') ||
+                            error.message?.includes('timeout');
+        
+        if (isRetryable && attempt < maxRetries) {
+          console.log(`[BannerDisplay] Retrying in ${backoffMs}ms (attempt ${attempt + 1})...`);
+          setTimeout(() => fetchBanners(attempt + 1), backoffMs);
+          return;
+        }
         console.error("Error fetching banners:", error);
+        setIsLoading(false);
         return;
       }
 
@@ -49,17 +63,23 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
       }) as Banner[];
 
       setBanners(activeBanners);
-    } catch (err) {
+      setIsLoading(false);
+    } catch (err: any) {
       console.error("Failed to fetch banners:", err);
+      if (attempt < maxRetries) {
+        setTimeout(() => fetchBanners(attempt + 1), backoffMs);
+        return;
+      }
+      setIsLoading(false);
     }
-  };
+  }, [position]);
 
   useEffect(() => {
     fetchBanners();
 
     // Subscribe to real-time banner changes
     const channel = supabase
-      .channel(`banners_${position}`)
+      .channel(`banners_${position}_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -67,17 +87,20 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
           schema: 'public',
           table: 'banners',
         },
-        () => {
-          // Refetch on any change
+        (payload) => {
+          console.log('[BannerDisplay] Realtime update received:', payload.eventType);
+          // Refetch on any change for instant global updates
           fetchBanners();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[BannerDisplay] Subscription status for ${position}:`, status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [position]);
+  }, [position, fetchBanners]);
 
   const handleBannerClick = async (banner: Banner) => {
     // Track click in database - increment via SQL
@@ -126,6 +149,7 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     banners.forEach((banner) => trackView(banner.id));
   }, [banners]);
 
+  // Don't render anything if no banners (even while loading, to avoid layout shift)
   if (banners.length === 0) return null;
 
   const positionStyles: Record<string, string> = {
@@ -170,7 +194,7 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
 
           {banner.type === "text" && (
             <div className="p-4 bg-primary/10 rounded-lg border border-primary/20 text-center">
-              <p className="text-foreground">{banner.content}</p>
+              <p className="text-foreground">{banner.content || ''}</p>
               {banner.link_url && (
                 <span className="text-primary text-sm hover:underline">
                   Learn more →

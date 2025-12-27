@@ -1,6 +1,6 @@
 // Enhanced Service Worker for Push Notifications and Offline Support
 // VERSION is checked on each build - changing it triggers cache invalidation
-const SW_VERSION = "3.1.0";
+const SW_VERSION = "3.2.0";
 const CACHE_NAME = `nullsto-${SW_VERSION}`;
 const STATIC_CACHE = `nullsto-static-${SW_VERSION}`;
 const DYNAMIC_CACHE = `nullsto-dynamic-${SW_VERSION}`;
@@ -9,17 +9,24 @@ const DATA_CACHE = `nullsto-data-${SW_VERSION}`;
 // All cache names for this version
 const CURRENT_CACHES = [CACHE_NAME, STATIC_CACHE, DYNAMIC_CACHE, DATA_CACHE];
 
-// Static assets to cache on install
+// Static assets to cache on install (excluding favicon/logo which should be fresh)
 const STATIC_ASSETS = [
   "/",
   "/index.html",
-  "/nullsto-favicon.png",
 ];
 
 // API routes that should NEVER be cached (always fetch fresh)
 const NEVER_CACHE_ROUTES = [
   "/rest/v1/app_settings",
   "/rest/v1/subscription_tiers",
+  "/rest/v1/banners",
+];
+
+// Assets that should always be fetched fresh (logo, favicon)
+const ALWAYS_FRESH_ASSETS = [
+  "favicon",
+  "logo",
+  ".ico",
 ];
 
 // API routes that CAN be cached for offline access (less dynamic data)
@@ -27,6 +34,11 @@ const CACHEABLE_API_ROUTES = [
   "/rest/v1/domains",
   "/rest/v1/blogs",
 ];
+
+// Check if asset should always be fetched fresh
+function shouldAlwaysFetch(url) {
+  return ALWAYS_FRESH_ASSETS.some(asset => url.toLowerCase().includes(asset));
+}
 
 // Check if a URL should never be cached
 function shouldNeverCache(url) {
@@ -102,9 +114,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // CRITICAL: Never cache app_settings and subscription_tiers - always network only
+  // CRITICAL: Never cache app_settings, subscription_tiers, banners - always network only
   if (shouldNeverCache(url.pathname) || shouldNeverCache(url.href)) {
     event.respondWith(networkOnly(request));
+    return;
+  }
+
+  // Always fetch fresh: favicon, logo images (to enable real-time updates)
+  if (shouldAlwaysFetch(url.pathname) || shouldAlwaysFetch(url.href)) {
+    event.respondWith(networkFirst(request));
     return;
   }
 
