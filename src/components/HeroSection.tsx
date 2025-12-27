@@ -1,4 +1,5 @@
 import { Sparkles } from "lucide-react";
+import DOMPurify from "dompurify";
 import EmailGenerator from "./EmailGenerator";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
 import { DynamicIcon } from "@/components/admin/LucideIconPicker";
@@ -49,9 +50,10 @@ const HeroSection = () => {
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-fade-in [animation-delay:250ms]">
-            {hero.subtitle}
-          </p>
+          <div 
+            className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-fade-in [animation-delay:250ms] prose prose-sm dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(hero.subtitle) }}
+          />
         </div>
 
         {/* Quick Stats - simplified animations */}

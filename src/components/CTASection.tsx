@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Zap } from "lucide-react";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
@@ -44,9 +45,10 @@ const CTASection = () => {
             )}
           </h2>
 
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            {cta.subtitle}
-          </p>
+          <div 
+            className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8 prose prose-sm dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cta.subtitle) }}
+          />
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to={cta.primaryButton.link}>

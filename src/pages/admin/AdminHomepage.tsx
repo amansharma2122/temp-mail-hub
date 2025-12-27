@@ -11,6 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Save, Plus, Trash2, GripVertical, Eye, EyeOff } from "lucide-react";
 import LucideIconPicker, { DynamicIcon } from "@/components/admin/LucideIconPicker";
+import RichTextEditor from "@/components/admin/RichTextEditor";
+import EmojiPicker from "@/components/admin/EmojiPicker";
 import type { 
   HeroContent, 
   FeaturesContent, 
@@ -205,11 +207,10 @@ function HeroEditor({ section, onSave, isSaving }: { section?: HomepageSection; 
 
         <div className="space-y-2">
           <Label>Subtitle</Label>
-          <Textarea 
-            value={content.subtitle} 
-            onChange={(e) => setContent({ ...content, subtitle: e.target.value })}
-            placeholder="Supporting text"
-            rows={3}
+          <RichTextEditor 
+            content={content.subtitle} 
+            onChange={(html) => setContent({ ...content, subtitle: html })}
+            placeholder="Supporting text..."
           />
         </div>
 
@@ -344,11 +345,10 @@ function FeaturesEditor({ section, onSave, isSaving }: { section?: HomepageSecti
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               </div>
-              <Textarea
-                value={item.description}
-                onChange={(e) => updateItem(index, "description", e.target.value)}
-                placeholder="Feature description"
-                rows={2}
+              <RichTextEditor
+                content={item.description}
+                onChange={(html) => updateItem(index, "description", html)}
+                placeholder="Feature description..."
               />
             </div>
           ))}
@@ -453,11 +453,10 @@ function HowItWorksEditor({ section, onSave, isSaving }: { section?: HomepageSec
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               </div>
-              <Textarea
-                value={step.description}
-                onChange={(e) => updateStep(index, "description", e.target.value)}
-                placeholder="Step description"
-                rows={2}
+              <RichTextEditor
+                content={step.description}
+                onChange={(html) => updateStep(index, "description", html)}
+                placeholder="Step description..."
               />
             </div>
           ))}
@@ -552,11 +551,10 @@ function FAQEditor({ section, onSave, isSaving }: { section?: HomepageSection; o
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               </div>
-              <Textarea
-                value={item.answer}
-                onChange={(e) => updateItem(index, "answer", e.target.value)}
-                placeholder="Answer"
-                rows={3}
+              <RichTextEditor
+                content={item.answer}
+                onChange={(html) => updateItem(index, "answer", html)}
+                placeholder="Answer..."
               />
             </div>
           ))}
@@ -605,10 +603,10 @@ function CTAEditor({ section, onSave, isSaving }: { section?: HomepageSection; o
 
         <div className="space-y-2">
           <Label>Subtitle</Label>
-          <Textarea 
-            value={content.subtitle} 
-            onChange={(e) => setContent({ ...content, subtitle: e.target.value })}
-            rows={2}
+          <RichTextEditor 
+            content={content.subtitle} 
+            onChange={(html) => setContent({ ...content, subtitle: html })}
+            placeholder="Subtitle..."
           />
         </div>
 

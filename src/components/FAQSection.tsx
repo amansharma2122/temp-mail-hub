@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import DOMPurify from "dompurify";
 import {
   Accordion,
   AccordionContent,
@@ -58,7 +59,10 @@ const FAQSection = () => {
                   {item.question}
                 </AccordionTrigger>
                 <AccordionContent className="text-muted-foreground pb-6">
-                  {item.answer}
+                  <div 
+                    className="prose prose-sm dark:prose-invert"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.answer) }}
+                  />
                 </AccordionContent>
               </AccordionItem>
             ))}
