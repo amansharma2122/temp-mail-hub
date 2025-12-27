@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
 import DOMPurify from "dompurify";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Banner {
   id: string;
@@ -12,6 +13,9 @@ interface Banner {
   image_url: string | null;
   link_url: string | null;
   is_active: boolean;
+  priority: number;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 interface BannerDisplayProps {
@@ -22,35 +26,76 @@ interface BannerDisplayProps {
 const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
   const [banners, setBanners] = useState<Banner[]>([]);
 
-  useEffect(() => {
-    // Load banners from localStorage for shared hosting compatibility
-    const loadBanners = () => {
-      const stored = localStorage.getItem("nullsto_banners");
-      if (stored) {
-        const allBanners: Banner[] = JSON.parse(stored);
-        const positionBanners = allBanners.filter(
-          (b) => b.position === position && b.is_active
-        );
-        setBanners(positionBanners);
-      }
-    };
+  const fetchBanners = async () => {
+    try {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("banners")
+        .select("id, name, position, type, content, image_url, link_url, is_active, priority, start_date, end_date")
+        .eq("position", position)
+        .eq("is_active", true)
+        .order("priority", { ascending: false });
 
-    loadBanners();
-    
-    // Listen for banner updates
-    window.addEventListener("bannersUpdated", loadBanners);
-    return () => window.removeEventListener("bannersUpdated", loadBanners);
+      if (error) {
+        console.error("Error fetching banners:", error);
+        return;
+      }
+
+      // Filter by date range on client side
+      const activeBanners = (data || []).filter((banner) => {
+        const startOk = !banner.start_date || new Date(banner.start_date) <= new Date(now);
+        const endOk = !banner.end_date || new Date(banner.end_date) >= new Date(now);
+        return startOk && endOk;
+      }) as Banner[];
+
+      setBanners(activeBanners);
+    } catch (err) {
+      console.error("Failed to fetch banners:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBanners();
+
+    // Subscribe to real-time banner changes
+    const channel = supabase
+      .channel(`banners_${position}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'banners',
+        },
+        () => {
+          // Refetch on any change
+          fetchBanners();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [position]);
 
-  const handleBannerClick = (banner: Banner) => {
-    // Track click
-    const stored = localStorage.getItem("nullsto_banners");
-    if (stored) {
-      const allBanners: Banner[] = JSON.parse(stored);
-      const updated = allBanners.map((b) =>
-        b.id === banner.id ? { ...b, click_count: (b as any).click_count + 1 } : b
-      );
-      localStorage.setItem("nullsto_banners", JSON.stringify(updated));
+  const handleBannerClick = async (banner: Banner) => {
+    // Track click in database - increment via SQL
+    try {
+      const { data } = await supabase
+        .from("banners")
+        .select("click_count")
+        .eq("id", banner.id)
+        .single();
+      
+      if (data) {
+        await supabase
+          .from("banners")
+          .update({ click_count: (data.click_count || 0) + 1 })
+          .eq("id", banner.id);
+      }
+    } catch (err) {
+      // Silently fail click tracking
     }
 
     if (banner.link_url) {
@@ -58,14 +103,22 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     }
   };
 
-  const trackView = (bannerId: string) => {
-    const stored = localStorage.getItem("nullsto_banners");
-    if (stored) {
-      const allBanners: Banner[] = JSON.parse(stored);
-      const updated = allBanners.map((b) =>
-        b.id === bannerId ? { ...b, view_count: (b as any).view_count + 1 } : b
-      );
-      localStorage.setItem("nullsto_banners", JSON.stringify(updated));
+  const trackView = async (bannerId: string) => {
+    try {
+      const { data } = await supabase
+        .from("banners")
+        .select("view_count")
+        .eq("id", bannerId)
+        .single();
+      
+      if (data) {
+        await supabase
+          .from("banners")
+          .update({ view_count: (data.view_count || 0) + 1 })
+          .eq("id", bannerId);
+      }
+    } catch (err) {
+      // Silently fail view tracking
     }
   };
 
