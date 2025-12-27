@@ -314,6 +314,7 @@ const App = () => (
                             <Route path="announcement" element={<AdminAnnouncement />} />
                             <Route path="status-settings" element={<AdminStatusSettings />} />
                             <Route path="friendly-websites" element={<AdminFriendlyWebsites />} />
+                            <Route path="homepage" element={<AdminHomepage />} />
                             <Route path="backup" element={<AdminBackup />} />
                             <Route path="pricing" element={<AdminPricing />} />
                           </Route>

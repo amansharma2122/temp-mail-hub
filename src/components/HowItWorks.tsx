@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import DOMPurify from "dompurify";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
 import { DynamicIcon } from "@/components/admin/LucideIconPicker";
 
@@ -51,7 +52,10 @@ const HowItWorks = () => {
                   </div>
 
                   <h3 className="text-xl font-semibold mb-2 text-foreground">{item.title}</h3>
-                  <p className="text-muted-foreground text-sm">{item.description}</p>
+                  <div 
+                    className="text-muted-foreground text-sm prose prose-sm dark:prose-invert"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.description) }}
+                  />
                 </div>
               </motion.div>
             ))}

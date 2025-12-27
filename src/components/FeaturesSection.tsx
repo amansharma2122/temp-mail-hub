@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import DOMPurify from "dompurify";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
 import { DynamicIcon } from "@/components/admin/LucideIconPicker";
 
@@ -51,7 +52,10 @@ const FeaturesSection = () => {
                 <DynamicIcon name={feature.icon} className="w-5 h-5 text-primary" />
               </div>
               <h3 className="text-base font-semibold mb-1.5 text-foreground">{feature.title}</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
+              <div 
+                className="text-muted-foreground text-sm leading-relaxed prose prose-sm dark:prose-invert"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(feature.description) }}
+              />
             </motion.div>
           ))}
         </div>
