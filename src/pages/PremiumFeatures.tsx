@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useSupabaseAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useConfetti } from "@/hooks/useConfetti";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Feature {
   id: string;
@@ -42,10 +43,11 @@ interface Feature {
 const PremiumFeatures = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { currentTier, isPremium } = useSubscription();
+  const { currentTier, isPremium, tiers } = useSubscription();
   const { fireConfetti } = useConfetti();
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<Record<string, boolean>>({});
+  const [comparisonData, setComparisonData] = useState<any[]>([]);
 
   const features: Feature[] = [
     // Free Features
@@ -171,6 +173,45 @@ const PremiumFeatures = () => {
     setActiveDemo(activeDemo === featureId ? null : featureId);
     setIsPlaying((prev) => ({ ...prev, [featureId]: !prev[featureId] }));
   };
+
+  // Helper to format tier values for comparison table
+  const formatTierValue = (tier: any, key: string) => {
+    if (!tier) return '-';
+    switch (key) {
+      case 'max_temp_emails':
+        return tier.max_temp_emails === -1 ? '∞' : tier.max_temp_emails.toString();
+      case 'email_expiry_hours':
+        const hours = tier.email_expiry_hours;
+        if (hours >= 24) return `${Math.round(hours / 24)} day${hours >= 48 ? 's' : ''}`;
+        return `${hours} hour${hours > 1 ? 's' : ''}`;
+      case 'ai_summaries_per_day':
+        if (tier.ai_summaries_per_day === -1) return '∞';
+        if (tier.ai_summaries_per_day === 0) return 'Disabled';
+        return `${tier.ai_summaries_per_day}/day`;
+      case 'can_forward_emails':
+      case 'can_use_api':
+      case 'can_use_custom_domains':
+      case 'priority_support':
+        return tier[key] ? '✓' : '✗';
+      default:
+        return '-';
+    }
+  };
+
+  // Get tiers by name
+  const freeTier = tiers.find(t => t.name.toLowerCase() === 'free');
+  const proTier = tiers.find(t => t.name.toLowerCase() === 'pro');
+  const businessTier = tiers.find(t => t.name.toLowerCase() === 'business');
+
+  const comparisonRows = [
+    { name: "Temp Emails", key: 'max_temp_emails' },
+    { name: "Email Expiry", key: 'email_expiry_hours' },
+    { name: "AI Summaries", key: 'ai_summaries_per_day' },
+    { name: "Email Forwarding", key: 'can_forward_emails' },
+    { name: "API Access", key: 'can_use_api' },
+    { name: "Custom Domains", key: 'can_use_custom_domains' },
+    { name: "Priority Support", key: 'priority_support' },
+  ];
 
   return (
     <div className="min-h-screen bg-background noise-bg relative">
@@ -380,25 +421,15 @@ const PremiumFeatures = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {[
-                    { name: "Temp Emails", free: "3", pro: "50", business: "∞" },
-                    { name: "Email Expiry", free: "1 hour", pro: "24 hours", business: "7 days" },
-                    { name: "Aliases", free: "3", pro: "10", business: "∞" },
-                    { name: "AI Summaries", free: "5/day", pro: "100/day", business: "∞" },
-                    { name: "Email Forwarding", free: "✗", pro: "✓", business: "✓" },
-                    { name: "API Access", free: "✗", pro: "✓", business: "✓" },
-                    { name: "Webhooks", free: "✗", pro: "✓", business: "✓" },
-                    { name: "Custom Domains", free: "✗", pro: "✗", business: "✓" },
-                    { name: "Priority Support", free: "✗", pro: "✓", business: "✓" },
-                  ].map((row, i) => (
+                  {comparisonRows.map((row, i) => (
                     <tr key={i} className="border-b border-border/50">
                       <td className="py-3 px-4 text-muted-foreground">{row.name}</td>
-                      <td className="py-3 px-4 text-center">{row.free}</td>
+                      <td className="py-3 px-4 text-center">{formatTierValue(freeTier, row.key)}</td>
                       <td className="py-3 px-4 text-center bg-purple-500/5 font-medium">
-                        {row.pro}
+                        {formatTierValue(proTier, row.key)}
                       </td>
                       <td className="py-3 px-4 text-center bg-amber-500/5 font-medium">
-                        {row.business}
+                        {formatTierValue(businessTier, row.key)}
                       </td>
                     </tr>
                   ))}

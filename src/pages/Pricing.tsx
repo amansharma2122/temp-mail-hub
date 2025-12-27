@@ -83,75 +83,66 @@ const PricingPage = () => {
     }
   };
 
-  // Static feature lists for beautiful display
-  const planFeatures = {
-    free: {
-      icon: Zap,
-      color: 'from-emerald-500 to-teal-500',
-      bgGlow: 'bg-emerald-500/20',
-      description: 'Perfect for casual users who need basic privacy protection',
-      features: [
-        { text: '3 Temporary Emails', included: true, icon: Mail },
-        { text: '1 Hour Email Expiry', included: true, icon: Clock },
-        { text: '3 AI Summaries/Day', included: true, icon: Sparkles },
-        { text: 'Email Search', included: true, icon: FileText },
-        { text: 'Email Aliases', included: true, icon: Users },
-        { text: 'Browser Notifications', included: true, icon: Bell },
-        { text: 'Export Emails (PDF/EML)', included: true, icon: FileText },
-        { text: 'Email Forwarding', included: false, icon: Mail },
-        { text: 'Custom Domains', included: false, icon: Globe },
-        { text: 'API Access', included: false, icon: Code },
-        { text: 'Webhook Notifications', included: false, icon: Bell },
-        { text: 'Priority Support', included: false, icon: Headphones },
-      ],
-    },
-    pro: {
-      icon: Crown,
-      color: 'from-primary to-accent',
-      bgGlow: 'bg-primary/20',
-      description: 'For power users who need advanced features and more control',
-      features: [
-        { text: '25 Temporary Emails', included: true, icon: Mail },
-        { text: '24 Hour Email Expiry', included: true, icon: Clock },
-        { text: '50 AI Summaries/Day', included: true, icon: Sparkles },
-        { text: 'Email Search', included: true, icon: FileText },
-        { text: 'Custom Email Aliases', included: true, icon: Users },
-        { text: 'Browser Notifications', included: true, icon: Bell },
-        { text: 'Export Emails (PDF/EML)', included: true, icon: FileText },
-        { text: 'Email Forwarding', included: true, icon: Mail },
-        { text: 'Email Scheduling', included: true, icon: Clock },
-        { text: 'Email Templates', included: true, icon: FileText },
-        { text: 'Custom Domains', included: false, icon: Globe },
-        { text: 'API Access', included: false, icon: Code },
-      ],
-    },
-  business: {
-      icon: Building2,
-      color: 'from-violet-500 to-purple-500',
-      bgGlow: 'bg-violet-500/20',
-      description: 'Enterprise-grade features for teams and businesses',
-      features: [
-        { text: 'Unlimited Temporary Emails', included: true, icon: Mail },
-        { text: '72 Hour Email Expiry', included: true, icon: Clock },
-        { text: 'Unlimited AI Summaries', included: true, icon: Sparkles },
-        { text: 'Advanced Email Search', included: true, icon: FileText },
-        { text: 'Unlimited Custom Aliases', included: true, icon: Users },
-        { text: 'All Notification Types', included: true, icon: Bell },
-        { text: 'Email Forwarding', included: true, icon: Mail },
-        { text: 'Custom Domains', included: true, icon: Globe },
-        { text: 'Full API Access', included: true, icon: Code },
-        { text: 'Webhook Notifications', included: true, icon: Bell },
-        { text: 'Priority Support 24/7', included: true, icon: Headphones },
-        { text: 'Advanced Security', included: true, icon: Lock },
-      ],
-    },
+  // Generate feature list dynamically from tier data
+  const generateFeatures = (tier: any) => {
+    const name = tier.name.toLowerCase();
+    const maxEmails = tier.max_temp_emails === -1 ? 'Unlimited' : tier.max_temp_emails;
+    const expiryHours = tier.email_expiry_hours;
+    const expiryText = expiryHours >= 24 
+      ? `${Math.round(expiryHours / 24)} Day${expiryHours >= 48 ? 's' : ''} Email Expiry`
+      : `${expiryHours} Hour${expiryHours > 1 ? 's' : ''} Email Expiry`;
+    const aiSummaries = tier.ai_summaries_per_day === -1 
+      ? 'Unlimited AI Summaries' 
+      : tier.ai_summaries_per_day === 0
+        ? 'AI Summaries Disabled'
+        : `${tier.ai_summaries_per_day} AI Summaries/Day`;
+    
+    const baseFeatures = [
+      { text: `${maxEmails} Temporary Emails`, included: true, icon: Mail },
+      { text: expiryText, included: true, icon: Clock },
+      { text: aiSummaries, included: tier.ai_summaries_per_day !== 0, icon: Sparkles },
+      { text: 'Email Search', included: true, icon: FileText },
+      { text: 'Email Aliases', included: true, icon: Users },
+      { text: 'Browser Notifications', included: true, icon: Bell },
+      { text: 'Export Emails (PDF/EML)', included: true, icon: FileText },
+      { text: 'Email Forwarding', included: tier.can_forward_emails, icon: Mail },
+      { text: 'Custom Domains', included: tier.can_use_custom_domains, icon: Globe },
+      { text: 'API Access', included: tier.can_use_api, icon: Code },
+      { text: 'Webhook Notifications', included: tier.can_use_api, icon: Bell },
+      { text: 'Priority Support', included: tier.priority_support, icon: Headphones },
+    ];
+    
+    return baseFeatures;
   };
 
-  const getPlanConfig = (tierName: string) => {
+  const getPlanIcon = (tierName: string) => {
     const name = tierName.toLowerCase();
-    if (name.includes('business') || name.includes('enterprise')) return planFeatures.business;
-    if (name.includes('pro') || name.includes('premium')) return planFeatures.pro;
-    return planFeatures.free;
+    if (name.includes('business') || name.includes('enterprise')) return Building2;
+    if (name.includes('pro') || name.includes('premium')) return Crown;
+    return Zap;
+  };
+
+  const getPlanColor = (tierName: string) => {
+    const name = tierName.toLowerCase();
+    if (name.includes('business') || name.includes('enterprise')) return 'from-violet-500 to-purple-500';
+    if (name.includes('pro') || name.includes('premium')) return 'from-primary to-accent';
+    return 'from-emerald-500 to-teal-500';
+  };
+
+  const getPlanBgGlow = (tierName: string) => {
+    const name = tierName.toLowerCase();
+    if (name.includes('business') || name.includes('enterprise')) return 'bg-violet-500/20';
+    if (name.includes('pro') || name.includes('premium')) return 'bg-primary/20';
+    return 'bg-emerald-500/20';
+  };
+
+  const getPlanDescription = (tierName: string) => {
+    const name = tierName.toLowerCase();
+    if (name.includes('business') || name.includes('enterprise')) 
+      return 'Enterprise-grade features for teams and businesses';
+    if (name.includes('pro') || name.includes('premium')) 
+      return 'For power users who need advanced features and more control';
+    return 'Perfect for casual users who need basic privacy protection';
   };
 
   if (isLoading) {
@@ -279,8 +270,11 @@ const PricingPage = () => {
                 : Number(tier.price_yearly);
               const isCurrentPlan = subscription?.tier_id === tier.id;
               const isPro = tier.name.toLowerCase() === pricingContent.featuredPlan.toLowerCase();
-              const planConfig = getPlanConfig(tier.name);
-              const PlanIcon = planConfig.icon;
+              const PlanIcon = getPlanIcon(tier.name);
+              const planColor = getPlanColor(tier.name);
+              const planBgGlow = getPlanBgGlow(tier.name);
+              const planDescription = getPlanDescription(tier.name);
+              const planFeatures = generateFeatures(tier);
 
               return (
                 <motion.div
@@ -311,11 +305,11 @@ const PricingPage = () => {
                       : 'border-border hover:border-primary/30'
                   }`}>
                     {/* Glow Effect */}
-                    <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 ${planConfig.bgGlow} blur-3xl opacity-50`} />
+                    <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 ${planBgGlow} blur-3xl opacity-50`} />
                     
                     <CardHeader className="relative pb-4 pt-8">
                       {/* Icon */}
-                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${planConfig.color} p-0.5 mb-4`}>
+                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${planColor} p-0.5 mb-4`}>
                         <div className="w-full h-full rounded-[14px] bg-card flex items-center justify-center">
                           <PlanIcon className="w-6 h-6 text-primary" />
                         </div>
@@ -323,7 +317,7 @@ const PricingPage = () => {
                       
                       <CardTitle className="text-2xl font-bold">{tier.name}</CardTitle>
                       <CardDescription className="text-sm min-h-[40px]">
-                        {planConfig.description}
+                        {planDescription}
                       </CardDescription>
                     </CardHeader>
                     
@@ -350,7 +344,7 @@ const PricingPage = () => {
 
                       {/* Features */}
                       <ul className="space-y-3">
-                        {planConfig.features.map((feature, i) => (
+                        {planFeatures.map((feature, i) => (
                           <motion.li
                             key={i}
                             initial={{ opacity: 0, x: -10 }}

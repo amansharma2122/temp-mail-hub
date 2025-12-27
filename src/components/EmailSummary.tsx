@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useSupabaseAuth";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { usePremiumFeatures } from "@/hooks/usePremiumFeatures";
 import { storage } from "@/lib/storage";
 
 interface EmailSummaryProps {
@@ -53,6 +54,7 @@ const incrementUsage = () => {
 const EmailSummary = ({ emailId, subject, body, htmlBody }: EmailSummaryProps) => {
   const { user } = useAuth();
   const { settings } = useUserSettings();
+  const { limits } = usePremiumFeatures();
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<SummaryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,11 +66,18 @@ const EmailSummary = ({ emailId, subject, body, htmlBody }: EmailSummaryProps) =
     setUsageCount(getUsageToday());
   }, []);
 
-  // Determine limits based on user type
+  // Determine limits: prioritize subscription tier limits, fallback to admin settings
   const isGuest = !user;
-  const dailyLimit = isGuest ? settings.guestAiSummaryLimit : settings.userAiSummaryLimit;
+  // For logged-in users, use tier-based limit; for guests, use admin settings
+  const tierLimit = limits.aiSummariesPerDay;
+  const dailyLimit = isGuest 
+    ? settings.guestAiSummaryLimit 
+    : (tierLimit !== undefined ? tierLimit : settings.userAiSummaryLimit);
+  
+  // Disabled if: global toggle off, OR tier limit is 0 (disabled for this tier)
   const isDisabled = !settings.aiSummaryEnabled || dailyLimit === 0;
-  const isLimitReached = usageCount >= dailyLimit && dailyLimit > 0;
+  // -1 means unlimited
+  const isLimitReached = dailyLimit > 0 && usageCount >= dailyLimit;
 
   const handleSummarize = async () => {
     if (isDisabled) {
