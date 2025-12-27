@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { storage } from '@/lib/storage';
 
@@ -26,12 +26,26 @@ const defaultSettings: AppearanceSettings = {
   footerText: '© 2024 Nullsto. All rights reserved.',
 };
 
+// Cache buster timestamp - updates on each settings change
+let globalCacheBuster = Date.now();
+
 export const useAppearanceSettings = () => {
   const [settings, setSettings] = useState<AppearanceSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
+  const cacheBusterRef = useRef(globalCacheBuster);
+
+  // Helper to add cache buster to URLs
+  const addCacheBuster = (url: string): string => {
+    if (!url) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}t=${cacheBusterRef.current}`;
+  };
 
   useEffect(() => {
-    const loadSettings = async () => {
+    const loadSettings = async (attempt = 0) => {
+      const maxRetries = 3;
+      const backoffMs = Math.min(1000 * Math.pow(2, attempt), 5000);
+      
       try {
         const { data, error } = await supabase
           .from('app_settings')
@@ -46,12 +60,25 @@ export const useAppearanceSettings = () => {
           const merged = { ...defaultSettings, ...dbSettings };
           setSettings(merged);
           storage.set(APPEARANCE_SETTINGS_KEY, merged);
+        } else if (error) {
+          const isRetryable = error.message?.includes('Failed to fetch') || 
+                              error.message?.includes('fetch');
+          if (isRetryable && attempt < maxRetries) {
+            setTimeout(() => loadSettings(attempt + 1), backoffMs);
+            return;
+          }
+          const localSettings = storage.get<AppearanceSettings>(APPEARANCE_SETTINGS_KEY, defaultSettings);
+          setSettings(localSettings);
         } else {
           const localSettings = storage.get<AppearanceSettings>(APPEARANCE_SETTINGS_KEY, defaultSettings);
           setSettings(localSettings);
         }
       } catch (e) {
         console.error('Error loading appearance settings:', e);
+        if (attempt < maxRetries) {
+          setTimeout(() => loadSettings(attempt + 1), backoffMs);
+          return;
+        }
         const localSettings = storage.get<AppearanceSettings>(APPEARANCE_SETTINGS_KEY, defaultSettings);
         setSettings(localSettings);
       } finally {
@@ -77,6 +104,9 @@ export const useAppearanceSettings = () => {
           if (payload.new && (payload.new as any).value) {
             const newSettings = (payload.new as any).value as AppearanceSettings;
             const merged = { ...defaultSettings, ...newSettings };
+            // Update cache buster for new images
+            cacheBusterRef.current = Date.now();
+            globalCacheBuster = cacheBusterRef.current;
             setSettings(merged);
             storage.set(APPEARANCE_SETTINGS_KEY, merged);
           }
@@ -100,16 +130,18 @@ export const useAppearanceSettings = () => {
       const faviconLink = document.createElement('link');
       faviconLink.rel = 'icon';
       faviconLink.type = 'image/x-icon';
-      // Add cache buster to force reload
-      const cacheBuster = `?v=${Date.now()}`;
-      faviconLink.href = settings.faviconUrl.includes('?') 
-        ? settings.faviconUrl + '&t=' + Date.now()
-        : settings.faviconUrl + cacheBuster;
+      faviconLink.href = addCacheBuster(settings.faviconUrl);
       document.head.appendChild(faviconLink);
     }
   }, [settings.faviconUrl]);
 
-  return { settings, isLoading, refetch: () => {} };
+  // Return settings with cache-busted URLs for logo
+  const settingsWithCacheBusting = {
+    ...settings,
+    logoUrl: settings.logoUrl ? addCacheBuster(settings.logoUrl) : settings.logoUrl,
+  };
+
+  return { settings: settingsWithCacheBusting, isLoading, refetch: () => {} };
 };
 
 export default useAppearanceSettings;

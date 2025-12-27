@@ -143,29 +143,43 @@ export const useSecureEmailService = () => {
     );
   }, [currentEmail?.id]);
 
-  // Load domains from Supabase - optimized for speed
+  // Load domains from Supabase with retry logic
   useEffect(() => {
-    const loadDomains = async () => {
-      // Single fast query without retries for initial load
-      const { data, error } = await supabase
-        .from('domains')
-        .select('id, name, is_premium, is_active, created_at')
-        .eq('is_active', true)
-        .order('is_premium', { ascending: true })
-        .limit(20);
+    const loadDomains = async (attempt = 0) => {
+      const maxRetries = 3;
+      const backoffMs = Math.min(1000 * Math.pow(2, attempt), 5000);
 
-      if (!error && data) {
-        setDomains(data);
-      } else if (error) {
-        console.error('Error loading domains:', error);
-        // Retry once after short delay
-        setTimeout(async () => {
-          const { data: retryData } = await supabase
-            .from('domains')
-            .select('id, name, is_premium, is_active, created_at')
-            .eq('is_active', true);
-          if (retryData) setDomains(retryData);
-        }, 500);
+      try {
+        const { data, error } = await supabase
+          .from('domains')
+          .select('id, name, is_premium, is_active, created_at')
+          .eq('is_active', true)
+          .order('is_premium', { ascending: true })
+          .limit(20);
+
+        if (!error && data) {
+          setDomains(data);
+          return;
+        }
+        
+        if (error) {
+          console.error(`Error loading domains (attempt ${attempt + 1}):`, error);
+          const isRetryable = error.message?.includes('Failed to fetch') || 
+                              error.message?.includes('fetch') ||
+                              error.message?.includes('timeout') ||
+                              error.message?.includes('network');
+          
+          if (isRetryable && attempt < maxRetries) {
+            console.log(`[email-service] Retrying domain load in ${backoffMs}ms...`);
+            setTimeout(() => loadDomains(attempt + 1), backoffMs);
+            return;
+          }
+        }
+      } catch (err: any) {
+        console.error(`Error loading domains (attempt ${attempt + 1}):`, err);
+        if (attempt < maxRetries) {
+          setTimeout(() => loadDomains(attempt + 1), backoffMs);
+        }
       }
     };
 
