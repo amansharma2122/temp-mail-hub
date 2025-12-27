@@ -93,23 +93,38 @@ const LiveStatsWidget = () => {
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
   const initialLoadRef = useRef(true);
 
-  // Update stats - only clamp monotonic counters (totalEmails, totalInboxesCreated, totalEmailsGenerated)
-  const updateStats = useCallback((incoming: Partial<Stats>) => {
+  // Update stats - for API responses, trust the server value for monotonic counters
+  // Only use Math.max for realtime incremental updates
+  const updateStats = useCallback((incoming: Partial<Stats>, isApiResponse = false) => {
     setStats(prev => {
+      // For API responses, trust the server value directly for monotonic counters
+      // This fixes the issue where cached values are higher than actual DB values
+      const incomingTotalInboxes = parseStatValue(incoming.totalInboxesCreated);
+      const incomingTotalEmails = parseStatValue(incoming.totalEmails);
+      const incomingTotalGenerated = parseStatValue(incoming.totalEmailsGenerated);
+      
       const next: Stats = {
         // Rolling 24h - allow natural fluctuation
         emailsToday: parseStatValue(incoming.emailsToday ?? prev.emailsToday),
-        // Monotonic - only increase
-        totalEmails: Math.max(prev.totalEmails, parseStatValue(incoming.totalEmails ?? prev.totalEmails)),
+        // Monotonic - for API responses, use server value if provided; for realtime, use max
+        totalEmails: isApiResponse && incoming.totalEmails !== undefined 
+          ? incomingTotalEmails 
+          : Math.max(prev.totalEmails, incomingTotalEmails || prev.totalEmails),
         // Active count - allow natural fluctuation as inboxes expire
         activeAddresses: parseStatValue(incoming.activeAddresses ?? prev.activeAddresses),
-        // Monotonic - total ever created, only increase
-        totalInboxesCreated: Math.max(prev.totalInboxesCreated, parseStatValue(incoming.totalInboxesCreated ?? prev.totalInboxesCreated)),
+        // Monotonic - for API responses, use server value if provided; for realtime, use max
+        totalInboxesCreated: isApiResponse && incoming.totalInboxesCreated !== undefined
+          ? incomingTotalInboxes
+          : Math.max(prev.totalInboxesCreated, incomingTotalInboxes || prev.totalInboxesCreated),
         // Domains can change
         activeDomains: parseStatValue(incoming.activeDomains ?? prev.activeDomains),
-        // Monotonic - only increase
-        totalEmailsGenerated: Math.max(prev.totalEmailsGenerated, parseStatValue(incoming.totalEmailsGenerated ?? prev.totalEmailsGenerated)),
+        // Monotonic - for API responses, use server value if provided; for realtime, use max
+        totalEmailsGenerated: isApiResponse && incoming.totalEmailsGenerated !== undefined
+          ? incomingTotalGenerated
+          : Math.max(prev.totalEmailsGenerated, incomingTotalGenerated || prev.totalEmailsGenerated),
       };
+      
+      console.log('[LiveStatsWidget] Stats updated:', { isApiResponse, incoming, prev, next });
       saveCachedStats(next);
       return next;
     });
@@ -121,6 +136,8 @@ const LiveStatsWidget = () => {
         const { data, error } = await supabase.functions.invoke('get-public-stats');
         
         if (!error && data) {
+          console.log('[LiveStatsWidget] API response:', data);
+          // Pass isApiResponse=true so we trust server values over cached
           updateStats({
             emailsToday: data.emailsToday,
             totalEmails: data.totalEmails,
@@ -128,7 +145,7 @@ const LiveStatsWidget = () => {
             totalInboxesCreated: data.totalInboxesCreated,
             activeDomains: data.activeDomains,
             totalEmailsGenerated: data.totalEmailsGenerated,
-          });
+          }, true);
         }
       } catch (err) {
         console.error('Error fetching stats:', err);
