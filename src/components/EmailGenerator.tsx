@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, RefreshCw, Check, Star, Volume2, Plus, Edit2, Sparkles, User, Mail, Zap } from "lucide-react";
+import { Copy, RefreshCw, Check, Star, Volume2, Plus, Edit2, Sparkles, User, Mail, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -40,6 +40,7 @@ interface EmailUsageStats {
   used: number;
   remaining: number;
   limit: number;
+  resetAt: Date | null;
 }
 
 const EmailGenerator = () => {
@@ -75,6 +76,7 @@ const EmailGenerator = () => {
     used: 0,
     remaining: 30,
     limit: 30,
+    resetAt: null,
   });
 
   // Load rate limit settings from subscription tiers (for registered users) or app_settings (for guests)
@@ -143,32 +145,58 @@ const EmailGenerator = () => {
     }
   }, [user]);
 
-  // Update email usage count - uses rate_limits for accurate tracking
-  const updateEmailUsage = useCallback(async (limit: number) => {
+  // Update email usage count - uses rate_limits for accurate tracking with 24h reset
+  const updateEmailUsage = useCallback(async (limit: number, windowMinutes: number = 1440) => {
     try {
       let used = 0;
+      let resetAt: Date | null = null;
+      
+      // Calculate reset time based on window
+      const now = new Date();
+      const windowMs = windowMinutes * 60 * 1000;
+      const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
+      resetAt = new Date(windowStart.getTime() + windowMs);
       
       if (user) {
-        // For logged-in users, count their temp_emails
-        const { count } = await supabase
-          .from("temp_emails")
-          .select("*", { count: 'exact', head: true })
-          .eq("user_id", user.id);
-        used = count || 0;
+        // For logged-in users, check rate_limits table
+        const { data } = await supabase
+          .from("rate_limits")
+          .select("request_count, window_start")
+          .eq("identifier", user.id)
+          .eq("action_type", "generate_email")
+          .order("window_start", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data) {
+          const recordWindow = new Date(data.window_start);
+          // Check if record is within current window
+          if (recordWindow >= windowStart) {
+            used = data.request_count || 0;
+          }
+        }
       } else {
-        // For guests, check rate_limits table first
+        // For guests, check rate_limits table
         const deviceId = localStorage.getItem('nullsto_device_id') || '';
         if (deviceId) {
           const { data } = await supabase
             .from("rate_limits")
-            .select("request_count")
+            .select("request_count, window_start")
             .eq("identifier", deviceId)
             .eq("action_type", "generate_email")
+            .order("window_start", { ascending: false })
+            .limit(1)
             .maybeSingle();
-          used = data?.request_count || 0;
+          
+          if (data) {
+            const recordWindow = new Date(data.window_start);
+            if (recordWindow >= windowStart) {
+              used = data.request_count || 0;
+            }
+          }
         }
         
-        // Also check localStorage for initial load count (includes current session)
+        // Also check localStorage for initial load count
         const localCount = getLocalEmailCount();
         if (localCount > used) {
           used = localCount;
@@ -176,7 +204,7 @@ const EmailGenerator = () => {
       }
 
       const remaining = limit === 9999 ? 9999 : Math.max(0, limit - used);
-      setEmailUsage({ used, remaining, limit: limit === 9999 ? -1 : limit });
+      setEmailUsage({ used, remaining, limit: limit === 9999 ? -1 : limit, resetAt });
     } catch (err) {
       console.error('Failed to update email usage:', err);
     }
@@ -200,7 +228,8 @@ const EmailGenerator = () => {
   useEffect(() => {
     const init = async () => {
       const limit = await loadRateLimitSettings();
-      await updateEmailUsage(limit);
+      const windowMinutes = user ? rateLimitSettings.window_minutes : rateLimitSettings.guest_window_minutes;
+      await updateEmailUsage(limit, windowMinutes || 1440);
     };
     init();
 
@@ -253,11 +282,10 @@ const EmailGenerator = () => {
           table: 'rate_limits',
         },
         async () => {
-          // Update for guests when rate_limits changes
-          if (!user) {
-            const limit = rateLimitSettings.guest_max_requests || 5;
-            await updateEmailUsage(limit);
-          }
+          // Update usage when rate_limits changes (including admin reset)
+          const limit = user ? rateLimitSettings.max_requests : rateLimitSettings.guest_max_requests;
+          const windowMinutes = user ? rateLimitSettings.window_minutes : rateLimitSettings.guest_window_minutes;
+          await updateEmailUsage(limit || 5, windowMinutes || 1440);
         }
       )
       .subscribe();
@@ -567,25 +595,49 @@ const EmailGenerator = () => {
                   )}
                 </div>
 
-                {/* Usage Counter - Inline */}
-                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-secondary/30 border border-border/50">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  <span className="text-[11px] text-muted-foreground">
-                    <span className="font-medium text-foreground">{emailUsage.used}</span>/{emailUsage.limit === -1 ? '∞' : emailUsage.limit}
-                  </span>
-                  {emailUsage.limit !== -1 && (
-                    <div className="w-12 h-1.5 rounded-full bg-secondary overflow-hidden">
-                      <motion.div
-                        className={`h-full rounded-full ${
-                          emailUsage.remaining <= 1 ? 'bg-destructive' : 'bg-primary'
-                        }`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, (emailUsage.used / emailUsage.limit) * 100)}%` }}
-                        transition={{ duration: 0.3 }}
-                      />
+                {/* Usage Counter - Inline with Tooltip */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-secondary/30 border border-border/50 cursor-help">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                      <span className="text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground">{emailUsage.used}</span>/{emailUsage.limit === -1 ? '∞' : emailUsage.limit}
+                      </span>
+                      {emailUsage.limit !== -1 && (
+                        <div className="w-12 h-1.5 rounded-full bg-secondary overflow-hidden">
+                          <motion.div
+                            className={`h-full rounded-full ${
+                              emailUsage.remaining <= 1 ? 'bg-destructive' : 'bg-primary'
+                            }`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(100, (emailUsage.used / emailUsage.limit) * 100)}%` }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <div className="text-xs space-y-1">
+                      <p className="font-medium flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        Email Generation Limit
+                      </p>
+                      <p className="text-muted-foreground">
+                        You can create {emailUsage.limit === -1 ? 'unlimited' : emailUsage.limit} emails per 24 hours.
+                      </p>
+                      <p className="text-muted-foreground">
+                        Used: {emailUsage.used} | Remaining: {emailUsage.remaining === 9999 ? '∞' : emailUsage.remaining}
+                      </p>
+                      {emailUsage.resetAt && emailUsage.limit !== -1 && (
+                        <p className="text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Resets: {emailUsage.resetAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
               {/* Upgrade prompt when low */}
