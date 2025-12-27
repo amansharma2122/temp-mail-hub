@@ -52,9 +52,16 @@ export function usePricingContent() {
           filter: 'key=eq.pricing_content',
         },
         (payload) => {
-          console.log('Pricing content changed:', payload);
+          console.log('[usePricingContent] Realtime event received:', {
+            event: payload.eventType,
+            old: payload.old,
+            new: payload.new,
+            timestamp: new Date().toISOString(),
+          });
           if (payload.new && (payload.new as any).value) {
-            setContent({ ...defaultPricingContent, ...((payload.new as any).value as Partial<PricingContent>) });
+            const newContent = { ...defaultPricingContent, ...((payload.new as any).value as Partial<PricingContent>) };
+            console.log('[usePricingContent] Updating content to:', newContent);
+            setContent(newContent);
           }
         }
       )

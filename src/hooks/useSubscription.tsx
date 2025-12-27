@@ -278,6 +278,37 @@ export const useSubscription = () => {
     }
   }, [user, tiers, fetchSubscription, fetchUsage]);
 
+  // Subscribe to realtime tier changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('subscription_tiers_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subscription_tiers',
+        },
+        (payload) => {
+          console.log('[useSubscription] Tier realtime event:', {
+            event: payload.eventType,
+            old: payload.old,
+            new: payload.new,
+            timestamp: new Date().toISOString(),
+          });
+          // Refetch all tiers when any change occurs
+          fetchTiers();
+        }
+      )
+      .subscribe((status) => {
+        console.log('[useSubscription] Realtime subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchTiers]);
+
   return {
     tiers,
     subscription,
