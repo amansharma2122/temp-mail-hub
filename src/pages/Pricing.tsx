@@ -169,7 +169,7 @@ const PricingPage = () => {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.02)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,black,transparent)]" />
       </div>
 
-      <main className="pt-28 pb-20">
+      <main className="pt-32 pb-20">
         <div className="container mx-auto px-4">
           {user && <EmailVerificationBanner />}
 
