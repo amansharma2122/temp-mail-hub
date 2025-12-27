@@ -193,6 +193,31 @@ export const usePremiumFeatures = () => {
     };
   }, [user, fetchSubscription]);
 
+  // Real-time subscription to subscription_tiers changes (for admin edits)
+  useEffect(() => {
+    const channel = supabase
+      .channel('subscription_tiers_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'subscription_tiers',
+        },
+        (payload) => {
+          console.log('[PremiumFeatures] Subscription tiers changed via realtime:', payload);
+          // Force refetch immediately when tier definitions change
+          setLastFetchTime(0);
+          fetchSubscription(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchSubscription]);
+
   const price = TIER_PRICES[tier];
 
   const canUseFeature = useCallback((feature: keyof TierLimits): boolean => {
