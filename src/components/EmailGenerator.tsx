@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, RefreshCw, Check, Star, Volume2, Plus, Edit2, Sparkles, User, Shuffle, Mail } from "lucide-react";
+import { Copy, RefreshCw, Check, Star, Volume2, Plus, Edit2, Sparkles, User, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -81,13 +81,13 @@ const EmailGenerator = () => {
   const loadRateLimitSettings = useCallback(async () => {
     try {
       // First fetch the subscription tiers to get limits for registered users
-      const { data: tiers, error: tiersError } = await supabase
+      const { data: tiers } = await supabase
         .from("subscription_tiers")
         .select("name, max_temp_emails")
         .order("price_monthly", { ascending: true });
 
       // Get user's current tier if logged in
-      let userTierLimit = 30; // Default for free tier
+      let userTierLimit = 5; // Default for free tier
       if (user) {
         const { data: subscription } = await supabase
           .from("user_subscriptions")
@@ -105,61 +105,71 @@ const EmailGenerator = () => {
             userTierLimit = freeTier.max_temp_emails === -1 ? 9999 : freeTier.max_temp_emails;
           }
         }
+      } else {
+        // For guests, get the free tier limit
+        if (tiers && tiers.length > 0) {
+          const freeTier = tiers.find(t => t.name.toLowerCase() === 'free');
+          if (freeTier) {
+            userTierLimit = freeTier.max_temp_emails === -1 ? 9999 : freeTier.max_temp_emails;
+          }
+        }
       }
 
-      // Fetch guest limits from app_settings
+      // Fetch guest limits from app_settings (for window minutes)
       const { data: appSettings } = await supabase
         .from("app_settings")
         .select("value")
         .eq("key", "rate_limit_temp_email_create")
         .single();
 
-      let guestLimit = 10;
       let guestWindow = 60;
       
       if (appSettings?.value && typeof appSettings.value === 'object' && !Array.isArray(appSettings.value)) {
         const value = appSettings.value as Record<string, unknown>;
-        guestLimit = typeof value.guest_max_requests === 'number' ? value.guest_max_requests : 10;
         guestWindow = typeof value.guest_window_minutes === 'number' ? value.guest_window_minutes : 60;
       }
 
       setRateLimitSettings({
         max_requests: userTierLimit,
         window_minutes: 60, // Daily for registered users
-        guest_max_requests: guestLimit,
+        guest_max_requests: userTierLimit, // Use same tier limit for guests
         guest_window_minutes: guestWindow,
       });
 
-      // Calculate current usage
-      await updateEmailUsage(user ? userTierLimit : guestLimit);
+      return userTierLimit;
     } catch (err) {
       console.error('Failed to load rate limit settings:', err);
+      return 5;
     }
   }, [user]);
 
-  // Update email usage count
+  // Update email usage count - count actual temp_emails created, not rate_limits
   const updateEmailUsage = useCallback(async (limit: number) => {
     try {
-      let identifier = user?.id;
-      if (!identifier) {
-        identifier = localStorage.getItem('nullsto_device_id') || '';
-      }
+      let used = 0;
       
-      if (!identifier) {
-        setEmailUsage({ used: 0, remaining: limit, limit });
-        return;
+      if (user) {
+        // For logged-in users, count their temp_emails
+        const { count } = await supabase
+          .from("temp_emails")
+          .select("*", { count: 'exact', head: true })
+          .eq("user_id", user.id);
+        used = count || 0;
+      } else {
+        // For guests, check rate_limits table
+        const deviceId = localStorage.getItem('nullsto_device_id') || '';
+        if (deviceId) {
+          const { data } = await supabase
+            .from("rate_limits")
+            .select("request_count")
+            .eq("identifier", deviceId)
+            .eq("action_type", "generate_email")
+            .maybeSingle();
+          used = data?.request_count || 0;
+        }
       }
 
-      // Get current rate limit count
-      const { data } = await supabase
-        .from("rate_limits")
-        .select("request_count")
-        .eq("identifier", identifier)
-        .eq("action_type", "generate_email")
-        .maybeSingle();
-
-      const used = data?.request_count || 0;
-      const remaining = Math.max(0, limit - used);
+      const remaining = limit === 9999 ? 9999 : Math.max(0, limit - used);
       setEmailUsage({ used, remaining, limit: limit === 9999 ? -1 : limit });
     } catch (err) {
       console.error('Failed to update email usage:', err);
@@ -168,11 +178,15 @@ const EmailGenerator = () => {
 
   // Load settings on mount and subscribe to real-time changes
   useEffect(() => {
-    loadRateLimitSettings();
+    const init = async () => {
+      const limit = await loadRateLimitSettings();
+      await updateEmailUsage(limit);
+    };
+    init();
 
-    // Subscribe to real-time changes in rate limit settings and subscription tiers
+    // Subscribe to real-time changes in settings, tiers, and temp_emails
     const channel = supabase
-      .channel('rate_limit_settings')
+      .channel('email_usage_tracking')
       .on(
         'postgres_changes',
         {
@@ -181,9 +195,9 @@ const EmailGenerator = () => {
           table: 'app_settings',
           filter: 'key=eq.rate_limit_temp_email_create'
         },
-        () => {
-          console.log('Rate limit settings changed, reloading...');
-          loadRateLimitSettings();
+        async () => {
+          const limit = await loadRateLimitSettings();
+          await updateEmailUsage(limit);
         }
       )
       .on(
@@ -193,9 +207,37 @@ const EmailGenerator = () => {
           schema: 'public',
           table: 'subscription_tiers',
         },
-        () => {
-          console.log('Subscription tiers changed, reloading rate limits...');
-          loadRateLimitSettings();
+        async () => {
+          const limit = await loadRateLimitSettings();
+          await updateEmailUsage(limit);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'temp_emails',
+        },
+        async () => {
+          // Immediately update usage when a new temp email is created
+          const limit = user ? rateLimitSettings.max_requests : rateLimitSettings.guest_max_requests;
+          await updateEmailUsage(limit || 5);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rate_limits',
+        },
+        async () => {
+          // Update for guests when rate_limits changes
+          if (!user) {
+            const limit = rateLimitSettings.guest_max_requests || 5;
+            await updateEmailUsage(limit);
+          }
         }
       )
       .subscribe();
@@ -203,7 +245,7 @@ const EmailGenerator = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadRateLimitSettings]);
+  }, [loadRateLimitSettings, updateEmailUsage, user, rateLimitSettings.max_requests, rateLimitSettings.guest_max_requests]);
 
   const verifyCaptcha = async (action: string): Promise<boolean> => {
     if (!captchaEnabled || !captchaSettings.enableOnEmailGen) {
@@ -264,7 +306,6 @@ const EmailGenerator = () => {
 
   const refreshEmail = async () => {
     // Get or create a unique device identifier for anonymous users
-    // This prevents all anonymous users from sharing the same rate-limit bucket
     let identifier = user?.id;
     if (!identifier) {
       let deviceId = localStorage.getItem('nullsto_device_id');
@@ -307,9 +348,12 @@ const EmailGenerator = () => {
     const currentDomainId = currentEmail?.domain_id || domains[0]?.id;
     await generateEmail(currentDomainId);
     
-    // Update usage after generating
-    const limit = user ? rateLimitSettings.max_requests : rateLimitSettings.guest_max_requests;
-    await updateEmailUsage(limit);
+    // Immediately update usage after generating (don't wait for realtime)
+    setEmailUsage(prev => ({
+      ...prev,
+      used: prev.used + 1,
+      remaining: prev.limit === -1 ? 9999 : Math.max(0, prev.remaining - 1)
+    }));
     
     toast.success("New email generated!");
   };
@@ -431,110 +475,105 @@ const EmailGenerator = () => {
                 </div>
               </motion.div>
               
-              {/* Domain Selector + Username Style Toggle */}
-              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-3">
-                {/* Username Style Toggle */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <Select 
-                        value={usernameStyle} 
-                        onValueChange={(value) => setUsernameStyle(value as 'human' | 'random')}
-                      >
-                        <SelectTrigger className="w-32 bg-card border-accent/30 text-sm shadow-lg">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="human">
-                            <span className="flex items-center gap-2">
-                              <User className="w-3 h-3" />
-                              Human-like
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="random">
-                            <span className="flex items-center gap-2">
-                              <Shuffle className="w-3 h-3" />
-                              Random
-                            </span>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Username style: Human-like (e.g., john.smith42) or Random (e.g., x8k3m2)</p>
-                  </TooltipContent>
-                </Tooltip>
+            </div>
 
-                {/* Separator */}
-                <div className="h-6 w-px bg-border/50" />
+            {/* Email Options - Redesigned layout */}
+            <div className="mt-8 mb-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                {/* Username Style Card */}
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/30 border border-border/50">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="w-4 h-4 text-primary" />
+                    <span>Style:</span>
+                  </div>
+                  <div className="flex rounded-lg overflow-hidden border border-border/50">
+                    <button
+                      onClick={() => setUsernameStyle('human')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-all ${
+                        usernameStyle === 'human' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-card hover:bg-secondary text-muted-foreground'
+                      }`}
+                    >
+                      Human-like
+                    </button>
+                    <button
+                      onClick={() => setUsernameStyle('random')}
+                      className={`px-3 py-1.5 text-sm font-medium transition-all ${
+                        usernameStyle === 'random' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-card hover:bg-secondary text-muted-foreground'
+                      }`}
+                    >
+                      Random
+                    </button>
+                  </div>
+                </div>
 
-                {/* Domain Selector */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <Select 
-                        value={currentDomain?.id || ""} 
-                        onValueChange={changeDomain}
-                        disabled={isGenerating}
-                      >
-                        <SelectTrigger className="w-52 bg-card border-primary/30 text-sm shadow-lg">
-                          <SelectValue placeholder="Select domain" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {domains.map((domain) => (
-                            <SelectItem key={domain.id} value={domain.id}>
-                              {domain.name} {domain.is_premium && "⭐"} {domain.is_custom && "🔧"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{tooltips.emailGenerator.domain}</p>
-                  </TooltipContent>
-                </Tooltip>
-                {user && (
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={() => setCustomDomainDialog(true)}
-                    className="shadow-lg"
-                    title="Add custom domain"
+                {/* Domain Selector Card */}
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/30 border border-border/50">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Mail className="w-4 h-4 text-primary" />
+                    <span>Domain:</span>
+                  </div>
+                  <Select 
+                    value={currentDomain?.id || ""} 
+                    onValueChange={changeDomain}
+                    disabled={isGenerating}
                   >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                )}
+                    <SelectTrigger className="w-44 bg-card border-border/50 text-sm h-8">
+                      <SelectValue placeholder="Select domain" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {domains.map((domain) => (
+                        <SelectItem key={domain.id} value={domain.id}>
+                          {domain.name} {domain.is_premium && "⭐"} {domain.is_custom && "🔧"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {user && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setCustomDomainDialog(true)}
+                      className="h-8 w-8"
+                      title="Add custom domain"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Email Usage Counter */}
-            <div className="flex justify-center mt-12 mb-2">
+            <div className="flex justify-center mb-4">
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-secondary/50 border border-border/50"
+                key={`usage-${emailUsage.used}-${emailUsage.remaining}`}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+                className="inline-flex items-center gap-4 px-5 py-2.5 rounded-full bg-gradient-to-r from-secondary/60 to-secondary/40 border border-border/50 shadow-sm"
               >
                 <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-primary" />
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                   <span className="text-sm text-muted-foreground">
-                    Emails created: <span className="font-medium text-foreground">{emailUsage.used}</span>
+                    Created: <span className="font-semibold text-foreground">{emailUsage.used}</span>
                   </span>
                 </div>
-                <div className="h-4 w-px bg-border" />
+                <div className="h-5 w-px bg-border/70" />
                 <div className="flex items-center gap-2">
                   {emailUsage.limit === -1 ? (
-                    <span className="text-sm font-medium text-primary">Unlimited</span>
+                    <span className="text-sm font-semibold text-primary">∞ Unlimited</span>
                   ) : (
                     <>
                       <span className="text-sm text-muted-foreground">
-                        Remaining: <span className={`font-medium ${emailUsage.remaining <= 3 ? 'text-destructive' : 'text-primary'}`}>
+                        Left: <span className={`font-semibold ${emailUsage.remaining <= 2 ? 'text-destructive' : 'text-primary'}`}>
                           {emailUsage.remaining}
                         </span>
+                        <span className="text-xs text-muted-foreground/70">/{emailUsage.limit}</span>
                       </span>
-                      <span className="text-xs text-muted-foreground">/ {emailUsage.limit}</span>
                     </>
                   )}
                 </div>
