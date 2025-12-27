@@ -140,6 +140,7 @@ const AdminPricing = () => {
 
   const saveContent = async () => {
     setIsSaving(true);
+    console.log('[AdminPricing] Saving content:', content);
     try {
       const { data: existing } = await supabase
         .from("app_settings")
@@ -147,25 +148,30 @@ const AdminPricing = () => {
         .eq("key", "pricing_content")
         .maybeSingle();
 
+      console.log('[AdminPricing] Existing record:', existing);
       const contentJson = JSON.parse(JSON.stringify(content));
 
       if (existing) {
-        const { error } = await supabase
+        const { error, data } = await supabase
           .from("app_settings")
           .update({ value: contentJson, updated_at: new Date().toISOString() })
-          .eq("key", "pricing_content");
+          .eq("key", "pricing_content")
+          .select();
+        console.log('[AdminPricing] Update result:', { error, data });
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error, data } = await supabase
           .from("app_settings")
-          .insert([{ key: "pricing_content", value: contentJson }]);
+          .insert([{ key: "pricing_content", value: contentJson }])
+          .select();
+        console.log('[AdminPricing] Insert result:', { error, data });
         if (error) throw error;
       }
 
       toast.success("Pricing content saved");
       queryClient.invalidateQueries({ queryKey: ["app_settings"] });
     } catch (error) {
-      console.error("Error saving content:", error);
+      console.error("[AdminPricing] Error saving content:", error);
       toast.error("Failed to save content");
     } finally {
       setIsSaving(false);
@@ -199,15 +205,15 @@ const AdminPricing = () => {
       
       const tierData = {
         name: editingTier.name,
-        price_monthly: editingTier.price_monthly || 0,
-        price_yearly: editingTier.price_yearly || 0,
-        max_temp_emails: editingTier.max_temp_emails || 3,
-        email_expiry_hours: editingTier.email_expiry_hours || 1,
-        ai_summaries_per_day: editingTier.ai_summaries_per_day || 5,
-        can_forward_emails: editingTier.can_forward_emails || false,
-        can_use_custom_domains: editingTier.can_use_custom_domains || false,
-        can_use_api: editingTier.can_use_api || false,
-        priority_support: editingTier.priority_support || false,
+        price_monthly: editingTier.price_monthly ?? 0,
+        price_yearly: editingTier.price_yearly ?? 0,
+        max_temp_emails: editingTier.max_temp_emails ?? 3,
+        email_expiry_hours: editingTier.email_expiry_hours ?? 1,
+        ai_summaries_per_day: editingTier.ai_summaries_per_day ?? 0, // Use ?? to allow 0 (disabled)
+        can_forward_emails: editingTier.can_forward_emails ?? false,
+        can_use_custom_domains: editingTier.can_use_custom_domains ?? false,
+        can_use_api: editingTier.can_use_api ?? false,
+        priority_support: editingTier.priority_support ?? false,
         is_active: editingTier.is_active ?? true,
         features: featuresArray,
       };
@@ -424,7 +430,11 @@ const AdminPricing = () => {
                         </div>
                         <div>
                           <p className="text-muted-foreground">AI Summaries/Day</p>
-                          <p className="font-medium">{tier.ai_summaries_per_day}</p>
+                          <p className="font-medium">
+                            {tier.ai_summaries_per_day === 0 ? (
+                              <span className="text-destructive">Disabled</span>
+                            ) : tier.ai_summaries_per_day}
+                          </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {tier.can_forward_emails && <Badge variant="outline">Forwarding</Badge>}
@@ -597,11 +607,15 @@ const AdminPricing = () => {
                   id="aiSummaries"
                   type="number"
                   min="0"
-                  value={editingTier?.ai_summaries_per_day || 5}
-                  onChange={(e) =>
-                    setEditingTier((prev) => ({ ...prev, ai_summaries_per_day: parseInt(e.target.value) || 5 }))
-                  }
+                  value={editingTier?.ai_summaries_per_day ?? 5}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                    setEditingTier((prev) => ({ ...prev, ai_summaries_per_day: isNaN(val) ? 0 : val }));
+                  }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Set to 0 to disable AI summaries for this tier
+                </p>
               </div>
             </div>
 
