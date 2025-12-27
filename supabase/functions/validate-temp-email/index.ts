@@ -6,6 +6,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Retry helper with exponential backoff
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelayMs = 200
+): Promise<T> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const error = err as Error;
+      lastError = error;
+      const errorMsg = error?.message || '';
+      const isRetryable = errorMsg.includes('timeout') || 
+                          errorMsg.includes('connect error') ||
+                          errorMsg.includes('reset');
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw error;
+      }
+      const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 100;
+      console.log(`[validate-temp-email] Retry ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -18,7 +46,7 @@ serve(async (req) => {
     if (!tempEmailId && !emailIds) {
       console.error('[validate-temp-email] Missing tempEmailId or emailIds');
       return new Response(
-        JSON.stringify({ valid: false, error: 'Missing tempEmailId or emailIds' }),
+        JSON.stringify({ valid: false, error: 'Missing tempEmailId or emailIds', code: 'MISSING_PARAMS' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
@@ -32,29 +60,39 @@ serve(async (req) => {
 
     // If emailIds array provided, validate multiple emails at once
     if (emailIds && Array.isArray(emailIds) && emailIds.length > 0) {
-      console.log(`[validate-temp-email] Validating ${emailIds.length} emails`);
+      // Limit the batch size to prevent timeouts
+      const limitedIds = emailIds.slice(0, 20);
+      console.log(`[validate-temp-email] Validating ${limitedIds.length} emails (limited from ${emailIds.length})`);
       
-      // Get all valid emails from the list
-      const { data: emails, error } = await supabase
-        .from('temp_emails')
-        .select('id, address, domain_id, user_id, expires_at, is_active, created_at, secret_token')
-        .in('id', emailIds)
-        .eq('is_active', true)
-        .gt('expires_at', now)
-        .order('created_at', { ascending: false });
+      // Use retry wrapper for database query
+      const { data: emails, error } = await withRetry(async () => {
+        return await supabase
+          .from('temp_emails')
+          .select('id, address, domain_id, user_id, expires_at, is_active, created_at, secret_token')
+          .in('id', limitedIds)
+          .eq('is_active', true)
+          .gt('expires_at', now)
+          .order('created_at', { ascending: false });
+      });
 
       if (error) {
         console.error('[validate-temp-email] Database error:', error);
+        const isTimeout = error.message?.includes('timeout') || error.message?.includes('connect error');
         return new Response(
-          JSON.stringify({ valid: false, error: 'Database error' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          JSON.stringify({ 
+            valid: false, 
+            error: 'Database error', 
+            code: isTimeout ? 'DB_TIMEOUT' : 'DB_ERROR',
+            retryable: isTimeout
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
         );
       }
 
       if (!emails || emails.length === 0) {
         console.log('[validate-temp-email] No valid emails found from provided IDs');
         return new Response(
-          JSON.stringify({ valid: false, error: 'No valid emails found' }),
+          JSON.stringify({ valid: false, error: 'No valid emails found', code: 'NO_VALID_EMAILS' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
       }
@@ -86,24 +124,34 @@ serve(async (req) => {
     if (!token) {
       console.error('[validate-temp-email] Missing token for single email validation');
       return new Response(
-        JSON.stringify({ valid: false, error: 'Missing token' }),
+        JSON.stringify({ valid: false, error: 'Missing token', code: 'MISSING_TOKEN' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
     console.log(`[validate-temp-email] Validating single email: ${tempEmailId}`);
 
-    // Query temp_emails with service role (bypasses RLS)
-    const { data: tempEmail, error } = await supabase
-      .from('temp_emails')
-      .select('id, address, domain_id, user_id, expires_at, is_active, created_at, secret_token')
-      .eq('id', tempEmailId)
-      .single();
+    // Query temp_emails with service role (bypasses RLS) with retry
+    const { data: tempEmail, error } = await withRetry(async () => {
+      return await supabase
+        .from('temp_emails')
+        .select('id, address, domain_id, user_id, expires_at, is_active, created_at, secret_token')
+        .eq('id', tempEmailId)
+        .single();
+    });
 
     if (error || !tempEmail) {
+      const isTimeout = error?.message?.includes('timeout') || error?.message?.includes('connect error');
+      if (isTimeout) {
+        console.error('[validate-temp-email] Database timeout:', error?.message);
+        return new Response(
+          JSON.stringify({ valid: false, error: 'Database timeout', code: 'DB_TIMEOUT', retryable: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
+        );
+      }
       console.log('[validate-temp-email] Email not found:', error?.message);
       return new Response(
-        JSON.stringify({ valid: false, error: 'Email not found' }),
+        JSON.stringify({ valid: false, error: 'Email not found', code: 'EMAIL_NOT_FOUND' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
@@ -112,7 +160,7 @@ serve(async (req) => {
     if (tempEmail.secret_token !== token) {
       console.log('[validate-temp-email] Invalid token');
       return new Response(
-        JSON.stringify({ valid: false, error: 'Invalid token' }),
+        JSON.stringify({ valid: false, error: 'Invalid token', code: 'INVALID_TOKEN' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
@@ -121,7 +169,7 @@ serve(async (req) => {
     if (new Date(tempEmail.expires_at) < new Date(now)) {
       console.log('[validate-temp-email] Email expired');
       return new Response(
-        JSON.stringify({ valid: false, error: 'Email expired' }),
+        JSON.stringify({ valid: false, error: 'Email expired', code: 'EMAIL_EXPIRED' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
@@ -130,7 +178,7 @@ serve(async (req) => {
     if (!tempEmail.is_active) {
       console.log('[validate-temp-email] Email inactive');
       return new Response(
-        JSON.stringify({ valid: false, error: 'Email inactive' }),
+        JSON.stringify({ valid: false, error: 'Email inactive', code: 'EMAIL_INACTIVE' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
@@ -154,11 +202,19 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
-  } catch (error) {
+  } catch (err) {
+    const error = err as Error;
     console.error('[validate-temp-email] Error:', error);
+    const errorMsg = error?.message || '';
+    const isTimeout = errorMsg.includes('timeout') || errorMsg.includes('connect error');
     return new Response(
-      JSON.stringify({ valid: false, error: 'Internal server error' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ 
+        valid: false, 
+        error: 'Internal server error',
+        code: isTimeout ? 'DB_TIMEOUT' : 'INTERNAL_ERROR',
+        retryable: isTimeout
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: isTimeout ? 503 : 500 }
     );
   }
 });

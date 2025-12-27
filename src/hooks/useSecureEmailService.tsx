@@ -352,21 +352,25 @@ export const useSecureEmailService = () => {
               body: { tempEmailId: preferredId, token: tokens[preferredId] },
             });
 
-            if (!preferredError && preferredResult?.valid && preferredResult?.email) {
+            // Handle retryable errors (503) - skip validation and generate new
+            if (preferredError || preferredResult?.retryable) {
+              console.warn('[email-service] Validation failed or backend busy, will generate new email');
+              // Don't clear tokens on timeout - just skip to generation
+            } else if (preferredResult?.valid && preferredResult?.email) {
               console.log(`[email-service] Preferred email is valid: ${preferredResult.email.address}`);
               setCurrentEmail({ ...preferredResult.email, secret_token: tokens[preferredId] });
               setIsLoading(false);
               return;
-            }
-
-            console.log(`[email-service] Preferred email invalid or expired, clearing...`);
-            // Clear invalid preferred email pointer
-            try {
-              localStorage.removeItem(CURRENT_EMAIL_ID_KEY);
-              delete tokens[preferredId];
-              localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
-            } catch {
-              // ignore
+            } else {
+              console.log(`[email-service] Preferred email invalid or expired, clearing...`);
+              // Clear invalid preferred email pointer
+              try {
+                localStorage.removeItem(CURRENT_EMAIL_ID_KEY);
+                delete tokens[preferredId];
+                localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
+              } catch {
+                // ignore
+              }
             }
           }
 
@@ -378,7 +382,10 @@ export const useSecureEmailService = () => {
               body: { emailIds: remainingEmailIds },
             });
 
-            if (!bulkError && bulkResult?.valid && bulkResult?.email) {
+            // Handle retryable errors - proceed to generate new email
+            if (bulkError || bulkResult?.retryable) {
+              console.warn('[email-service] Bulk validation failed or backend busy, will generate new email');
+            } else if (bulkResult?.valid && bulkResult?.email) {
               console.log(`[email-service] Found valid email: ${bulkResult.email.address}`);
               
               // Clean up stale tokens (only keep valid ones)
@@ -401,12 +408,13 @@ export const useSecureEmailService = () => {
               setCurrentEmail({ ...bulkResult.email, secret_token: tokens[bulkResult.email.id] });
               setIsLoading(false);
               return;
+            } else {
+              console.log('[email-service] No valid emails found from stored tokens');
             }
-
-            console.log('[email-service] No valid emails found from stored tokens');
           }
         } catch (error) {
           console.error('[email-service] Error validating emails via edge function:', error);
+          // Don't block - proceed to generate new email
         }
       }
 

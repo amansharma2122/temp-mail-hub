@@ -7,6 +7,22 @@ const corsHeaders = {
   'Cache-Control': 'public, max-age=60', // Cache for 1 minute
 };
 
+// IST timezone offset: UTC+5:30
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+// Get midnight IST as UTC timestamp
+function getMidnightIST(): string {
+  const now = new Date();
+  // Convert current time to IST
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  // Get midnight IST (start of day)
+  const istMidnight = new Date(istNow);
+  istMidnight.setUTCHours(0, 0, 0, 0);
+  // Convert back to UTC
+  const utcMidnight = new Date(istMidnight.getTime() - IST_OFFSET_MS);
+  return utcMidnight.toISOString();
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -18,24 +34,24 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get rolling 24-hour window (not calendar day which resets at UTC midnight)
-    const now = new Date();
-    const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    // Get IST midnight for "Today (IST)" stat
+    const istMidnight = getMidnightIST();
+    console.log('[get-public-stats] IST midnight (UTC):', istMidnight);
 
     // Fetch stats in parallel
     const [
-      emailsLast24hResult,
+      emailsTodayISTResult,
       totalEmailsReceivedResult,
       activeAddressesResult,
       totalInboxesCreatedResult,
       totalDomainsResult,
       emailStatsDataResult
     ] = await Promise.all([
-      // Emails received in last 24 hours (rolling window)
+      // Emails received since midnight IST (not rolling 24h)
       supabase
         .from('received_emails')
         .select('*', { count: 'exact', head: true })
-        .gte('received_at', last24Hours),
+        .gte('received_at', istMidnight),
       
       // Total emails received all time (monotonic)
       supabase
@@ -68,7 +84,7 @@ serve(async (req) => {
     ]);
 
     // Use ?? to preserve 0 values (|| would treat 0 as falsy)
-    const emailsLast24h = emailsLast24hResult.count ?? 0;
+    const emailsToday = emailsTodayISTResult.count ?? 0;
     const totalEmailsReceived = totalEmailsReceivedResult.count ?? 0;
     const activeAddresses = activeAddressesResult.count ?? 0;
     const totalInboxesCreated = totalInboxesCreatedResult.count ?? 0;
@@ -76,8 +92,8 @@ serve(async (req) => {
     const totalEmailsGenerated = emailStatsDataResult.data?.stat_value ?? 0;
 
     const stats = {
-      // Rolling 24h window - can naturally go up or down
-      emailsToday: emailsLast24h,
+      // Emails since midnight IST - resets at IST midnight
+      emailsToday: emailsToday,
       // All-time received emails (monotonic)
       totalEmails: totalEmailsReceived,
       // Currently active inboxes (can go down as they expire)
@@ -86,9 +102,11 @@ serve(async (req) => {
       totalInboxesCreated: totalInboxesCreated,
       // Active domains
       activeDomains: activeDomains,
-      // Permanent counter from email_stats (monotonic)
+      // Permanent counter from email_stats (monotonic) - never resets
       totalEmailsGenerated: Number(totalEmailsGenerated),
       updatedAt: new Date().toISOString(),
+      // Include IST info for debugging
+      istMidnight: istMidnight,
     };
 
     console.log('[get-public-stats] Returning stats:', stats);
