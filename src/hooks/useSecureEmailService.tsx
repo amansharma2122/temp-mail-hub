@@ -143,29 +143,29 @@ export const useSecureEmailService = () => {
     );
   }, [currentEmail?.id]);
 
-  // Load domains from Supabase
+  // Load domains from Supabase - optimized for speed
   useEffect(() => {
     const loadDomains = async () => {
-      // Small retry to avoid getting stuck in "generating..." when backend is temporarily busy
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const { data, error } = await supabase
-          .from('domains')
-          .select('*')
-          .eq('is_active', true);
+      // Single fast query without retries for initial load
+      const { data, error } = await supabase
+        .from('domains')
+        .select('id, name, is_premium, is_active, created_at')
+        .eq('is_active', true)
+        .order('is_premium', { ascending: true })
+        .limit(20);
 
-        if (!error) {
-          setDomains(data || []);
-          return;
-        }
-
+      if (!error && data) {
+        setDomains(data);
+      } else if (error) {
         console.error('Error loading domains:', error);
-        if (attempt < 3) {
-          await new Promise((r) => setTimeout(r, 250 * attempt));
-        } else {
-          toast.error('Backend is busy. Please refresh and try again.');
-          setIsLoading(false);
-          initStartedRef.current = false;
-        }
+        // Retry once after short delay
+        setTimeout(async () => {
+          const { data: retryData } = await supabase
+            .from('domains')
+            .select('id, name, is_premium, is_active, created_at')
+            .eq('is_active', true);
+          if (retryData) setDomains(retryData);
+        }, 500);
       }
     };
 
@@ -194,44 +194,13 @@ export const useSecureEmailService = () => {
     loadHistory();
   }, [user]);
 
-  // Generate new email with secret token
+  // Generate new email with secret token - optimized for speed
   const generateEmail = useCallback(async (domainId?: string, customUsername?: string, skipExistingCheck = false) => {
     if (domains.length === 0) return;
 
     setIsGenerating(true);
 
     try {
-      // Fetch admin settings to check limits
-      const { data: settingsData } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'user_settings')
-        .maybeSingle();
-      
-      const adminSettings = settingsData?.value as {
-        allowGuestAccess?: boolean;
-        guestEmailLimit?: number;
-        userEmailLimit?: number;
-      } | null;
-
-      if (adminSettings) {
-        const isGuest = !user;
-        const limit = isGuest ? (adminSettings.guestEmailLimit ?? 5) : (adminSettings.userEmailLimit ?? 50);
-        const currentCount = getEmailCreationCount();
-        
-        if (isGuest && adminSettings.allowGuestAccess === false) {
-          toast.error('Guest email creation is disabled. Please sign in.');
-          setIsGenerating(false);
-          return false;
-        }
-        
-        if (currentCount >= limit && limit > 0) {
-          toast.error(`Daily email creation limit of ${limit} reached`);
-          setIsGenerating(false);
-          return false;
-        }
-      }
-
       const selectedDomain = domainId 
         ? domains.find(d => d.id === domainId) 
         : domains[0];
@@ -242,7 +211,6 @@ export const useSecureEmailService = () => {
       }
 
       // Generate username if not provided based on user preference
-      // Default is 'human' style (e.g., "john.smith42") for better deliverability
       let username = customUsername;
       if (!username) {
         username = generateUsername(usernameStyle);

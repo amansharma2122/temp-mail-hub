@@ -143,7 +143,7 @@ const EmailGenerator = () => {
     }
   }, [user]);
 
-  // Update email usage count - count actual temp_emails created, not rate_limits
+  // Update email usage count - uses rate_limits for accurate tracking
   const updateEmailUsage = useCallback(async (limit: number) => {
     try {
       let used = 0;
@@ -156,7 +156,7 @@ const EmailGenerator = () => {
           .eq("user_id", user.id);
         used = count || 0;
       } else {
-        // For guests, check rate_limits table
+        // For guests, check rate_limits table first
         const deviceId = localStorage.getItem('nullsto_device_id') || '';
         if (deviceId) {
           const { data } = await supabase
@@ -167,6 +167,12 @@ const EmailGenerator = () => {
             .maybeSingle();
           used = data?.request_count || 0;
         }
+        
+        // Also check localStorage for initial load count (includes current session)
+        const localCount = getLocalEmailCount();
+        if (localCount > used) {
+          used = localCount;
+        }
       }
 
       const remaining = limit === 9999 ? 9999 : Math.max(0, limit - used);
@@ -175,6 +181,20 @@ const EmailGenerator = () => {
       console.error('Failed to update email usage:', err);
     }
   }, [user]);
+
+  // Helper to get local email creation count
+  const getLocalEmailCount = (): number => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const data = JSON.parse(localStorage.getItem('nullsto_email_creation_count') || '{}');
+      if (data.date === today) {
+        return data.count || 0;
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  };
 
   // Load settings on mount and subscribe to real-time changes
   useEffect(() => {
@@ -246,6 +266,14 @@ const EmailGenerator = () => {
       supabase.removeChannel(channel);
     };
   }, [loadRateLimitSettings, updateEmailUsage, user, rateLimitSettings.max_requests, rateLimitSettings.guest_max_requests]);
+
+  // Update counter when currentEmail changes (including initial load)
+  useEffect(() => {
+    if (currentEmail) {
+      const limit = user ? rateLimitSettings.max_requests : rateLimitSettings.guest_max_requests;
+      updateEmailUsage(limit || 5);
+    }
+  }, [currentEmail?.id, user, rateLimitSettings.max_requests, rateLimitSettings.guest_max_requests, updateEmailUsage]);
 
   const verifyCaptcha = async (action: string): Promise<boolean> => {
     if (!captchaEnabled || !captchaSettings.enableOnEmailGen) {
@@ -477,16 +505,16 @@ const EmailGenerator = () => {
               
             </div>
 
-            {/* Email Options - Compact responsive layout */}
-            <div className="mt-5 mb-3">
-              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            {/* Email Options + Usage Counter - Inline compact layout */}
+            <div className="mt-4 mb-2">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 {/* Username Style */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/30 border border-border/50">
-                  <User className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <div className="flex rounded-md overflow-hidden border border-border/50">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/30 border border-border/50">
+                  <User className="w-3 h-3 text-primary shrink-0" />
+                  <div className="flex rounded overflow-hidden border border-border/40">
                     <button
                       onClick={() => setUsernameStyle('human')}
-                      className={`px-2.5 py-1 text-xs font-medium transition-all ${
+                      className={`px-2 py-0.5 text-[11px] font-medium transition-all ${
                         usernameStyle === 'human' 
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-card hover:bg-secondary text-muted-foreground'
@@ -496,7 +524,7 @@ const EmailGenerator = () => {
                     </button>
                     <button
                       onClick={() => setUsernameStyle('random')}
-                      className={`px-2.5 py-1 text-xs font-medium transition-all ${
+                      className={`px-2 py-0.5 text-[11px] font-medium transition-all ${
                         usernameStyle === 'random' 
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-card hover:bg-secondary text-muted-foreground'
@@ -508,14 +536,14 @@ const EmailGenerator = () => {
                 </div>
 
                 {/* Domain Selector */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/30 border border-border/50">
-                  <Mail className="w-3.5 h-3.5 text-primary shrink-0" />
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/30 border border-border/50">
+                  <Mail className="w-3 h-3 text-primary shrink-0" />
                   <Select 
                     value={currentDomain?.id || ""} 
                     onValueChange={changeDomain}
                     disabled={isGenerating}
                   >
-                    <SelectTrigger className="w-32 sm:w-40 bg-card border-border/50 text-xs h-7">
+                    <SelectTrigger className="w-28 sm:w-36 bg-card border-border/40 text-[11px] h-6">
                       <SelectValue placeholder="Domain" />
                     </SelectTrigger>
                     <SelectContent>
@@ -531,88 +559,57 @@ const EmailGenerator = () => {
                       variant="ghost"
                       size="icon"
                       onClick={() => setCustomDomainDialog(true)}
-                      className="h-7 w-7"
+                      className="h-6 w-6"
                       title="Add custom domain"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-3 h-3" />
                     </Button>
                   )}
                 </div>
-              </div>
-            </div>
 
-            {/* Email Usage Counter with Progress Bar */}
-            <div className="flex flex-col items-center gap-3 mb-4">
-              <motion.div
-                key={`usage-${emailUsage.used}-${emailUsage.remaining}`}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.2 }}
-                className="w-full max-w-sm"
-              >
-                {/* Stats row */}
-                <div className="flex items-center justify-between mb-2 px-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                    <span className="text-sm text-muted-foreground">
-                      Created: <span className="font-semibold text-foreground">{emailUsage.used}</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {emailUsage.limit === -1 ? (
-                      <span className="text-sm font-semibold text-primary">∞ Unlimited</span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        Left: <span className={`font-semibold ${emailUsage.remaining <= 2 ? 'text-destructive' : 'text-primary'}`}>
-                          {emailUsage.remaining}
-                        </span>
-                        <span className="text-xs text-muted-foreground/70">/{emailUsage.limit}</span>
-                      </span>
-                    )}
-                  </div>
+                {/* Usage Counter - Inline */}
+                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-secondary/30 border border-border/50">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  <span className="text-[11px] text-muted-foreground">
+                    <span className="font-medium text-foreground">{emailUsage.used}</span>/{emailUsage.limit === -1 ? '∞' : emailUsage.limit}
+                  </span>
+                  {emailUsage.limit !== -1 && (
+                    <div className="w-12 h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <motion.div
+                        className={`h-full rounded-full ${
+                          emailUsage.remaining <= 1 ? 'bg-destructive' : 'bg-primary'
+                        }`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, (emailUsage.used / emailUsage.limit) * 100)}%` }}
+                        transition={{ duration: 0.3 }}
+                      />
+                    </div>
+                  )}
                 </div>
-                
-                {/* Progress bar */}
-                {emailUsage.limit !== -1 && (
-                  <div className="relative h-2 w-full rounded-full bg-secondary/50 overflow-hidden border border-border/30">
-                    <motion.div
-                      className={`h-full rounded-full ${
-                        emailUsage.remaining <= 2 
-                          ? 'bg-gradient-to-r from-destructive to-destructive/70' 
-                          : emailUsage.remaining <= emailUsage.limit * 0.3
-                            ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
-                            : 'bg-gradient-to-r from-primary to-primary/70'
-                      }`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(emailUsage.used / emailUsage.limit) * 100}%` }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                    />
-                  </div>
-                )}
-              </motion.div>
+              </div>
 
-              {/* Upgrade prompt when low or exhausted */}
-              {emailUsage.limit !== -1 && emailUsage.remaining <= 2 && (
+              {/* Upgrade prompt when low */}
+              {emailUsage.limit !== -1 && emailUsage.remaining <= 1 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center gap-2"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="flex justify-center mt-2"
                 >
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={() => window.location.href = "/pricing"}
-                    className="h-8 text-xs border-primary/50 hover:bg-primary/10 hover:border-primary gap-1.5"
+                    className="h-6 text-[10px] text-primary hover:text-primary gap-1"
                   >
-                    <Zap className="w-3 h-3 text-primary" />
-                    {emailUsage.remaining === 0 ? 'Upgrade for more emails' : 'Running low? Upgrade now'}
+                    <Zap className="w-3 h-3" />
+                    {emailUsage.remaining === 0 ? 'Upgrade for more' : 'Running low'}
                   </Button>
                 </motion.div>
               )}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap justify-center gap-3 mt-10">
+            <div className="flex flex-wrap justify-center gap-3 mt-6">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
