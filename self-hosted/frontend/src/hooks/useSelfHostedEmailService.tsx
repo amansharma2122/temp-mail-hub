@@ -30,7 +30,7 @@ interface UseEmailServiceReturn extends EmailServiceState {
 }
 
 const STORAGE_KEY = 'temp_email_data';
-const POLL_INTERVAL = 10000; // 10 seconds
+const POLL_INTERVAL = 2000; // 2 seconds for instant email delivery
 
 export function useEmailService(): UseEmailServiceReturn {
   const [state, setState] = useState<EmailServiceState>({
