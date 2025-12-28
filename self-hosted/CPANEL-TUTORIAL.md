@@ -296,43 +296,124 @@ If webhooks aren't available, set up IMAP polling:
 
 ---
 
-## PART 8: TEST YOUR SETUP
+## PART 8: SSL CERTIFICATE SETUP
 
-### Basic Tests
-1. Visit `https://yourdomain.com` - homepage should load
-2. Click **Generate Email** - a temp address should appear
-3. Copy the email address
+SSL is **required** for production. Most cPanel hosts offer free SSL.
 
-### Test Email Delivery
+### Option A: AutoSSL (Recommended)
+1. Go to **SSL/TLS Status** in cPanel
+2. Click **Run AutoSSL**
+3. Wait for certificate to be issued (usually instant)
+4. Verify: Visit `https://yourdomain.com`
 
-**If using webhooks:**
-```bash
-# Test webhook endpoint
-curl -X POST https://yourdomain.com/api/emails/webhook.php \
-  -H "Content-Type: application/json" \
-  -H "X-Webhook-Secret: your-secret" \
-  -d '{
-    "recipient": "test@yourdomain.com",
-    "from": "sender@example.com",
-    "subject": "Test Email",
-    "body_plain": "This is a test"
-  }'
+### Option B: Let's Encrypt
+1. Go to **SSL/TLS** → **Manage SSL Sites**
+2. Or look for **Let's Encrypt SSL** in cPanel
+3. Select your domain and click **Issue**
+
+### Option C: Cloudflare (Free CDN + SSL)
+1. Sign up at [cloudflare.com](https://cloudflare.com)
+2. Add your domain
+3. Update nameservers at your registrar
+4. Enable **Full (Strict)** SSL mode
+5. Benefits: Free SSL, CDN, DDoS protection
+
+### Force HTTPS
+The `.htaccess` file already includes HTTPS redirect:
+```apache
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 ```
 
-**If using IMAP:**
-1. Send an email to the generated address
-2. Wait 2-3 minutes for cron to run
-3. Refresh inbox
+### Verify SSL
+```bash
+# Check certificate
+curl -vI https://yourdomain.com 2>&1 | grep -i "SSL certificate"
 
-### Check Webhook Logs (Admin Panel)
-Navigate to **Admin → Webhooks** to see incoming webhook activity.
-
-### Real-Time Updates
-The inbox should update automatically without refreshing when new emails arrive (via SSE).
+# Test from browser
+# Look for 🔒 padlock in address bar
+```
 
 ---
 
-## PART 9: ADMIN SETUP
+## PART 9: TEST YOUR SETUP
+
+### Step 1: Basic Tests
+1. Visit `https://yourdomain.com` - homepage should load with 🔒
+2. Click **Generate Email** - a temp address should appear
+3. Copy the email address
+
+### Step 2: Test Webhook Endpoint
+
+**Quick test with curl:**
+```bash
+# First, generate a temp email on your site and note the address
+# Then test the webhook:
+
+curl -X POST https://yourdomain.com/api/emails/webhook.php \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Secret: your-custom-secret" \
+  -d '{
+    "recipient": "GENERATED_ADDRESS@yourdomain.com",
+    "from": "test@example.com",
+    "from_name": "Test Sender",
+    "subject": "Webhook Test",
+    "body_plain": "This email was delivered via webhook!",
+    "body_html": "<p>This email was delivered via <strong>webhook</strong>!</p>"
+  }'
+```
+
+**Expected responses:**
+
+✅ Success:
+```json
+{
+  "success": true,
+  "data": { "accepted": true, "email_id": "uuid-here" },
+  "message": "Email received successfully"
+}
+```
+
+⚠️ Address not found:
+```json
+{
+  "success": true,
+  "data": { "accepted": false, "reason": "Address not found" }
+}
+```
+
+❌ Error:
+```json
+{
+  "success": false,
+  "error": "Error message here"
+}
+```
+
+### Step 3: Verify Email Arrived
+1. Refresh the inbox on your site
+2. The test email should appear instantly
+3. Check **Admin → Webhooks** for delivery logs
+
+### Step 4: Test Real-Time Updates
+1. Open inbox in browser
+2. In another terminal, send another webhook test
+3. Email should appear WITHOUT refreshing the page
+
+### Step 5: Test IMAP Fallback (if configured)
+1. Send a real email to your generated address
+2. Wait 2-3 minutes for cron
+3. Check inbox
+
+### Step 6: Check Webhook Logs
+```sql
+-- In phpMyAdmin, run:
+SELECT * FROM webhook_logs ORDER BY created_at DESC LIMIT 10;
+```
+
+---
+
+## PART 10: ADMIN SETUP
 
 ### Create Admin Account
 1. Register a new account on your site
@@ -350,9 +431,10 @@ Navigate to `https://yourdomain.com/admin`
 
 ---
 
-## CONGRATULATIONS!
+## CONGRATULATIONS! 🎉
 
 Your self-hosted temp email system is now running with:
+- ✅ SSL/HTTPS encryption
 - ✅ Instant webhook email delivery
 - ✅ Real-time browser updates
 - ✅ Optimized database
@@ -363,6 +445,7 @@ Your self-hosted temp email system is now running with:
 - Configure appearance in Admin → Appearance
 - Set up Stripe payments in Admin → Payments (optional)
 - Review webhook logs in Admin → Webhooks
+- Set up automated backups
 
 ---
 
