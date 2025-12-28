@@ -42,7 +42,7 @@ try {
     }
     
     if (!$domain) {
-        Response::error('No active domains available', 503);
+        Response::error('No active domains available. Please add at least one domain in the admin panel.', 503);
     }
     
     // Generate unique email address
@@ -53,7 +53,7 @@ try {
     $attempts = 0;
     while ($attempts < 5) {
         $existing = Database::fetchOne(
-            "SELECT id FROM temp_emails WHERE email = ?",
+            "SELECT id FROM temp_emails WHERE email_address = ?",
             [$emailAddress]
         );
         
@@ -74,29 +74,64 @@ try {
     $accessToken = Encryption::generateSecureToken(32);
     $tokenHash = hash('sha256', $accessToken);
     
-    // Calculate expiry
-    $expiryHours = $domain['default_expiry_hours'] ?? 24;
+    // Calculate expiry - get from domain or use default
+    $expiryHours = 24; // Default 24 hours
+    
+    // Check app_settings for default expiry
+    $expirySetting = Database::fetchOne(
+        "SELECT value FROM app_settings WHERE `key` = 'default_email_expiry_hours'"
+    );
+    if ($expirySetting && !empty($expirySetting['value'])) {
+        $expiryHours = (int) json_decode($expirySetting['value'], true) ?: 24;
+    }
+    
     $expiresAt = date('Y-m-d H:i:s', time() + ($expiryHours * 3600));
     
-    // Create temp email record
-    $emailId = Database::insert('temp_emails', [
-        'id' => Database::generateUUID(),
+    // Generate UUID for the email
+    $emailId = Database::generateUUID();
+    
+    // Create temp email record - using correct column names matching schema
+    Database::insert('temp_emails', [
+        'id' => $emailId,
         'user_id' => $user ? $user['id'] : null,
-        'email' => $emailAddress,
+        'email_address' => $emailAddress,
         'domain_id' => $domain['id'],
+        'token' => $accessToken, // Store the token itself
         'token_hash' => $tokenHash,
         'expires_at' => $expiresAt,
         'is_active' => 1,
         'created_at' => date('Y-m-d H:i:s')
     ]);
     
-    // Log creation
-    Database::insert('email_stats', [
-        'id' => Database::generateUUID(),
-        'date' => date('Y-m-d'),
-        'emails_created' => 1,
-        'created_at' => date('Y-m-d H:i:s')
-    ]);
+    // Log creation to email_stats if table exists
+    try {
+        $statsExists = Database::fetchOne("SHOW TABLES LIKE 'email_stats'");
+        if ($statsExists) {
+            // Try to update existing record or insert new one
+            $today = date('Y-m-d');
+            $existingStat = Database::fetchOne(
+                "SELECT id FROM email_stats WHERE date = ?",
+                [$today]
+            );
+            
+            if ($existingStat) {
+                Database::query(
+                    "UPDATE email_stats SET emails_created = emails_created + 1 WHERE date = ?",
+                    [$today]
+                );
+            } else {
+                Database::insert('email_stats', [
+                    'id' => Database::generateUUID(),
+                    'date' => $today,
+                    'emails_created' => 1,
+                    'created_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+        }
+    } catch (Exception $e) {
+        // Ignore stats errors - non-critical
+        error_log("Stats logging failed: " . $e->getMessage());
+    }
     
     Response::success([
         'id' => $emailId,
@@ -109,15 +144,15 @@ try {
     
 } catch (Exception $e) {
     error_log("Create email error: " . $e->getMessage());
-    Response::serverError('Failed to create temporary email');
+    Response::serverError('Failed to create temporary email: ' . $e->getMessage());
 }
 
 /**
  * Generate random username
  */
 function generateUsername(): string {
-    $adjectives = ['swift', 'clever', 'bright', 'cool', 'quick', 'smart', 'happy', 'lucky', 'rapid', 'silent'];
-    $nouns = ['fox', 'wolf', 'bear', 'eagle', 'hawk', 'tiger', 'lion', 'shark', 'falcon', 'phoenix'];
+    $adjectives = ['swift', 'clever', 'bright', 'cool', 'quick', 'smart', 'happy', 'lucky', 'rapid', 'silent', 'brave', 'calm', 'eager', 'fancy', 'gentle'];
+    $nouns = ['fox', 'wolf', 'bear', 'eagle', 'hawk', 'tiger', 'lion', 'shark', 'falcon', 'phoenix', 'owl', 'raven', 'panther', 'dragon', 'knight'];
     
     $adj = $adjectives[array_rand($adjectives)];
     $noun = $nouns[array_rand($nouns)];

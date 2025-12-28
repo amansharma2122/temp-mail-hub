@@ -23,7 +23,7 @@ if (empty($token)) {
 try {
     $tokenHash = hash('sha256', $token);
     
-    // Build query
+    // Build query - using correct column name email_address
     $sql = "SELECT te.*, d.domain as domain_name 
             FROM temp_emails te
             JOIN domains d ON d.id = te.domain_id
@@ -31,7 +31,7 @@ try {
     $params = [$tokenHash];
     
     if (!empty($emailAddress)) {
-        $sql .= " AND te.email = ?";
+        $sql .= " AND te.email_address = ?";
         $params[] = $emailAddress;
     }
     
@@ -42,7 +42,7 @@ try {
     }
     
     // Check if expired
-    if (strtotime($tempEmail['expires_at']) < time()) {
+    if ($tempEmail['expires_at'] && strtotime($tempEmail['expires_at']) < time()) {
         // Mark as inactive
         Database::update(
             'temp_emails',
@@ -64,15 +64,15 @@ try {
     Response::success([
         'valid' => true,
         'id' => $tempEmail['id'],
-        'email' => $tempEmail['email'],
+        'email' => $tempEmail['email_address'], // Using correct column name
         'domain' => $tempEmail['domain_name'],
         'expires_at' => $tempEmail['expires_at'],
         'is_active' => (bool) $tempEmail['is_active'],
-        'unread_count' => (int) $unreadCount['count'],
+        'unread_count' => (int) ($unreadCount['count'] ?? 0),
         'created_at' => $tempEmail['created_at']
     ], 'Token validated successfully');
     
 } catch (Exception $e) {
     error_log("Validate email error: " . $e->getMessage());
-    Response::serverError('Validation failed');
+    Response::serverError('Validation failed: ' . $e->getMessage());
 }
