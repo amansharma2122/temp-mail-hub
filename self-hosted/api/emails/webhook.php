@@ -213,7 +213,9 @@ function detectProvider(): string {
  */
 function verifyWebhookSignature(string $provider): bool {
     $config = Database::getConfig();
-    $webhookSecrets = $config['webhook_secrets'] ?? [];
+    
+    // Support both config structures for backwards compatibility
+    $webhookSecrets = $config['webhooks']['secrets'] ?? $config['webhook_secrets'] ?? [];
     
     // Skip verification for unknown providers or if no secrets configured
     if ($provider === 'unknown' || empty($webhookSecrets)) {

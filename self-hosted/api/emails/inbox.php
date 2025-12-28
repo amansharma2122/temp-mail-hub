@@ -31,13 +31,14 @@ try {
     $tokenHash = hash('sha256', $token);
     
     // Optimized single query with JOIN - faster than subquery
-    $sql = "SELECT te.id, te.email, te.expires_at, te.is_active 
+    // Using correct column name email_address
+    $sql = "SELECT te.id, te.email_address, te.expires_at, te.is_active 
             FROM temp_emails te
             WHERE te.token_hash = ? AND te.is_active = 1";
     $params = [$tokenHash];
     
     if (!empty($emailAddress)) {
-        $sql .= " AND te.email = ?";
+        $sql .= " AND te.email_address = ?";
         $params[] = $emailAddress;
     }
     
@@ -130,7 +131,7 @@ try {
         ],
         'temp_email' => [
             'id' => $tempEmail['id'],
-            'email' => $tempEmail['email'],
+            'email' => $tempEmail['email_address'], // Using correct column name
             'expires_at' => $tempEmail['expires_at']
         ],
         'server_time' => time()
