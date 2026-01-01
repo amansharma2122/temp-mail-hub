@@ -1539,13 +1539,13 @@ export const admin = {
   },
 
   // DNS Verification
-  async verifyDomainDNS(domain: string, verificationToken?: string): Promise<ApiResponse<any>> {
+  async verifyDomainDNS(domain: string, verificationToken?: string, skipDnsCheck?: boolean): Promise<ApiResponse<any>> {
     if (USE_SUPABASE) {
       return functions.invoke('check-email-config', { body: { check_dns: true, domain, verification_token: verificationToken } });
     }
     return fetchApi('/admin/domain-verify-dns', {
       method: 'POST',
-      body: JSON.stringify({ action: 'domain-verify-dns', domain, verification_token: verificationToken })
+      body: JSON.stringify({ action: 'domain-verify-dns', domain, verification_token: verificationToken, skip_dns_check: skipDnsCheck })
     });
   },
 

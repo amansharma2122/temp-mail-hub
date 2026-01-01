@@ -1489,6 +1489,7 @@ function saveThemes($body, $pdo, $adminId) {
 function verifyDomainDNS($body, $pdo, $adminId) {
     $domain = $body['domain'] ?? '';
     $verificationToken = $body['verification_token'] ?? null;
+    $skipDnsCheck = $body['skip_dns_check'] ?? false;
     
     if (empty($domain)) {
         http_response_code(400);
@@ -1504,60 +1505,110 @@ function verifyDomainDNS($body, $pdo, $adminId) {
     $results = [
         'domain' => $domain,
         'verified' => false,
+        'skip_dns_check' => $skipDnsCheck,
         'checks' => []
     ];
     
-    // 1. Check MX records
-    $mxRecords = @dns_get_record($domain, DNS_MX);
-    $results['checks']['mx'] = [
-        'status' => !empty($mxRecords) ? 'pass' : 'fail',
-        'records' => $mxRecords ?: [],
-        'message' => !empty($mxRecords) ? 'MX records found' : 'No MX records found'
-    ];
-    
-    // 2. Check A records
-    $aRecords = @dns_get_record($domain, DNS_A);
-    $results['checks']['a'] = [
-        'status' => !empty($aRecords) ? 'pass' : 'warning',
-        'records' => $aRecords ?: [],
-        'message' => !empty($aRecords) ? 'A records found' : 'No A records found'
-    ];
-    
-    // 3. Check NS records
-    $nsRecords = @dns_get_record($domain, DNS_NS);
-    $results['checks']['ns'] = [
-        'status' => !empty($nsRecords) ? 'pass' : 'warning',
-        'records' => $nsRecords ?: [],
-        'message' => !empty($nsRecords) ? 'NS records found' : 'No NS records found'
-    ];
-    
-    // 4. Check TXT records for verification token
-    $txtRecords = @dns_get_record($domain, DNS_TXT);
-    $verificationFound = false;
-    
-    if ($verificationToken) {
-        foreach ($txtRecords as $record) {
-            if (isset($record['txt']) && strpos($record['txt'], $verificationToken) !== false) {
-                $verificationFound = true;
-                break;
-            }
-        }
+    // If skip DNS check is enabled, mark as verified without checking
+    if ($skipDnsCheck) {
+        $results['verified'] = true;
+        $results['checks']['skip'] = [
+            'status' => 'pass',
+            'message' => 'DNS check skipped (same-server installation)'
+        ];
+        
+        // Enable the domain in database
+        $stmt = $pdo->prepare('UPDATE domains SET is_active = 1 WHERE name = ?');
+        $stmt->execute([$domain]);
+        
+        logAdminAction($pdo, $adminId, 'VERIFY_DOMAIN_SKIP', 'domains', null, ['domain' => $domain]);
+        
+        echo json_encode($results);
+        return;
     }
     
-    $results['checks']['txt'] = [
-        'status' => $verificationToken ? ($verificationFound ? 'pass' : 'fail') : 'skip',
-        'records' => $txtRecords ?: [],
-        'message' => $verificationToken 
-            ? ($verificationFound ? 'Verification token found' : 'Verification token not found in TXT records')
-            : 'No verification token provided'
-    ];
+    // 1. Check MX records
+    try {
+        $mxRecords = @dns_get_record($domain, DNS_MX);
+        $results['checks']['mx'] = [
+            'status' => !empty($mxRecords) ? 'pass' : 'fail',
+            'records' => $mxRecords ?: [],
+            'message' => !empty($mxRecords) ? 'MX records found (' . count($mxRecords) . ')' : 'No MX records found - required for receiving emails'
+        ];
+    } catch (Exception $e) {
+        $results['checks']['mx'] = [
+            'status' => 'error',
+            'message' => 'Failed to check MX records: ' . $e->getMessage()
+        ];
+    }
+    
+    // 2. Check A records
+    try {
+        $aRecords = @dns_get_record($domain, DNS_A);
+        $results['checks']['a'] = [
+            'status' => !empty($aRecords) ? 'pass' : 'warning',
+            'records' => $aRecords ?: [],
+            'message' => !empty($aRecords) ? 'A records found (' . count($aRecords) . ')' : 'No A records found'
+        ];
+    } catch (Exception $e) {
+        $results['checks']['a'] = [
+            'status' => 'warning',
+            'message' => 'Failed to check A records'
+        ];
+    }
+    
+    // 3. Check NS records
+    try {
+        $nsRecords = @dns_get_record($domain, DNS_NS);
+        $results['checks']['ns'] = [
+            'status' => !empty($nsRecords) ? 'pass' : 'warning',
+            'records' => $nsRecords ?: [],
+            'message' => !empty($nsRecords) ? 'NS records found' : 'No NS records found'
+        ];
+    } catch (Exception $e) {
+        $results['checks']['ns'] = [
+            'status' => 'warning',
+            'message' => 'Failed to check NS records'
+        ];
+    }
+    
+    // 4. Check TXT records for verification token
+    try {
+        $txtRecords = @dns_get_record($domain, DNS_TXT);
+        $verificationFound = false;
+        
+        if ($verificationToken) {
+            foreach ($txtRecords as $record) {
+                if (isset($record['txt']) && strpos($record['txt'], $verificationToken) !== false) {
+                    $verificationFound = true;
+                    break;
+                }
+            }
+        }
+        
+        $results['checks']['txt'] = [
+            'status' => $verificationToken ? ($verificationFound ? 'pass' : 'fail') : 'skip',
+            'records' => $txtRecords ?: [],
+            'message' => $verificationToken 
+                ? ($verificationFound ? 'Verification token found' : 'Verification token not found in TXT records')
+                : 'No verification token provided'
+        ];
+    } catch (Exception $e) {
+        $results['checks']['txt'] = [
+            'status' => 'warning',
+            'message' => 'Failed to check TXT records'
+        ];
+        $txtRecords = [];
+    }
     
     // 5. Check SPF record
     $spfFound = false;
-    foreach ($txtRecords as $record) {
-        if (isset($record['txt']) && strpos($record['txt'], 'v=spf1') !== false) {
-            $spfFound = true;
-            break;
+    if (!empty($txtRecords)) {
+        foreach ($txtRecords as $record) {
+            if (isset($record['txt']) && strpos($record['txt'], 'v=spf1') !== false) {
+                $spfFound = true;
+                break;
+            }
         }
     }
     
@@ -1571,10 +1622,14 @@ function verifyDomainDNS($body, $pdo, $adminId) {
     $dkimFound = false;
     
     foreach ($dkimSelectors as $selector) {
-        $dkimRecords = @dns_get_record("$selector._domainkey.$domain", DNS_TXT);
-        if (!empty($dkimRecords)) {
-            $dkimFound = true;
-            break;
+        try {
+            $dkimRecords = @dns_get_record("$selector._domainkey.$domain", DNS_TXT);
+            if (!empty($dkimRecords)) {
+                $dkimFound = true;
+                break;
+            }
+        } catch (Exception $e) {
+            // Continue to next selector
         }
     }
     
@@ -1584,12 +1639,19 @@ function verifyDomainDNS($body, $pdo, $adminId) {
     ];
     
     // 7. Check DMARC
-    $dmarcRecords = @dns_get_record("_dmarc.$domain", DNS_TXT);
-    $results['checks']['dmarc'] = [
-        'status' => !empty($dmarcRecords) ? 'pass' : 'warning',
-        'records' => $dmarcRecords ?: [],
-        'message' => !empty($dmarcRecords) ? 'DMARC record found' : 'No DMARC record found (recommended for email delivery)'
-    ];
+    try {
+        $dmarcRecords = @dns_get_record("_dmarc.$domain", DNS_TXT);
+        $results['checks']['dmarc'] = [
+            'status' => !empty($dmarcRecords) ? 'pass' : 'warning',
+            'records' => $dmarcRecords ?: [],
+            'message' => !empty($dmarcRecords) ? 'DMARC record found' : 'No DMARC record found (recommended for email delivery)'
+        ];
+    } catch (Exception $e) {
+        $results['checks']['dmarc'] = [
+            'status' => 'warning',
+            'message' => 'Failed to check DMARC records'
+        ];
+    }
     
     // Calculate overall verification status
     $requiredChecks = ['mx'];
