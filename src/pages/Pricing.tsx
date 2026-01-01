@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Check, Crown, Zap, Shield, Mail, Clock, Loader2, X, 
   Sparkles, Star, Rocket, Building2, Users, Globe, 
   Lock, Bell, FileText, Code, Headphones,
-  ArrowRight, MessageSquare
+  ArrowRight, MessageSquare, CreditCard, Wallet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,9 +16,17 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { usePricingContent } from '@/hooks/usePricingContent';
 import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import EmailVerificationBanner from '@/components/EmailVerificationBanner';
+
+interface PaymentSettings {
+  stripe_enabled?: boolean;
+  paypal_enabled?: boolean;
+  stripe_publishable_key?: string;
+  paypal_client_id?: string;
+}
 
 const PricingPage = () => {
   const navigate = useNavigate();
@@ -28,6 +36,39 @@ const PricingPage = () => {
   const { content: pricingContent } = usePricingContent();
   const [selectedBilling, setSelectedBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [processingTier, setProcessingTier] = useState<string | null>(null);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({});
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
+  const [loadingPaymentSettings, setLoadingPaymentSettings] = useState(true);
+
+  // Fetch payment settings on mount
+  useEffect(() => {
+    const fetchPaymentSettings = async () => {
+      try {
+        const { data, error } = await api.admin.getSettings('payment_settings');
+        if (!error && data?.value) {
+          const settings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          setPaymentSettings(settings);
+          // Auto-select the first available payment method
+          if (settings.stripe_enabled && !settings.paypal_enabled) {
+            setSelectedPaymentMethod('stripe');
+          } else if (settings.paypal_enabled && !settings.stripe_enabled) {
+            setSelectedPaymentMethod('paypal');
+          } else if (settings.stripe_enabled) {
+            setSelectedPaymentMethod('stripe');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch payment settings:', err);
+      } finally {
+        setLoadingPaymentSettings(false);
+      }
+    };
+    fetchPaymentSettings();
+  }, []);
+
+  const stripeEnabled = paymentSettings.stripe_enabled;
+  const paypalEnabled = paymentSettings.paypal_enabled;
+  const bothEnabled = stripeEnabled && paypalEnabled;
 
   const handleSelectPlan = async (tierId: string, tierName: string, price: number) => {
     if (!user) {
@@ -46,34 +87,67 @@ const PricingPage = () => {
       return;
     }
 
+    if (!stripeEnabled && !paypalEnabled) {
+      toast.error('Payment methods are not configured. Please contact support.');
+      return;
+    }
+
     setProcessingTier(tierId);
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: {
-          tier_id: tierId,
-          billing_cycle: selectedBilling,
-          success_url: `${window.location.origin}/dashboard?checkout=success`,
-          cancel_url: `${window.location.origin}/pricing?checkout=cancelled`,
-        },
-      });
+      if (selectedPaymentMethod === 'paypal' && paypalEnabled) {
+        // PayPal checkout
+        const { data, error } = await api.functions.invoke<{ code?: string; approval_url?: string }>('create-checkout', {
+          body: {
+            tier_id: tierId,
+            billing_cycle: selectedBilling,
+            payment_method: 'paypal',
+            success_url: `${window.location.origin}/dashboard?checkout=success`,
+            cancel_url: `${window.location.origin}/pricing?checkout=cancelled`,
+          },
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (data.code === 'STRIPE_NOT_CONFIGURED') {
-        toast.info('Stripe is not configured yet. Please add your Stripe API keys in the admin panel.', { duration: 5000 });
-        return;
-      }
+        if (data?.code === 'PAYPAL_NOT_CONFIGURED') {
+          toast.info('PayPal is not configured yet. Please try Stripe or contact support.');
+          return;
+        }
 
-      if (data.code === 'EMAIL_NOT_VERIFIED') {
-        toast.error('Please verify your email before subscribing');
-        return;
-      }
-
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url;
+        if (data?.approval_url) {
+          window.location.href = data.approval_url;
+        } else {
+          throw new Error('No PayPal approval URL received');
+        }
       } else {
-        throw new Error('No checkout URL received');
+        // Stripe checkout (default)
+        const { data, error } = await supabase.functions.invoke('create-checkout', {
+          body: {
+            tier_id: tierId,
+            billing_cycle: selectedBilling,
+            payment_method: 'stripe',
+            success_url: `${window.location.origin}/dashboard?checkout=success`,
+            cancel_url: `${window.location.origin}/pricing?checkout=cancelled`,
+          },
+        });
+
+        if (error) throw error;
+
+        if (data.code === 'STRIPE_NOT_CONFIGURED') {
+          toast.info('Stripe is not configured yet. Please add your Stripe API keys in the admin panel.', { duration: 5000 });
+          return;
+        }
+
+        if (data.code === 'EMAIL_NOT_VERIFIED') {
+          toast.error('Please verify your email before subscribing');
+          return;
+        }
+
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -369,6 +443,37 @@ const PricingPage = () => {
                           </motion.li>
                         ))}
                       </ul>
+
+                      {/* Payment Method Selector - Only show for paid plans when both methods enabled */}
+                      {price > 0 && bothEnabled && !loadingPaymentSettings && (
+                        <div className="pt-4 border-t border-border">
+                          <p className="text-xs text-muted-foreground mb-3">Payment Method</p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setSelectedPaymentMethod('stripe')}
+                              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border transition-all ${
+                                selectedPaymentMethod === 'stripe'
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border bg-secondary/50 text-muted-foreground hover:border-primary/50'
+                              }`}
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              <span className="text-sm font-medium">Card</span>
+                            </button>
+                            <button
+                              onClick={() => setSelectedPaymentMethod('paypal')}
+                              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border transition-all ${
+                                selectedPaymentMethod === 'paypal'
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border bg-secondary/50 text-muted-foreground hover:border-primary/50'
+                              }`}
+                            >
+                              <Wallet className="w-4 h-4" />
+                              <span className="text-sm font-medium">PayPal</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* CTA Button */}
                       <motion.div

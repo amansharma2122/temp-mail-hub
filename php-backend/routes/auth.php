@@ -134,57 +134,87 @@ function handleSignup($body, $pdo, $config) {
 }
 
 function handleLogin($body, $pdo, $config) {
-    $email = strtolower(trim($body['email'] ?? ''));
-    $password = $body['password'] ?? '';
+    try {
+        $email = strtolower(trim($body['email'] ?? ''));
+        $password = $body['password'] ?? '';
 
-    $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user || !password_verify($password, $user['password_hash'])) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Invalid email or password']);
-        return;
-    }
-
-    // Check suspension
-    $stmt = $pdo->prepare('SELECT * FROM user_suspensions WHERE user_id = ? AND is_active = 1');
-    $stmt->execute([$user['id']]);
-    $suspension = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($suspension) {
-        if (!$suspension['suspended_until'] || strtotime($suspension['suspended_until']) > time()) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Account suspended: ' . ($suspension['reason'] ?? 'Contact support')]);
+        if (empty($email) || empty($password)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Email and password are required']);
             return;
         }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid email format']);
+            return;
+        }
+
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            logError('Login failed: User not found', ['email' => $email], 'warning');
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid email or password']);
+            return;
+        }
+
+        if (!password_verify($password, $user['password_hash'])) {
+            logError('Login failed: Invalid password', ['email' => $email], 'warning');
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid email or password']);
+            return;
+        }
+
+        // Check suspension
+        $stmt = $pdo->prepare('SELECT * FROM user_suspensions WHERE user_id = ? AND is_active = 1');
+        $stmt->execute([$user['id']]);
+        $suspension = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($suspension) {
+            if (!$suspension['suspended_until'] || strtotime($suspension['suspended_until']) > time()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Account suspended: ' . ($suspension['reason'] ?? 'Contact support')]);
+                return;
+            }
+        }
+
+        // Generate tokens
+        $accessToken = generateJWT($user['id'], $config);
+        $refreshToken = bin2hex(random_bytes(32));
+
+        // Store refresh token
+        $stmt = $pdo->prepare('UPDATE users SET refresh_token = ?, refresh_token_expires = ?, last_login = ? WHERE id = ?');
+        $stmt->execute([$refreshToken, date('Y-m-d H:i:s', time() + 86400 * 30), date('Y-m-d H:i:s'), $user['id']]);
+
+        $userData = [
+            'id' => $user['id'],
+            'email' => $user['email'],
+            'display_name' => $user['display_name'],
+            'avatar_url' => $user['avatar_url'],
+            'created_at' => $user['created_at'],
+            'updated_at' => $user['updated_at'],
+        ];
+
+        $session = [
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken,
+            'expires_at' => time() + $config['jwt']['expiry'],
+            'user' => $userData,
+        ];
+
+        echo json_encode(['user' => $userData, 'session' => $session]);
+    } catch (PDOException $e) {
+        logError('Login database error: ' . $e->getMessage(), ['email' => $email ?? 'unknown'], 'error');
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error during login. Please try again.']);
+    } catch (Exception $e) {
+        logError('Login error: ' . $e->getMessage(), ['email' => $email ?? 'unknown'], 'error');
+        http_response_code(500);
+        echo json_encode(['error' => 'An error occurred during login. Please try again.']);
     }
-
-    // Generate tokens
-    $accessToken = generateJWT($user['id'], $config);
-    $refreshToken = bin2hex(random_bytes(32));
-
-    // Store refresh token
-    $stmt = $pdo->prepare('UPDATE users SET refresh_token = ?, refresh_token_expires = ?, last_login = ? WHERE id = ?');
-    $stmt->execute([$refreshToken, date('Y-m-d H:i:s', time() + 86400 * 30), date('Y-m-d H:i:s'), $user['id']]);
-
-    $userData = [
-        'id' => $user['id'],
-        'email' => $user['email'],
-        'display_name' => $user['display_name'],
-        'avatar_url' => $user['avatar_url'],
-        'created_at' => $user['created_at'],
-        'updated_at' => $user['updated_at'],
-    ];
-
-    $session = [
-        'access_token' => $accessToken,
-        'refresh_token' => $refreshToken,
-        'expires_at' => time() + $config['jwt']['expiry'],
-        'user' => $userData,
-    ];
-
-    echo json_encode(['user' => $userData, 'session' => $session]);
 }
 
 function handleLogout($pdo, $config) {
