@@ -172,12 +172,69 @@ async function createTarGz(sourceDir, outputPath) {
   return outputPath;
 }
 
+// PHP syntax validation
+async function lintPhpFiles(dir) {
+  const errors = [];
+  
+  async function checkFile(filePath) {
+    return new Promise((resolve) => {
+      const child = spawn("php", ["-l", filePath], {
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: process.platform === "win32",
+      });
+      
+      let stderr = "";
+      child.stderr.on("data", (data) => { stderr += data.toString(); });
+      
+      child.on("close", (code) => {
+        if (code !== 0) {
+          errors.push({ file: filePath, error: stderr.trim() || `Exit code ${code}` });
+        }
+        resolve();
+      });
+      
+      child.on("error", () => {
+        // PHP not available - skip lint
+        resolve();
+      });
+    });
+  }
+  
+  async function walkDir(currentDir) {
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await walkDir(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith(".php")) {
+        await checkFile(fullPath);
+      }
+    }
+  }
+  
+  await walkDir(dir);
+  return errors;
+}
+
 async function main() {
   console.log("🚀 TempMail cPanel Packager\n");
 
   if (!(await pathExists(PHP_BACKEND_DIR))) {
     throw new Error(`Missing php-backend/ folder at: ${PHP_BACKEND_DIR}`);
   }
+
+  // Validate PHP syntax before proceeding
+  console.log("🔍 Validating PHP syntax...\n");
+  const phpErrors = await lintPhpFiles(PHP_BACKEND_DIR);
+  if (phpErrors.length > 0) {
+    console.error("❌ PHP syntax errors found:\n");
+    for (const { file, error } of phpErrors) {
+      console.error(`  ${path.relative(ROOT, file)}:`);
+      console.error(`    ${error}\n`);
+    }
+    throw new Error("PHP syntax validation failed. Fix the errors above before packaging.");
+  }
+  console.log("✅ PHP syntax validation passed\n");
 
   if (!SKIP_BUILD) {
     console.log("📦 Building React app...\n");

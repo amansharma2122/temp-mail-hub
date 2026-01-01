@@ -105,15 +105,22 @@ try {
     exit;
 }
 
-// Check IP blocking
+// Check IP blocking (graceful if table doesn't exist)
 $clientIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
 if ($clientIp) {
-    $stmt = $pdo->prepare('SELECT 1 FROM blocked_ips WHERE ip_address = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())');
-    $stmt->execute([$clientIp]);
-    if ($stmt->fetch()) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Access denied']);
-        exit;
+    try {
+        $stmt = $pdo->prepare('SELECT 1 FROM blocked_ips WHERE ip_address = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())');
+        $stmt->execute([$clientIp]);
+        if ($stmt->fetch()) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Access denied']);
+            exit;
+        }
+    } catch (PDOException $e) {
+        // Table may not exist yet - log warning and continue
+        if (function_exists('logWarning')) {
+            logWarning('IP blocking check skipped: ' . $e->getMessage());
+        }
     }
 }
 
