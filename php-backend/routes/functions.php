@@ -521,6 +521,7 @@ function createCheckout($body, $pdo, $config, $userId) {
 
     $tierId = $body['tier_id'] ?? '';
     $interval = $body['interval'] ?? 'monthly';
+    $paymentMethod = $body['payment_method'] ?? 'stripe';
 
     // Get tier
     $stmt = $pdo->prepare('SELECT * FROM subscription_tiers WHERE id = ? AND is_active = 1');
@@ -533,11 +534,212 @@ function createCheckout($body, $pdo, $config, $userId) {
         return;
     }
 
-    // For Stripe integration, you would create a checkout session here
-    // This is a placeholder response
-    echo json_encode([
-        'error' => 'Stripe integration not configured. Please set up Stripe keys in config.php',
+    // Get user email
+    $stmt = $pdo->prepare('SELECT email FROM profiles WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    $profile = $stmt->fetch(PDO::FETCH_ASSOC);
+    $userEmail = $profile['email'] ?? '';
+
+    // Get payment settings
+    $paymentConfig = getPaymentSettings($pdo);
+    
+    $price = $interval === 'yearly' ? $tier['price_yearly'] : $tier['price_monthly'];
+    
+    if ($paymentMethod === 'paypal') {
+        // PayPal checkout
+        return createPaypalCheckout($pdo, $config, $paymentConfig, $userId, $tier, $interval, $price, $userEmail);
+    }
+    
+    // Stripe checkout
+    return createStripeCheckout($pdo, $config, $paymentConfig, $userId, $tier, $interval, $price, $userEmail);
+}
+
+function createStripeCheckout($pdo, $config, $paymentConfig, $userId, $tier, $interval, $price, $userEmail) {
+    $secretKey = $paymentConfig['stripeSecretKey'] ?? $config['stripe']['secret_key'] ?? '';
+    
+    if (empty($secretKey)) {
+        echo json_encode([
+            'error' => 'Stripe not configured. Please add your Stripe API keys in Admin > Payments settings.',
+            'code' => 'STRIPE_NOT_CONFIGURED'
+        ]);
+        return;
+    }
+    
+    $currency = $paymentConfig['currency'] ?? 'usd';
+    $successUrl = ($_SERVER['HTTP_ORIGIN'] ?? 'https://yourdomain.com') . '/dashboard?payment=success';
+    $cancelUrl = ($_SERVER['HTTP_ORIGIN'] ?? 'https://yourdomain.com') . '/pricing?payment=canceled';
+    
+    // Create Stripe checkout session using cURL
+    $stripeData = [
+        'mode' => 'subscription',
+        'success_url' => $successUrl,
+        'cancel_url' => $cancelUrl,
+        'client_reference_id' => $userId,
+        'metadata[user_id]' => $userId,
+        'metadata[tier_id]' => $tier['id'],
+        'metadata[tier_name]' => $tier['name'],
+        'line_items[0][price_data][currency]' => $currency,
+        'line_items[0][price_data][product_data][name]' => $tier['name'] . ' Subscription',
+        'line_items[0][price_data][product_data][description]' => 'Premium subscription for TempMail',
+        'line_items[0][price_data][unit_amount]' => intval($price * 100),
+        'line_items[0][price_data][recurring][interval]' => $interval === 'yearly' ? 'year' : 'month',
+        'line_items[0][quantity]' => 1,
+    ];
+    
+    if ($userEmail) {
+        $stripeData['customer_email'] = $userEmail;
+    }
+    
+    $ch = curl_init('https://api.stripe.com/v1/checkout/sessions');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($stripeData),
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $secretKey,
+            'Content-Type: application/x-www-form-urlencoded',
+        ],
     ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    $result = json_decode($response, true);
+    
+    if ($httpCode !== 200 || isset($result['error'])) {
+        logError('Stripe checkout creation failed', ['error' => $result['error'] ?? 'Unknown error', 'http_code' => $httpCode]);
+        http_response_code(400);
+        echo json_encode([
+            'error' => $result['error']['message'] ?? 'Failed to create checkout session',
+        ]);
+        return;
+    }
+    
+    logInfo('Stripe checkout session created', ['user_id' => $userId, 'tier' => $tier['name'], 'session_id' => $result['id']]);
+    
+    echo json_encode([
+        'url' => $result['url'],
+        'session_id' => $result['id'],
+    ]);
+}
+
+function createPaypalCheckout($pdo, $config, $paymentConfig, $userId, $tier, $interval, $price, $userEmail) {
+    $clientId = $paymentConfig['paypalClientId'] ?? $config['paypal']['client_id'] ?? '';
+    $clientSecret = $paymentConfig['paypalClientSecret'] ?? $config['paypal']['client_secret'] ?? '';
+    $mode = $paymentConfig['paypalMode'] ?? 'sandbox';
+    
+    if (empty($clientId) || empty($clientSecret)) {
+        echo json_encode([
+            'error' => 'PayPal not configured. Please add your PayPal API credentials in Admin > Payments settings.',
+            'code' => 'PAYPAL_NOT_CONFIGURED'
+        ]);
+        return;
+    }
+    
+    $baseUrl = $mode === 'live' 
+        ? 'https://api-m.paypal.com'
+        : 'https://api-m.sandbox.paypal.com';
+    
+    // Get PayPal access token
+    $ch = curl_init($baseUrl . '/v1/oauth2/token');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => 'grant_type=client_credentials',
+        CURLOPT_USERPWD => $clientId . ':' . $clientSecret,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/x-www-form-urlencoded',
+        ],
+    ]);
+    
+    $tokenResponse = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+    
+    if (!isset($tokenResponse['access_token'])) {
+        logError('PayPal token acquisition failed', ['error' => $tokenResponse['error'] ?? 'Unknown']);
+        echo json_encode(['error' => 'PayPal authentication failed']);
+        return;
+    }
+    
+    $accessToken = $tokenResponse['access_token'];
+    $currency = strtoupper($paymentConfig['currency'] ?? 'USD');
+    $successUrl = ($_SERVER['HTTP_ORIGIN'] ?? 'https://yourdomain.com') . '/dashboard?payment=success';
+    $cancelUrl = ($_SERVER['HTTP_ORIGIN'] ?? 'https://yourdomain.com') . '/pricing?payment=canceled';
+    
+    // Create order (one-time payment) or subscription
+    // For subscriptions, you'd need to create a product and plan first in PayPal dashboard
+    // This creates a simple order for now
+    $orderData = [
+        'intent' => 'CAPTURE',
+        'purchase_units' => [[
+            'reference_id' => $userId . ':' . $tier['id'],
+            'custom_id' => $userId . ':' . $tier['id'],
+            'description' => $tier['name'] . ' Subscription',
+            'amount' => [
+                'currency_code' => $currency,
+                'value' => number_format($price, 2, '.', ''),
+            ],
+        ]],
+        'application_context' => [
+            'return_url' => $successUrl,
+            'cancel_url' => $cancelUrl,
+            'brand_name' => 'TempMail',
+            'user_action' => 'PAY_NOW',
+        ],
+    ];
+    
+    $ch = curl_init($baseUrl . '/v2/checkout/orders');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($orderData),
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $accessToken,
+            'Content-Type: application/json',
+        ],
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    $result = json_decode($response, true);
+    
+    if ($httpCode !== 201 || !isset($result['id'])) {
+        logError('PayPal order creation failed', ['error' => $result, 'http_code' => $httpCode]);
+        echo json_encode(['error' => 'Failed to create PayPal order']);
+        return;
+    }
+    
+    // Find approval link
+    $approvalUrl = '';
+    foreach ($result['links'] as $link) {
+        if ($link['rel'] === 'approve') {
+            $approvalUrl = $link['href'];
+            break;
+        }
+    }
+    
+    logInfo('PayPal order created', ['user_id' => $userId, 'tier' => $tier['name'], 'order_id' => $result['id']]);
+    
+    echo json_encode([
+        'url' => $approvalUrl,
+        'order_id' => $result['id'],
+        'payment_method' => 'paypal',
+    ]);
+}
+
+function getPaymentSettings($pdo) {
+    $stmt = $pdo->prepare('SELECT value FROM app_settings WHERE `key` = ?');
+    $stmt->execute(['payment_settings']);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($row && $row['value']) {
+        return json_decode($row['value'], true);
+    }
+    
+    return [];
 }
 
 function emailWebhook($body, $pdo, $config) {
