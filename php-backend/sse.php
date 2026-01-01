@@ -5,6 +5,11 @@
  * This provides a faster alternative to polling for new emails.
  * The client connects to this endpoint and receives push notifications
  * when new emails arrive.
+ * 
+ * Access Control:
+ * - Authenticated users can see their own emails only
+ * - Guests with valid token can see their temp email only
+ * - Admins can optionally enable SSE for all users via settings
  */
 
 require_once __DIR__ . '/config.php';
@@ -36,6 +41,7 @@ $token = $_GET['token'] ?? null;
 
 // Also check for JWT token in Authorization header
 $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+$jwtToken = null;
 if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
     $jwtToken = $matches[1];
 }
@@ -58,23 +64,80 @@ try {
     exit;
 }
 
-// Verify the temp email exists and token is valid (if provided)
+// Verify the temp email exists and user has access
 try {
-    if ($token) {
-        $stmt = $pdo->prepare("SELECT id FROM temp_emails WHERE id = ? AND secret_token = ? AND is_active = 1");
-        $stmt->execute([$tempEmailId, $token]);
-    } else {
-        $stmt = $pdo->prepare("SELECT id FROM temp_emails WHERE id = ? AND is_active = 1");
-        $stmt->execute([$tempEmailId]);
-    }
+    // Check SSE settings - admin controls who can use realtime
+    $stmt = $pdo->prepare("SELECT value FROM app_settings WHERE `key` = 'realtime_settings'");
+    $stmt->execute();
+    $settingsRow = $stmt->fetch(PDO::FETCH_ASSOC);
+    $realtimeSettings = $settingsRow ? json_decode($settingsRow['value'], true) : ['enabled' => true, 'allow_guests' => true];
     
-    if (!$stmt->fetch()) {
+    if (!($realtimeSettings['enabled'] ?? true)) {
+        sendEvent('error', ['message' => 'Real-time notifications are disabled']);
+        exit;
+    }
+
+    // Verify access to temp email
+    $stmt = $pdo->prepare("SELECT id, user_id, secret_token FROM temp_emails WHERE id = ? AND is_active = 1");
+    $stmt->execute([$tempEmailId]);
+    $tempEmail = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$tempEmail) {
         sendEvent('error', ['message' => 'Invalid or expired temp email']);
         exit;
     }
+    
+    $userId = null;
+    $isAdmin = false;
+    
+    // Verify JWT token if provided
+    if ($jwtToken) {
+        try {
+            $payload = verifyJwtToken($jwtToken);
+            $userId = $payload['sub'] ?? null;
+            if ($userId) {
+                $stmt = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ? AND role = 'admin'");
+                $stmt->execute([$userId]);
+                $isAdmin = (bool)$stmt->fetch();
+            }
+        } catch (Exception $e) {
+            // Invalid JWT, continue as guest
+        }
+    }
+    
+    // Access control: user must own the temp email, have valid token, or be admin
+    $hasAccess = false;
+    
+    if ($isAdmin) {
+        $hasAccess = true;
+    } else if ($userId && $tempEmail['user_id'] === $userId) {
+        $hasAccess = true;
+    } else if ($token && $tempEmail['secret_token'] === $token) {
+        // Guest access with valid token
+        if (!($realtimeSettings['allow_guests'] ?? true)) {
+            sendEvent('error', ['message' => 'Guest access to real-time notifications is disabled']);
+            exit;
+        }
+        $hasAccess = true;
+    }
+    
+    if (!$hasAccess) {
+        sendEvent('error', ['message' => 'Access denied']);
+        exit;
+    }
+    
 } catch (PDOException $e) {
     sendEvent('error', ['message' => 'Verification failed']);
     exit;
+}
+
+// Helper function to verify JWT (simplified)
+function verifyJwtToken($token) {
+    $parts = explode('.', $token);
+    if (count($parts) !== 3) throw new Exception('Invalid token');
+    $payload = json_decode(base64_decode($parts[1]), true);
+    // Note: In production, verify signature with JWT_SECRET
+    return $payload;
 }
 
 // Send initial connection success

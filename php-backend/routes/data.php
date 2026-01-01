@@ -23,7 +23,7 @@ function handleData($path, $method, $body, $pdo, $config) {
     $authRequiredTables = [
         'profiles', 'temp_emails', 'received_emails', 'email_forwarding',
         'saved_emails', 'user_subscriptions', 'user_usage', 'user_2fa',
-        'user_invoices', 'push_subscriptions'
+        'user_invoices', 'push_subscriptions', 'email_attachments'
     ];
     
     $adminOnlyTables = [

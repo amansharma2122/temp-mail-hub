@@ -295,13 +295,16 @@ const Header = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="relative overflow-hidden h-9 w-9 rounded-lg bg-secondary/50 hover:bg-secondary"
+                        className="relative overflow-hidden h-9 w-9 rounded-lg bg-secondary/50 hover:bg-secondary border border-border/50"
+                        aria-label="Theme picker"
                       >
                         <div 
-                          className="absolute inset-1 rounded-md opacity-30"
-                          style={{ backgroundColor: theme.colors.primary }}
+                          className="absolute inset-1.5 rounded-md opacity-40"
+                          style={{ 
+                            background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.accent})`
+                          }}
                         />
-                        <Palette className="w-4 h-4 relative z-10" />
+                        <Palette className="w-4 h-4 relative z-10 text-foreground" />
                       </Button>
                     </motion.div>
                   </DropdownMenuTrigger>
