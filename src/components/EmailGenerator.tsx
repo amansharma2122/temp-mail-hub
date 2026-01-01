@@ -388,6 +388,18 @@ const EmailGenerator = () => {
       return;
     }
 
+    // Pre-flight check: Verify user hasn't reached their limit before making API call
+    const currentLimit = user ? rateLimitSettings.max_requests : rateLimitSettings.guest_max_requests;
+    if (currentLimit !== 9999 && emailUsage.remaining <= 0) {
+      toast.error("You've reached your daily email limit. Upgrade your plan for more emails!", {
+        action: {
+          label: "Upgrade",
+          onClick: () => window.location.href = "/pricing",
+        },
+      });
+      return;
+    }
+
     // Use dynamic rate limit settings from admin config
     const maxRequests = user
       ? rateLimitSettings.max_requests
