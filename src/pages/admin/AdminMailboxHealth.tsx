@@ -110,10 +110,19 @@ const AdminMailboxHealth = () => {
         }
       }
 
+      // Supabase backend - fetch mailboxes and logs
+      const [mailboxResult, logResult] = await Promise.all([
+        supabase.from('mailboxes').select('*'),
+        supabase.from('email_logs').select('*').gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      ]);
+      
+      const mailboxData = mailboxResult.data || [];
+      const logData = logResult.data || [];
+
       // Calculate health status for each mailbox
       const newAlerts: typeof alerts = [];
-      const healthyMailboxes: MailboxHealth[] = (mailboxData || []).map((mailbox) => {
-        const mailboxLogs = (logData || []).filter(l => l.mailbox_id === mailbox.id || l.mailbox_name === mailbox.smtp_from);
+      const healthyMailboxes: MailboxHealth[] = mailboxData.map((mailbox) => {
+        const mailboxLogs = logData.filter(l => l.mailbox_id === mailbox.id || l.mailbox_name === mailbox.smtp_from);
         const failures = mailboxLogs.filter(l => l.status === 'failed' || l.status === 'bounced');
         const successes = mailboxLogs.filter(l => l.status === 'sent');
 
@@ -172,8 +181,8 @@ const AdminMailboxHealth = () => {
       setAlerts(newAlerts);
 
       // Calculate overall stats
-      const totalSent = (logData || []).filter(l => l.status === 'sent').length;
-      const totalFailed = (logData || []).filter(l => l.status === 'failed' || l.status === 'bounced').length;
+      const totalSent = logData.filter(l => l.status === 'sent').length;
+      const totalFailed = logData.filter(l => l.status === 'failed' || l.status === 'bounced').length;
       const successRate = totalSent + totalFailed > 0 
         ? Math.round((totalSent / (totalSent + totalFailed)) * 100) 
         : 100;
