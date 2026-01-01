@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Loader2,
-  Database,
   Trash2,
   RefreshCw,
   Info,
@@ -19,7 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { format, formatDistanceToNow } from "date-fns";
 
 interface BackupHistory {
@@ -42,14 +41,10 @@ const AdminBackup = () => {
 
   const fetchHistory = async () => {
     try {
-      const { data, error } = await supabase
-        .from('backup_history')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-      const mappedData: BackupHistory[] = (data || []).map((item) => ({
+      const { data, error } = await api.admin.getBackupHistory();
+      if (error) throw new Error(error.message);
+      
+      const mappedData: BackupHistory[] = (data || []).map((item: any) => ({
         id: item.id,
         backup_type: item.backup_type,
         status: item.status,
@@ -82,15 +77,15 @@ const AdminBackup = () => {
         setProgress(prev => Math.min(prev + 5, 90));
       }, 300);
 
-      const { data, error } = await supabase.functions.invoke('generate-backup');
+      const { data, error } = await api.admin.generateBackup();
 
       clearInterval(progressInterval);
 
-      if (error) throw error;
+      if (error) throw new Error(error.message);
 
       setProgress(100);
 
-      if (data.zipData) {
+      if (data?.zipData) {
         // Convert base64 to blob and download as ZIP
         const binaryString = atob(data.zipData);
         const bytes = new Uint8Array(binaryString.length);
@@ -109,7 +104,7 @@ const AdminBackup = () => {
         URL.revokeObjectURL(url);
 
         toast.success(`Backup downloaded! ${data.totalRows} rows across ${data.rowCounts ? Object.keys(data.rowCounts).length : 0} tables.`);
-      } else if (data.backup) {
+      } else if (data?.backup) {
         // Fallback to JSON if ZIP not available
         const blob = new Blob([JSON.stringify(data.backup, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -125,9 +120,9 @@ const AdminBackup = () => {
       }
 
       fetchHistory();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating backup:', error);
-      toast.error('Failed to generate backup');
+      toast.error(error.message || 'Failed to generate backup');
     } finally {
       setIsGenerating(false);
       setProgress(0);
@@ -138,17 +133,14 @@ const AdminBackup = () => {
     if (!confirm('Delete this backup record?')) return;
 
     try {
-      const { error } = await supabase
-        .from('backup_history')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      const { error } = await api.admin.deleteBackupRecord(id);
+      if (error) throw new Error(error.message);
+      
       toast.success('Backup record deleted');
       fetchHistory();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting backup:', error);
-      toast.error('Failed to delete backup record');
+      toast.error(error.message || 'Failed to delete backup record');
     }
   };
 
