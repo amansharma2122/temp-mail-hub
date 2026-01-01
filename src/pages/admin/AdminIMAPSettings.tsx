@@ -91,12 +91,13 @@ const AdminIMAPSettings = () => {
   const fetchMailboxes = async () => {
     setIsLoadingMailboxes(true);
     try {
-      const response = await api.admin('mailboxes', {});
-      const data = response.mailboxes || [];
-      setMailboxes(data);
+      const { data, error } = await api.admin.getMailboxes();
+      if (error) throw new Error(error.message);
+      const mailboxData = data || [];
+      setMailboxes(mailboxData);
       
-      if (data.length > 0 && !selectedMailboxId) {
-        const firstActive = data.find((m: Mailbox) => m.is_active);
+      if (mailboxData.length > 0 && !selectedMailboxId) {
+        const firstActive = mailboxData.find((m: Mailbox) => m.is_active);
         if (firstActive) {
           setSelectedMailboxId(firstActive.id);
           loadMailboxToForm(firstActive);

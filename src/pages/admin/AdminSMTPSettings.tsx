@@ -105,13 +105,14 @@ const AdminSMTPSettings = () => {
   const fetchMailboxes = async () => {
     setIsLoadingMailboxes(true);
     try {
-      const response = await api.admin('mailboxes', {});
-      const data = response.mailboxes || [];
-      setMailboxes(data);
+      const { data, error } = await api.admin.getMailboxes();
+      if (error) throw new Error(error.message);
+      const mailboxData = data || [];
+      setMailboxes(mailboxData);
       
       // If we have mailboxes and none selected, select the first active one
-      if (data.length > 0 && !selectedMailboxId) {
-        const firstActive = data.find((m: Mailbox) => m.is_active);
+      if (mailboxData.length > 0 && !selectedMailboxId) {
+        const firstActive = mailboxData.find((m: Mailbox) => m.is_active);
         if (firstActive) {
           setSelectedMailboxId(firstActive.id);
           loadMailboxToForm(firstActive);
@@ -280,7 +281,7 @@ const AdminSMTPSettings = () => {
     setTestResult(null);
     
     try {
-      const data = await api.admin('mailbox-test-smtp', {
+      const { data, error } = await api.admin.testMailbox('smtp', {
         host: settings.host,
         port: settings.port,
         user: settings.username,
@@ -289,12 +290,14 @@ const AdminSMTPSettings = () => {
         test_email: testEmail,
       });
 
-      if (data.success && data.email_sent) {
+      if (error) throw new Error(error.message);
+
+      if (data?.success && data?.email_sent) {
         setTestResult({ success: true, message: 'Test email sent successfully!' });
         toast.success(`Test email sent to ${testEmail}!`);
       } else {
-        setTestResult({ success: false, message: data.error || "Failed to send test email" });
-        toast.error(data.error || "Failed to send test email");
+        setTestResult({ success: false, message: data?.error || "Failed to send test email" });
+        toast.error(data?.error || "Failed to send test email");
       }
     } catch (error: any) {
       console.error("Error sending test email:", error);
