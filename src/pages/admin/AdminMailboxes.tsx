@@ -131,54 +131,30 @@ const AdminMailboxes = () => {
 
     setIsSaving(true);
     try {
-      if (editingMailbox.id) {
-        // Update existing
-        const { error } = await api.db.update("mailboxes", {
-          name: editingMailbox.name,
-          smtp_host: editingMailbox.smtp_host || null,
-          smtp_port: editingMailbox.smtp_port,
-          smtp_user: editingMailbox.smtp_user || null,
-          smtp_password: editingMailbox.smtp_password || null,
-          smtp_from: editingMailbox.smtp_from || null,
-          imap_host: editingMailbox.imap_host || null,
-          imap_port: editingMailbox.imap_port,
-          imap_user: editingMailbox.imap_user || null,
-          imap_password: editingMailbox.imap_password || null,
-          receiving_email: editingMailbox.receiving_email || null,
-          hourly_limit: editingMailbox.hourly_limit,
-          daily_limit: editingMailbox.daily_limit,
-          auto_delete_after_store: editingMailbox.auto_delete_after_store,
-          is_active: editingMailbox.is_active,
-          priority: editingMailbox.priority,
-          updated_at: new Date().toISOString(),
-        }, { id: editingMailbox.id });
+      const mailboxData = {
+        id: editingMailbox.id,
+        name: editingMailbox.name,
+        smtp_host: editingMailbox.smtp_host || null,
+        smtp_port: editingMailbox.smtp_port,
+        smtp_user: editingMailbox.smtp_user || null,
+        smtp_password: editingMailbox.smtp_password || null,
+        smtp_from: editingMailbox.smtp_from || null,
+        imap_host: editingMailbox.imap_host || null,
+        imap_port: editingMailbox.imap_port,
+        imap_user: editingMailbox.imap_user || null,
+        imap_password: editingMailbox.imap_password || null,
+        receiving_email: editingMailbox.receiving_email || null,
+        hourly_limit: editingMailbox.hourly_limit,
+        daily_limit: editingMailbox.daily_limit,
+        auto_delete_after_store: editingMailbox.auto_delete_after_store,
+        is_active: editingMailbox.is_active,
+        priority: editingMailbox.priority,
+      };
 
-        if (error) throw error;
-        toast.success("Mailbox updated");
-      } else {
-        // Create new
-        const { error } = await api.db.insert("mailboxes", {
-          name: editingMailbox.name,
-          smtp_host: editingMailbox.smtp_host || null,
-          smtp_port: editingMailbox.smtp_port,
-          smtp_user: editingMailbox.smtp_user || null,
-          smtp_password: editingMailbox.smtp_password || null,
-          smtp_from: editingMailbox.smtp_from || null,
-          imap_host: editingMailbox.imap_host || null,
-          imap_port: editingMailbox.imap_port,
-          imap_user: editingMailbox.imap_user || null,
-          imap_password: editingMailbox.imap_password || null,
-          receiving_email: editingMailbox.receiving_email || null,
-          hourly_limit: editingMailbox.hourly_limit,
-          daily_limit: editingMailbox.daily_limit,
-          auto_delete_after_store: editingMailbox.auto_delete_after_store,
-          is_active: editingMailbox.is_active,
-          priority: editingMailbox.priority,
-        });
+      const { error } = await api.admin.saveMailbox(mailboxData);
 
-        if (error) throw error;
-        toast.success("Mailbox created");
-      }
+      if (error) throw error;
+      toast.success(editingMailbox.id ? "Mailbox updated" : "Mailbox created");
 
       closeDialog();
       refetch();
@@ -192,9 +168,13 @@ const AdminMailboxes = () => {
 
   const handleDeleteMailbox = async (id: string) => {
     try {
-      await deleteMailboxMutation.mutateAsync(id);
+      const { error } = await api.admin.deleteMailbox(id);
+      if (error) throw error;
+      toast.success("Mailbox deleted");
+      refetch();
     } catch (error: any) {
       console.error("Error deleting mailbox:", error);
+      toast.error(error.message || "Failed to delete mailbox");
     }
   };
 
@@ -206,13 +186,11 @@ const AdminMailboxes = () => {
 
     setIsTesting(mailbox.id);
     try {
-      const { data, error } = await api.functions.invoke<{success?: boolean; error?: string}>("smtp-connectivity-test", {
-        body: {
-          host: mailbox.smtp_host,
-          port: mailbox.smtp_port,
-          username: mailbox.smtp_user,
-          password: mailbox.smtp_password,
-        },
+      const { data, error } = await api.admin.testMailbox('smtp', {
+        host: mailbox.smtp_host,
+        port: mailbox.smtp_port,
+        user: mailbox.smtp_user,
+        password: mailbox.smtp_password,
       });
 
       if (error) throw error;
@@ -232,9 +210,16 @@ const AdminMailboxes = () => {
 
   const handleToggleMailboxActive = async (mailbox: Mailbox) => {
     try {
-      await toggleActive.mutateAsync({ id: mailbox.id, isActive: mailbox.is_active });
+      const { error } = await api.admin.saveMailbox({
+        id: mailbox.id,
+        is_active: !mailbox.is_active,
+      });
+      if (error) throw error;
+      toast.success(mailbox.is_active ? "Mailbox disabled" : "Mailbox enabled");
+      refetch();
     } catch (error: any) {
       console.error("Error toggling mailbox:", error);
+      toast.error(error.message || "Failed to toggle mailbox");
     }
   };
 

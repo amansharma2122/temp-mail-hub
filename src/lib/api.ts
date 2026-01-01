@@ -1382,7 +1382,10 @@ export const admin = {
       // Supabase doesn't have a cron jobs table - return mock data
       return { data: [], error: null };
     }
-    return fetchApi('/admin/cron-jobs');
+    return fetchApi('/admin/cron-jobs', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'cron-jobs' })
+    });
   },
 
   async runCronJob(jobId: string): Promise<ApiResponse<any>> {
@@ -1399,24 +1402,33 @@ export const admin = {
       }
       return { data: null, error: { message: 'Unknown cron job' } };
     }
-    return fetchApi(`/admin/cron-jobs/${jobId}/run`, { method: 'POST' });
+    return fetchApi('/admin/cron-job-run', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'cron-job-run', job_id: jobId })
+    });
   },
 
   async toggleCronJob(jobId: string, enabled: boolean): Promise<ApiResponse<any>> {
     if (USE_SUPABASE) {
       return { data: null, error: { message: 'Cron management requires PHP backend' } };
     }
-    return fetchApi(`/admin/cron-jobs/${jobId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ enabled })
+    return fetchApi('/admin/cron-job-toggle', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'cron-job-toggle', job_id: jobId, enabled })
     });
   },
 
   // Backup management
   async getBackupHistory(): Promise<ApiResponse<any>> {
-    return db.query('backup_history', { 
-      order: { column: 'created_at', ascending: false },
-      limit: 10 
+    if (USE_SUPABASE) {
+      return db.query('backup_history', { 
+        order: { column: 'created_at', ascending: false },
+        limit: 10 
+      });
+    }
+    return fetchApi('/admin/backup-history', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'backup-history' })
     });
   },
 
@@ -1424,24 +1436,68 @@ export const admin = {
     if (USE_SUPABASE) {
       return functions.invoke('generate-backup');
     }
-    return fetchApi('/admin/backup/generate', { method: 'POST' });
+    return fetchApi('/admin/backup-generate', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'backup-generate' })
+    });
   },
 
   async deleteBackupRecord(id: string): Promise<ApiResponse<any>> {
-    return db.delete('backup_history', { id });
+    if (USE_SUPABASE) {
+      return db.delete('backup_history', { id });
+    }
+    return fetchApi('/admin/backup-delete', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'backup-delete', id })
+    });
   },
 
   // Themes management (stored in app_settings)
   async getThemes(): Promise<ApiResponse<any>> {
-    return db.query('app_settings', { eq: { key: 'custom_themes' }, single: true });
+    if (USE_SUPABASE) {
+      return db.query('app_settings', { eq: { key: 'custom_themes' }, single: true });
+    }
+    return fetchApi('/admin/themes-get', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'themes-get' })
+    });
   },
 
   async saveThemes(themes: any[]): Promise<ApiResponse<any>> {
-    return db.upsert('app_settings', { 
-      key: 'custom_themes', 
-      value: themes, 
-      updated_at: new Date().toISOString() 
-    }, { onConflict: 'key' });
+    if (USE_SUPABASE) {
+      return db.upsert('app_settings', { 
+        key: 'custom_themes', 
+        value: themes, 
+        updated_at: new Date().toISOString() 
+      }, { onConflict: 'key' });
+    }
+    return fetchApi('/admin/themes-save', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'themes-save', themes })
+    });
+  },
+
+  // Analytics
+  async getAnalytics(days: number = 7): Promise<ApiResponse<any>> {
+    if (USE_SUPABASE) {
+      // Use existing db queries for Supabase
+      return { data: null, error: null };
+    }
+    return fetchApi('/admin/analytics', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'analytics', days })
+    });
+  },
+
+  // Dashboard stats
+  async getDashboardStats(): Promise<ApiResponse<any>> {
+    if (USE_SUPABASE) {
+      return { data: null, error: null };
+    }
+    return fetchApi('/admin/dashboard', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'dashboard' })
+    });
   },
 };
 

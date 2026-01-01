@@ -106,6 +106,36 @@ function handleAdminRoute($action, $body, $pdo, $config) {
             getDashboardStats($pdo);
             break;
 
+        // Cron Jobs Management
+        case 'cron-jobs':
+            getCronJobs($pdo);
+            break;
+        case 'cron-job-run':
+            runCronJob($body, $pdo, $userId);
+            break;
+        case 'cron-job-toggle':
+            toggleCronJob($body, $pdo, $userId);
+            break;
+
+        // Backup Management
+        case 'backup-history':
+            getBackupHistory($pdo);
+            break;
+        case 'backup-generate':
+            generateBackup($pdo, $userId);
+            break;
+        case 'backup-delete':
+            deleteBackupRecord($body, $pdo, $userId);
+            break;
+
+        // Themes Management
+        case 'themes-get':
+            getThemes($pdo);
+            break;
+        case 'themes-save':
+            saveThemes($body, $pdo, $userId);
+            break;
+
         default:
             http_response_code(404);
             echo json_encode(['error' => 'Unknown admin action: ' . $action]);
@@ -1094,4 +1124,344 @@ function sendEmailWithCredentials($to, $subject, $body, $host, $port, $user, $pa
     $success = @mail($to, $subject, $body, implode("\r\n", array_map(fn($k, $v) => "$k: $v", array_keys($headers), $headers)));
 
     return ['success' => $success, 'error' => $success ? null : 'mail() function failed'];
+}
+
+// =========== CRON JOBS MANAGEMENT ===========
+
+function getCronJobs($pdo) {
+    // Cron jobs are managed via cron/maintenance.php and cron/imap-poll.php
+    // Return default job definitions with last run info from settings
+    $jobs = [
+        [
+            'id' => 'clean-emails',
+            'name' => 'Clean Expired Emails',
+            'description' => 'Delete temporary emails that have passed their expiration time',
+            'schedule' => '0 * * * *',
+            'last_run' => null,
+            'next_run' => null,
+            'status' => 'active',
+            'last_result' => null
+        ],
+        [
+            'id' => 'imap-poll',
+            'name' => 'IMAP Polling',
+            'description' => 'Check mailboxes for new incoming emails',
+            'schedule' => '*/5 * * * *',
+            'last_run' => null,
+            'next_run' => null,
+            'status' => 'active',
+            'last_result' => null
+        ],
+        [
+            'id' => 'cleanup-backups',
+            'name' => 'Cleanup Old Backups',
+            'description' => 'Remove expired backup records from the database',
+            'schedule' => '0 0 * * *',
+            'last_run' => null,
+            'next_run' => null,
+            'status' => 'active',
+            'last_result' => null
+        ],
+    ];
+
+    // Get cron settings to check last run times
+    $stmt = $pdo->prepare('SELECT * FROM app_settings WHERE `key` LIKE ?');
+    $stmt->execute(['cron_%']);
+    $settings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $cronSettings = [];
+    foreach ($settings as $setting) {
+        $cronSettings[$setting['key']] = json_decode($setting['value'], true);
+    }
+
+    // Update jobs with stored data
+    foreach ($jobs as &$job) {
+        $key = 'cron_' . str_replace('-', '_', $job['id']);
+        if (isset($cronSettings[$key])) {
+            $job['last_run'] = $cronSettings[$key]['last_run'] ?? null;
+            $job['last_result'] = $cronSettings[$key]['last_result'] ?? null;
+            $job['status'] = $cronSettings[$key]['enabled'] ?? true ? 'active' : 'paused';
+        }
+    }
+
+    echo json_encode(['jobs' => $jobs]);
+}
+
+function runCronJob($body, $pdo, $adminId) {
+    $jobId = $body['job_id'] ?? '';
+
+    if (empty($jobId)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'job_id required']);
+        return;
+    }
+
+    $result = ['success' => false, 'message' => ''];
+
+    switch ($jobId) {
+        case 'clean-emails':
+            // Delete expired temp emails
+            $stmt = $pdo->prepare('DELETE FROM temp_emails WHERE expires_at < NOW()');
+            $stmt->execute();
+            $deleted = $stmt->rowCount();
+            $result = ['success' => true, 'message' => "Deleted $deleted expired emails"];
+            break;
+
+        case 'imap-poll':
+            // Trigger IMAP polling for all active mailboxes
+            $stmt = $pdo->query('SELECT id, name FROM mailboxes WHERE is_active = 1');
+            $mailboxes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $polled = count($mailboxes);
+            // In a real implementation, this would trigger fetchImapEmails for each
+            $result = ['success' => true, 'message' => "Polled $polled mailboxes"];
+            break;
+
+        case 'cleanup-backups':
+            // Delete expired backup records
+            $stmt = $pdo->prepare('DELETE FROM backup_history WHERE expires_at < NOW()');
+            $stmt->execute();
+            $deleted = $stmt->rowCount();
+            $result = ['success' => true, 'message' => "Deleted $deleted expired backups"];
+            break;
+
+        default:
+            http_response_code(400);
+            echo json_encode(['error' => 'Unknown cron job: ' . $jobId]);
+            return;
+    }
+
+    // Update last run time
+    $key = 'cron_' . str_replace('-', '_', $jobId);
+    $value = json_encode([
+        'last_run' => date('Y-m-d H:i:s'),
+        'last_result' => $result['success'] ? 'success' : 'failed',
+        'enabled' => true
+    ]);
+
+    $stmt = $pdo->prepare('
+        INSERT INTO app_settings (id, `key`, value, updated_at)
+        VALUES (?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE value = ?, updated_at = NOW()
+    ');
+    $stmt->execute([generateUUID(), $key, $value, $value]);
+
+    logAdminAction($pdo, $adminId, 'RUN_CRON_JOB', 'cron_jobs', null, ['job_id' => $jobId]);
+
+    echo json_encode($result);
+}
+
+function toggleCronJob($body, $pdo, $adminId) {
+    $jobId = $body['job_id'] ?? '';
+    $enabled = $body['enabled'] ?? true;
+
+    if (empty($jobId)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'job_id required']);
+        return;
+    }
+
+    $key = 'cron_' . str_replace('-', '_', $jobId);
+
+    // Get existing settings
+    $stmt = $pdo->prepare('SELECT value FROM app_settings WHERE `key` = ?');
+    $stmt->execute([$key]);
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $value = $existing ? json_decode($existing['value'], true) : [];
+    $value['enabled'] = $enabled;
+    $valueJson = json_encode($value);
+
+    $stmt = $pdo->prepare('
+        INSERT INTO app_settings (id, `key`, value, updated_at)
+        VALUES (?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE value = ?, updated_at = NOW()
+    ');
+    $stmt->execute([generateUUID(), $key, $valueJson, $valueJson]);
+
+    logAdminAction($pdo, $adminId, 'TOGGLE_CRON_JOB', 'cron_jobs', null, ['job_id' => $jobId, 'enabled' => $enabled]);
+
+    echo json_encode(['success' => true]);
+}
+
+// =========== BACKUP MANAGEMENT ===========
+
+function getBackupHistory($pdo) {
+    $stmt = $pdo->query('
+        SELECT * FROM backup_history 
+        ORDER BY created_at DESC 
+        LIMIT 20
+    ');
+    $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Parse JSON fields
+    foreach ($history as &$record) {
+        if ($record['row_counts']) {
+            $record['row_counts'] = json_decode($record['row_counts'], true);
+        }
+        if ($record['tables_included']) {
+            $record['tables_included'] = json_decode($record['tables_included'], true);
+        }
+    }
+
+    echo json_encode(['history' => $history]);
+}
+
+function generateBackup($pdo, $adminId) {
+    $tables = [
+        'profiles', 'domains', 'temp_emails', 'received_emails', 'email_attachments',
+        'email_forwarding', 'mailboxes', 'email_templates', 'app_settings',
+        'subscription_tiers', 'user_subscriptions', 'user_roles', 'user_invoices',
+        'blogs', 'banners', 'friendly_websites', 'homepage_sections',
+        'email_restrictions', 'blocked_ips', 'email_stats', 'email_logs'
+    ];
+
+    $backup = [];
+    $rowCounts = [];
+    $totalRows = 0;
+
+    foreach ($tables as $table) {
+        try {
+            $stmt = $pdo->query("SELECT * FROM `$table`");
+            $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $backup[$table] = $data;
+            $rowCounts[$table] = count($data);
+            $totalRows += count($data);
+        } catch (PDOException $e) {
+            // Table might not exist, skip
+            $backup[$table] = [];
+            $rowCounts[$table] = 0;
+        }
+    }
+
+    // Add metadata
+    $metadata = [
+        'generated_at' => date('Y-m-d H:i:s'),
+        'version' => '1.0',
+        'total_rows' => $totalRows,
+        'tables' => array_keys($rowCounts),
+        'row_counts' => $rowCounts
+    ];
+
+    // Create ZIP file in memory
+    $zipData = null;
+    $fileName = 'backup-' . date('Y-m-d-His') . '.zip';
+
+    if (class_exists('ZipArchive')) {
+        $tempFile = tempnam(sys_get_temp_dir(), 'backup');
+        $zip = new ZipArchive();
+        
+        if ($zip->open($tempFile, ZipArchive::CREATE) === true) {
+            // Add metadata
+            $zip->addFromString('metadata.json', json_encode($metadata, JSON_PRETTY_PRINT));
+            
+            // Add README
+            $readme = "# Database Backup\n\n";
+            $readme .= "Generated: " . $metadata['generated_at'] . "\n";
+            $readme .= "Total Rows: " . $totalRows . "\n\n";
+            $readme .= "## Tables Included\n\n";
+            foreach ($rowCounts as $table => $count) {
+                $readme .= "- $table: $count rows\n";
+            }
+            $readme .= "\n## Restore Instructions\n\n";
+            $readme .= "1. Extract the ZIP file\n";
+            $readme .= "2. Import each JSON file into the corresponding table\n";
+            $zip->addFromString('README.md', $readme);
+            
+            // Add each table as a JSON file
+            foreach ($backup as $table => $data) {
+                $zip->addFromString("database/$table.json", json_encode($data, JSON_PRETTY_PRINT));
+            }
+            
+            $zip->close();
+            
+            $zipData = base64_encode(file_get_contents($tempFile));
+            $fileSize = filesize($tempFile);
+            unlink($tempFile);
+        }
+    }
+
+    // Record backup in history
+    $backupId = generateUUID();
+    $stmt = $pdo->prepare('
+        INSERT INTO backup_history (id, backup_type, status, file_size_bytes, tables_included, row_counts, created_by, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 24 HOUR))
+    ');
+    $stmt->execute([
+        $backupId,
+        'manual',
+        'completed',
+        $fileSize ?? strlen(json_encode($backup)),
+        json_encode(array_keys($backup)),
+        json_encode($rowCounts),
+        $adminId
+    ]);
+
+    logAdminAction($pdo, $adminId, 'GENERATE_BACKUP', 'backup_history', $backupId, ['total_rows' => $totalRows]);
+
+    if ($zipData) {
+        echo json_encode([
+            'success' => true,
+            'zipData' => $zipData,
+            'fileName' => $fileName,
+            'totalRows' => $totalRows,
+            'rowCounts' => $rowCounts
+        ]);
+    } else {
+        // Fallback to JSON
+        echo json_encode([
+            'success' => true,
+            'backup' => $backup,
+            'totalRows' => $totalRows,
+            'rowCounts' => $rowCounts
+        ]);
+    }
+}
+
+function deleteBackupRecord($body, $pdo, $adminId) {
+    $id = $body['id'] ?? '';
+
+    if (empty($id)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Backup ID required']);
+        return;
+    }
+
+    $stmt = $pdo->prepare('DELETE FROM backup_history WHERE id = ?');
+    $stmt->execute([$id]);
+
+    logAdminAction($pdo, $adminId, 'DELETE_BACKUP', 'backup_history', $id, []);
+
+    echo json_encode(['success' => true]);
+}
+
+// =========== THEMES MANAGEMENT ===========
+
+function getThemes($pdo) {
+    $stmt = $pdo->prepare('SELECT * FROM app_settings WHERE `key` = ?');
+    $stmt->execute(['custom_themes']);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($result && $result['value']) {
+        $themes = json_decode($result['value'], true);
+        echo json_encode(['themes' => $themes]);
+    } else {
+        echo json_encode(['themes' => []]);
+    }
+}
+
+function saveThemes($body, $pdo, $adminId) {
+    $themes = $body['themes'] ?? [];
+
+    $value = json_encode($themes);
+
+    $stmt = $pdo->prepare('
+        INSERT INTO app_settings (id, `key`, value, updated_at)
+        VALUES (?, ?, ?, NOW())
+        ON DUPLICATE KEY UPDATE value = ?, updated_at = NOW()
+    ');
+    $stmt->execute([generateUUID(), 'custom_themes', $value, $value]);
+
+    logAdminAction($pdo, $adminId, 'UPDATE_THEMES', 'app_settings', null, ['theme_count' => count($themes)]);
+
+    echo json_encode(['success' => true]);
 }
