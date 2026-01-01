@@ -3,9 +3,11 @@
 Complete self-hosted solution for the TempMail application using PHP/MySQL on cPanel hosting.
 
 ## Requirements
-- PHP 8.0+ with extensions: `pdo_mysql`, `openssl`, `mbstring`, `imap`, `json`
+
+- PHP 8.0+ with extensions: `pdo_mysql`, `openssl`, `mbstring`, `imap`, `json`, `curl`
 - MySQL 8.0+
 - cPanel hosting or any Apache server with mod_rewrite
+- SSL certificate (required for secure authentication)
 
 ## File Structure
 
@@ -25,64 +27,310 @@ public_html/
 │
 └── api/                    # PHP Backend (this folder)
     ├── index.php           # Main API router
-    ├── .htaccess           # API rewrite rules
-    ├── config.php          # Your DB/SMTP/JWT settings (create from example)
+    ├── .htaccess           # API rewrite rules + security
+    ├── install.php         # Interactive setup wizard
+    ├── config.php          # Your DB/SMTP/JWT settings (auto-generated)
     ├── config.example.php  # Template config file
     ├── schema.sql          # Database schema
     ├── sse.php             # Server-Sent Events for realtime
+    ├── test-smtp.php       # SMTP connection tester
+    ├── test-imap.php       # IMAP connection tester
+    ├── health-dashboard.php # System health monitor
+    ├── analytics.php       # Analytics dashboard
+    ├── cron-manager.php    # Cron job manager
+    ├── settings.php        # Admin settings API
     ├── routes/
     │   ├── auth.php        # Authentication endpoints
     │   ├── data.php        # Database CRUD operations
     │   ├── rpc.php         # RPC function calls
     │   ├── storage.php     # File upload/download
     │   ├── functions.php   # Edge function equivalents
-    │   └── admin.php       # Admin panel endpoints
+    │   ├── admin.php       # Admin panel endpoints
+    │   └── webhook.php     # Email webhook receiver
     └── cron/
         ├── imap-poll.php   # Fetch emails via IMAP
         └── maintenance.php # Cleanup expired emails
 ```
 
-## Quick Start (One-Command Deploy)
+## Quick Start Installation
 
-### Option 1: Download ZIP from Lovable
-1. In Lovable, run the cPanel export command
-2. Download the generated ZIP file
-3. Extract and upload contents to cPanel `public_html/`
-4. Visit `https://yourdomain.com/api/install.php`
-5. Delete `install.php` after setup
+### Step 1: Upload Files
 
-### Option 2: Build Locally
+1. Download the deployment package or build locally:
+   ```bash
+   npm install
+   node scripts/cpanel-package.mjs --out cpanel-package
+   ```
+
+2. Upload contents of `cpanel-package/public_html/` to your cPanel `public_html/` folder
+
+### Step 2: Run Setup Wizard
+
+1. Visit `https://yourdomain.com/api/install.php`
+2. The wizard will guide you through:
+   - **Database Configuration**: Enter your MySQL credentials
+   - **Admin Account**: Create your first admin user
+   - **Email Settings**: Configure SMTP and IMAP
+
+3. **IMPORTANT**: Delete `install.php` after setup for security!
+
+### Step 3: Configure Cron Jobs
+
+In cPanel → Cron Jobs, add these entries:
+
 ```bash
-# Clone/download the project
-git clone <your-repo>
-cd <project-folder>
+# Poll IMAP for new emails every minute (fast polling)
+* * * * * /usr/bin/php /home/username/public_html/api/cron/imap-poll.php >> /home/username/logs/imap-poll.log 2>&1
 
-# Install dependencies
-npm install
-
-# Build and package for cPanel
-node scripts/cpanel-package.mjs --out cpanel-package
-
-# Upload cpanel-package/public_html/* to your cPanel public_html/
+# Cleanup expired emails every hour
+0 * * * * /usr/bin/php /home/username/public_html/api/cron/maintenance.php >> /home/username/logs/maintenance.log 2>&1
 ```
 
-## Installation Steps
+Replace `/home/username/` with your actual cPanel home directory path.
 
-### 1. Upload Files
-Upload the entire `public_html/` contents to your cPanel `public_html/` folder.
+### Step 4: Add Email Domain
 
-### 2. Create MySQL Database
-- In cPanel → MySQL Databases, create a new database
-- Create a database user with full privileges
-- Note down: database name, username, password
+1. Log in as admin at `https://yourdomain.com/auth`
+2. Go to Admin Panel → Domains
+3. Add your email domain (e.g., `yourdomain.com`)
 
-### 3. Run Install Script
-Visit: `https://yourdomain.com/api/install.php`
-- This creates all database tables
-- **DELETE THIS FILE AFTER SETUP** (security!)
+### Step 5: Configure Mailbox
 
-### 4. Configure Backend
-Copy `config.example.php` to `config.php` and edit:
+1. Go to Admin Panel → IMAP Settings
+2. Add your cPanel email account credentials
+3. Click "Test Connection" to verify
+
+## Authentication & Login
+
+### Admin Login URL
+
+Access the admin panel at: `https://yourdomain.com/auth`
+
+### First Admin Setup
+
+The setup wizard automatically creates your first admin account. If you need to manually create an admin:
+
+```sql
+-- First, check if user exists
+SELECT id, email FROM users WHERE email = 'your@email.com';
+
+-- Add admin role
+INSERT INTO user_roles (user_id, role)
+SELECT id, 'admin' FROM users WHERE email = 'your@email.com';
+```
+
+### Login Troubleshooting
+
+**Issue: /auth page not loading or showing errors**
+
+1. **Check .htaccess routing**:
+   ```
+   public_html/.htaccess must contain SPA routing rules
+   ```
+
+2. **Verify config.php exists**:
+   ```bash
+   ls -la public_html/api/config.php
+   ```
+
+3. **Check PHP error logs**:
+   ```bash
+   tail -f /home/username/logs/error.log
+   ```
+
+4. **Test API health**:
+   ```bash
+   curl https://yourdomain.com/api/health
+   ```
+
+5. **Clear browser cache** and try incognito mode
+
+**Issue: Invalid credentials when logging in**
+
+1. Verify the user exists in database:
+   ```sql
+   SELECT id, email, password_hash FROM users WHERE email = 'your@email.com';
+   ```
+
+2. Reset password via setup wizard or manually:
+   ```sql
+   UPDATE users SET password_hash = '$2y$10$...' WHERE email = 'your@email.com';
+   ```
+   (Generate hash with PHP: `password_hash('newpassword', PASSWORD_DEFAULT)`)
+
+## Email Webhook Receiver
+
+For receiving emails via HTTP POST from services like Mailgun or SendGrid:
+
+**Endpoint**: `POST https://yourdomain.com/api/webhook`
+
+### Mailgun Setup
+
+1. In Mailgun → Routes, create a catch-all route:
+   - Expression Type: `Catch All`
+   - Action: `forward("https://yourdomain.com/api/webhook")`
+
+### SendGrid Setup
+
+1. In SendGrid → Settings → Inbound Parse:
+   - Add your domain
+   - Destination URL: `https://yourdomain.com/api/webhook`
+
+### Webhook Security
+
+Add webhook secret to `config.php`:
+```php
+'webhook_secret' => 'your-secret-key',
+```
+
+## API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/signup` | Register new user |
+| POST | `/api/auth/login` | Login with email/password |
+| POST | `/api/auth/logout` | Logout |
+| GET | `/api/auth/session` | Get current session |
+| POST | `/api/auth/reset-password` | Request password reset |
+| POST | `/api/auth/update-password` | Update password |
+| PATCH | `/api/auth/profile` | Update profile |
+
+### Database Operations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/data/{table}` | Query table |
+| POST | `/api/data/{table}` | Insert data |
+| PATCH | `/api/data/{table}` | Update data |
+| DELETE | `/api/data/{table}` | Delete data |
+| POST | `/api/data/{table}/upsert` | Upsert data |
+
+### Admin Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/health` | Mailbox health dashboard |
+| GET | `/api/admin/cron-logs` | Cron job execution logs |
+| POST | `/api/admin/dns-verify` | Verify domain DNS |
+| POST | `/api/admin/settings` | Save admin settings |
+
+### Functions (Edge Function Equivalents)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/functions/send-test-email` | Send test email |
+| POST | `/api/functions/send-verification-email` | Send verification |
+| POST | `/api/functions/fetch-imap-emails` | Fetch emails manually |
+
+### Health Check
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Check API status |
+
+## Performance Optimization
+
+### Fast Email Polling
+
+The IMAP polling is optimized for speed:
+- Runs every minute via cron
+- Uses `SINCE` filter to only fetch new emails
+- Batch processes emails efficiently
+- Automatically reconnects on failures
+
+### Database Optimization
+
+```sql
+-- Add indexes for faster queries
+CREATE INDEX idx_temp_emails_address ON temp_emails(address);
+CREATE INDEX idx_temp_emails_expires ON temp_emails(expires_at);
+CREATE INDEX idx_received_emails_temp ON received_emails(temp_email_id);
+CREATE INDEX idx_received_emails_date ON received_emails(received_at);
+```
+
+## Security Checklist
+
+- [x] `.htaccess` blocks access to sensitive files
+- [x] Rate limiting on all endpoints
+- [x] IP blocking for repeated failures
+- [x] Input sanitization on all inputs
+- [x] SQL injection prevention (PDO prepared statements)
+- [x] XSS prevention (output encoding)
+- [x] CSRF token validation
+- [x] Secure password hashing (bcrypt)
+- [x] JWT token authentication
+- [x] HTTPS enforced
+
+### Post-Installation Security
+
+1. **Delete install.php**:
+   ```bash
+   rm public_html/api/install.php
+   ```
+
+2. **Set proper file permissions**:
+   ```bash
+   find public_html -type f -exec chmod 644 {} \;
+   find public_html -type d -exec chmod 755 {} \;
+   chmod 600 public_html/api/config.php
+   ```
+
+3. **Generate strong JWT secret** (64+ characters):
+   ```bash
+   openssl rand -base64 48
+   ```
+
+4. **Enable HTTPS only** in config.php:
+   ```php
+   'force_https' => true,
+   ```
+
+5. **Configure CORS origins**:
+   ```php
+   'cors_origins' => ['https://yourdomain.com'],
+   ```
+
+## Troubleshooting
+
+### Homepage Not Loading
+
+1. Verify `.htaccess` exists in `public_html/`
+2. Check that `mod_rewrite` is enabled
+3. Verify `index.html` exists in `public_html/`
+
+### API Returns 404
+
+1. Check `/api/.htaccess` exists
+2. Verify `config.php` exists (not just `config.example.php`)
+3. Test: `curl https://yourdomain.com/api/health`
+
+### Database Connection Failed
+
+1. Verify database credentials in `config.php`
+2. Ensure database user has full privileges
+3. Check if MySQL server is running
+
+### Emails Not Arriving
+
+1. Verify IMAP credentials in admin panel
+2. Check cron job is running: `tail -f ~/logs/imap-poll.log`
+3. Test IMAP: `curl -X POST https://yourdomain.com/api/test-imap.php`
+4. Check firewall allows IMAP port 993
+
+### CORS Errors
+
+1. Add your domain to `cors_origins` in `config.php`
+2. Clear browser cache
+
+### Login Not Working
+
+1. Check `/api/auth/session` returns valid response
+2. Verify JWT secret is set in config.php
+3. Check browser console for errors
+4. Ensure cookies are not blocked
+
+## Manual Configuration
+
+If you prefer manual setup over the wizard:
+
+### config.php
 
 ```php
 <?php
@@ -109,122 +357,15 @@ return [
     ],
     'storage_path' => __DIR__ . '/storage',
     'cors_origins' => ['https://yourdomain.com'],
+    'force_https' => true,
+    'webhook_secret' => null, // Optional: for email webhook verification
 ];
 ```
 
-### 5. Create First Admin User
-1. Visit `https://yourdomain.com/auth` and sign up
-2. In cPanel → phpMyAdmin, run:
-```sql
-INSERT INTO user_roles (user_id, role)
-SELECT id, 'admin' FROM users WHERE email = 'your@email.com';
-```
+## Support
 
-### 6. Configure Cron Jobs
-In cPanel → Cron Jobs, add:
-
-```bash
-# Poll IMAP for new emails every minute
-* * * * * /usr/bin/php /home/username/public_html/api/cron/imap-poll.php
-
-# Cleanup expired emails every hour
-0 * * * * /usr/bin/php /home/username/public_html/api/cron/maintenance.php
-```
-
-### 7. Add Email Domains
-1. Log in as admin
-2. Go to Admin → Domains
-3. Add your email domain (e.g., `yourdomain.com`)
-
-### 8. Configure Mailboxes
-1. Go to Admin → IMAP Settings
-2. Add your cPanel email account credentials
-3. Test connection
-
-## API Endpoints
-
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/signup` | Register new user |
-| POST | `/api/auth/login` | Login with email/password |
-| POST | `/api/auth/logout` | Logout |
-| GET | `/api/auth/session` | Get current session |
-| POST | `/api/auth/reset-password` | Request password reset |
-| POST | `/api/auth/update-password` | Update password |
-| PATCH | `/api/auth/profile` | Update profile |
-
-### Database Operations
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/data/{table}` | Query table |
-| POST | `/api/data/{table}` | Insert data |
-| PATCH | `/api/data/{table}` | Update data |
-| DELETE | `/api/data/{table}` | Delete data |
-| POST | `/api/data/{table}/upsert` | Upsert data |
-
-### RPC Functions
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/rpc/{function}` | Call stored procedure |
-
-### Storage
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/storage/upload` | Upload file |
-| GET | `/api/storage/download` | Download file |
-| DELETE | `/api/storage/delete` | Delete files |
-| GET | `/api/storage/public/{bucket}/{path}` | Public file URL |
-
-### Functions (Edge Function Equivalents)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/functions/{name}` | Invoke function |
-
-### Health Check
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Check API status |
-
-## Troubleshooting
-
-### Homepage Not Loading
-1. Verify `.htaccess` exists in `public_html/` (not just in `/api`)
-2. Check that `mod_rewrite` is enabled
-3. Verify `index.html` exists in `public_html/`
-
-### API Returns 404
-1. Check `/api/.htaccess` exists
-2. Verify `config.php` exists (not just `config.example.php`)
-3. Test: `https://yourdomain.com/api/health`
-
-### Database Connection Failed
-1. Verify database credentials in `config.php`
-2. Ensure database user has full privileges
-3. Check if MySQL server is running
-
-### Emails Not Arriving
-1. Verify IMAP credentials in admin panel
-2. Check cron job is running: look for recent entries in cron logs
-3. Test IMAP connection manually in Admin → IMAP Settings
-
-### CORS Errors
-1. Add your domain to `cors_origins` in `config.php`
-2. Clear browser cache
-
-## Security Checklist
-
-- [ ] Delete `install.php` after setup
-- [ ] Set strong `jwt_secret` (64+ random characters)
-- [ ] Use HTTPS only
-- [ ] Keep `config.php` outside public access (already protected by `.htaccess`)
-- [ ] Set proper file permissions (644 for files, 755 for directories)
-- [ ] Regular database backups
-
-## JWT Authentication
-
-The backend uses JWT tokens stored in localStorage. Tokens expire after 7 days.
-Generate a secure `jwt_secret`:
-```bash
-openssl rand -base64 48
-```
+For issues or questions:
+1. Check the troubleshooting section above
+2. Review PHP error logs in cPanel
+3. Test individual components (database, SMTP, IMAP) separately
+4. Verify all file permissions are correct
