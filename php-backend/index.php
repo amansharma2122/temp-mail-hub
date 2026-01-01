@@ -65,6 +65,8 @@ require_once __DIR__ . '/routes/rpc.php';
 require_once __DIR__ . '/routes/storage.php';
 require_once __DIR__ . '/routes/functions.php';
 require_once __DIR__ . '/routes/admin.php';
+require_once __DIR__ . '/routes/forwarding.php';
+require_once __DIR__ . '/routes/attachments.php';
 
 // CORS Headers
 $allowedOrigins = $config['cors']['origins'] ?? ['*'];
@@ -152,6 +154,14 @@ try {
             
         case 'admin':
             handleAdminRoute($segments[1] ?? '', $body, $pdo, $config);
+            break;
+            
+        case 'forwarding':
+            handleForwarding($segments[1] ?? '', $method, $body, $pdo, $config);
+            break;
+            
+        case 'attachments':
+            handleAttachments($segments[1] ?? '', $method, $body, $pdo, $config);
             break;
             
         case 'sse':
