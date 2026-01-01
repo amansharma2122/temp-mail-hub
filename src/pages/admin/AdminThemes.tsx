@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Palette, Check, Plus } from "lucide-react";
+import { Palette, Check, Plus, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useTheme, Theme } from "@/contexts/ThemeContext";
 import { toast } from "sonner";
 import { generateId } from "@/lib/storage";
+import { api } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,8 @@ import {
 const AdminThemes = () => {
   const { theme, themes, setTheme, addCustomTheme } = useTheme();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [newTheme, setNewTheme] = useState({
     name: "",
     primary: "175 80% 50%",
@@ -27,29 +30,87 @@ const AdminThemes = () => {
     isDark: true,
   });
 
-  const handleCreateTheme = () => {
+  // Load saved themes from database
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        const { data } = await api.admin.getThemes();
+        if (data?.value && Array.isArray(data.value)) {
+          // Themes are already loaded in context via ThemeContext
+        }
+      } catch (error) {
+        console.error('Error loading themes:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadThemes();
+  }, []);
+
+  const handleCreateTheme = async () => {
     if (!newTheme.name) {
       toast.error("Please enter a theme name");
       return;
     }
 
-    const customTheme: Theme = {
-      id: `custom-${generateId()}`,
-      name: newTheme.name,
-      colors: {
-        primary: newTheme.primary,
-        accent: newTheme.accent,
-        background: newTheme.background,
-        card: newTheme.card,
-      },
-      isDark: newTheme.isDark,
-    };
+    setIsSaving(true);
 
-    addCustomTheme(customTheme);
-    setTheme(customTheme.id);
-    setDialogOpen(false);
-    toast.success("Custom theme created!");
+    try {
+      const customTheme: Theme = {
+        id: `custom-${generateId()}`,
+        name: newTheme.name,
+        colors: {
+          primary: newTheme.primary,
+          accent: newTheme.accent,
+          background: newTheme.background,
+          card: newTheme.card,
+        },
+        isDark: newTheme.isDark,
+      };
+
+      addCustomTheme(customTheme);
+      setTheme(customTheme.id);
+
+      // Save to database
+      const customThemes = themes.filter(t => t.id.startsWith('custom-'));
+      await api.admin.saveThemes([...customThemes, customTheme]);
+
+      setDialogOpen(false);
+      setNewTheme({
+        name: "",
+        primary: "175 80% 50%",
+        accent: "280 70% 55%",
+        background: "222 47% 5%",
+        card: "222 47% 8%",
+        isDark: true,
+      });
+      toast.success("Custom theme created!");
+    } catch (error: any) {
+      console.error('Error saving theme:', error);
+      toast.error(error.message || 'Failed to save theme');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleSelectTheme = async (themeId: string) => {
+    setTheme(themeId);
+    
+    // Save selected theme preference
+    try {
+      await api.admin.saveSettings('selected_theme', themeId);
+    } catch (error) {
+      console.error('Error saving theme preference:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -60,7 +121,7 @@ const AdminThemes = () => {
             Choose or create custom themes for your site
           </p>
         </div>
-        <Button variant="neon" onClick={() => setDialogOpen(true)}>
+        <Button variant="default" onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Create Theme
         </Button>
@@ -73,9 +134,9 @@ const AdminThemes = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            onClick={() => setTheme(t.id)}
-            className={`glass-card p-4 cursor-pointer transition-all ${
-              theme.id === t.id ? 'ring-2 ring-primary' : 'hover:border-primary/30'
+            onClick={() => handleSelectTheme(t.id)}
+            className={`p-4 cursor-pointer transition-all rounded-lg border bg-card ${
+              theme.id === t.id ? 'ring-2 ring-primary border-primary' : 'border-border hover:border-primary/30'
             }`}
           >
             <div className="flex items-center justify-between mb-4">
@@ -125,7 +186,7 @@ const AdminThemes = () => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="glass-card p-6"
+        className="p-6 rounded-lg border bg-card"
       >
         <h3 className="font-semibold text-foreground mb-4">Current Theme: {theme.name}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -234,10 +295,45 @@ const AdminThemes = () => {
                 onCheckedChange={(checked) => setNewTheme({ ...newTheme, isDark: checked })}
               />
             </div>
+
+            {/* Preview */}
+            <div>
+              <p className="text-sm font-medium mb-2">Preview</p>
+              <div className="flex gap-2">
+                <div 
+                  className="flex-1 h-8 rounded"
+                  style={{ backgroundColor: `hsl(${newTheme.background})` }}
+                />
+                <div 
+                  className="flex-1 h-8 rounded"
+                  style={{ backgroundColor: `hsl(${newTheme.card})` }}
+                />
+                <div 
+                  className="flex-1 h-8 rounded"
+                  style={{ backgroundColor: `hsl(${newTheme.primary})` }}
+                />
+                <div 
+                  className="flex-1 h-8 rounded"
+                  style={{ backgroundColor: `hsl(${newTheme.accent})` }}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button variant="neon" onClick={handleCreateTheme}>Create Theme</Button>
+            <Button onClick={handleCreateTheme} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Create Theme
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

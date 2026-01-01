@@ -1364,6 +1364,74 @@ export const admin = {
   async deleteBlog(id: string): Promise<ApiResponse<any>> {
     return db.delete('blogs', { id });
   },
+
+  // Cron jobs management
+  async getCronJobs(): Promise<ApiResponse<any>> {
+    if (USE_SUPABASE) {
+      // Supabase doesn't have a cron jobs table - return mock data
+      return { data: [], error: null };
+    }
+    return fetchApi('/admin/cron-jobs');
+  },
+
+  async runCronJob(jobId: string): Promise<ApiResponse<any>> {
+    if (USE_SUPABASE) {
+      // Trigger specific edge function based on job
+      const jobMap: Record<string, string> = {
+        'clean-emails': 'auto-delete-emails',
+        'imap-poll': 'imap-poll-cron',
+        'cleanup-backups': 'cleanup-old-backups'
+      };
+      const functionName = jobMap[jobId];
+      if (functionName) {
+        return functions.invoke(functionName);
+      }
+      return { data: null, error: { message: 'Unknown cron job' } };
+    }
+    return fetchApi(`/admin/cron-jobs/${jobId}/run`, { method: 'POST' });
+  },
+
+  async toggleCronJob(jobId: string, enabled: boolean): Promise<ApiResponse<any>> {
+    if (USE_SUPABASE) {
+      return { data: null, error: { message: 'Cron management requires PHP backend' } };
+    }
+    return fetchApi(`/admin/cron-jobs/${jobId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled })
+    });
+  },
+
+  // Backup management
+  async getBackupHistory(): Promise<ApiResponse<any>> {
+    return db.query('backup_history', { 
+      order: { column: 'created_at', ascending: false },
+      limit: 10 
+    });
+  },
+
+  async generateBackup(): Promise<ApiResponse<any>> {
+    if (USE_SUPABASE) {
+      return functions.invoke('generate-backup');
+    }
+    return fetchApi('/admin/backup/generate', { method: 'POST' });
+  },
+
+  async deleteBackupRecord(id: string): Promise<ApiResponse<any>> {
+    return db.delete('backup_history', { id });
+  },
+
+  // Themes management (stored in app_settings)
+  async getThemes(): Promise<ApiResponse<any>> {
+    return db.query('app_settings', { eq: { key: 'custom_themes' }, single: true });
+  },
+
+  async saveThemes(themes: any[]): Promise<ApiResponse<any>> {
+    return db.upsert('app_settings', { 
+      key: 'custom_themes', 
+      value: themes, 
+      updated_at: new Date().toISOString() 
+    }, { onConflict: 'key' });
+  },
 };
 
 // ============================================
