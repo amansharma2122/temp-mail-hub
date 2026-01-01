@@ -66,6 +66,7 @@ const About = lazyWithRetry(() => import("./pages/About"));
 const Changelog = lazyWithRetry(() => import("./pages/Changelog"));
 const Status = lazyWithRetry(() => import("./pages/Status"));
 const HostingGuide = lazyWithRetry(() => import("./pages/HostingGuide"));
+const SubscriptionDetails = lazyWithRetry(() => import("./pages/SubscriptionDetails"));
 // Lazy load admin pages with retry
 const AdminLayout = lazyWithRetry(() => import("./pages/admin/AdminLayout"));
 const AdminDashboard = lazyWithRetry(() => import("./pages/admin/AdminDashboard"));
@@ -255,6 +256,13 @@ const App = () => (
                             <ProtectedRoute requireAuth>
                               <PageErrorBoundary name="Profile">
                                 <Profile />
+                              </PageErrorBoundary>
+                            </ProtectedRoute>
+                          } />
+                          <Route path="/subscription" element={
+                            <ProtectedRoute requireAuth>
+                              <PageErrorBoundary name="Subscription">
+                                <SubscriptionDetails />
                               </PageErrorBoundary>
                             </ProtectedRoute>
                           } />
