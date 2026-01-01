@@ -262,8 +262,9 @@ function sendTestEmail($body, $pdo, $config, $isAdmin) {
     }
 
     $to = $body['to'] ?? '';
-    $subject = $body['subject'] ?? 'Test Email';
-    $bodyText = $body['body'] ?? 'This is a test email.';
+    $subject = $body['subject'] ?? 'Test Email from TempMail';
+    $bodyText = $body['body'] ?? 'This is a test email sent from your TempMail installation.';
+    $mailboxId = $body['mailboxId'] ?? null;
 
     if (empty($to)) {
         http_response_code(400);
@@ -271,9 +272,222 @@ function sendTestEmail($body, $pdo, $config, $isAdmin) {
         return;
     }
 
-    $success = sendEmail($to, $subject, $bodyText, $config);
+    // Try to get mailbox config from database first
+    $smtpConfig = null;
+    
+    if ($mailboxId) {
+        $stmt = $pdo->prepare('SELECT * FROM mailboxes WHERE id = ? AND is_active = 1');
+        $stmt->execute([$mailboxId]);
+        $smtpConfig = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    if (!$smtpConfig) {
+        // Get first active mailbox
+        $stmt = $pdo->query('SELECT * FROM mailboxes WHERE is_active = 1 ORDER BY priority ASC LIMIT 1');
+        $smtpConfig = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 
-    echo json_encode(['success' => $success]);
+    // Use config.php values as fallback
+    $host = $smtpConfig['smtp_host'] ?? $config['smtp']['host'] ?? SMTP_HOST ?? '';
+    $port = $smtpConfig['smtp_port'] ?? $config['smtp']['port'] ?? SMTP_PORT ?? 587;
+    $user = $smtpConfig['smtp_user'] ?? $config['smtp']['user'] ?? SMTP_USER ?? '';
+    $pass = $smtpConfig['smtp_password'] ?? $config['smtp']['pass'] ?? SMTP_PASS ?? '';
+    $from = $smtpConfig['smtp_from'] ?? $config['smtp']['from'] ?? SMTP_FROM ?? $user;
+
+    if (empty($host) || empty($user)) {
+        echo json_encode([
+            'success' => false, 
+            'error' => 'SMTP not configured. Please configure SMTP settings first.'
+        ]);
+        return;
+    }
+
+    // Send email using raw SMTP
+    $result = sendSmtpEmail($host, $port, $user, $pass, $from, $to, $subject, $bodyText);
+    
+    // Log the attempt
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO email_logs (id, recipient_email, subject, status, smtp_host, mailbox_id, mailbox_name, 
+                                   error_message, sent_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([
+            generateUUID(),
+            $to,
+            $subject,
+            $result['success'] ? 'sent' : 'failed',
+            $host,
+            $smtpConfig['id'] ?? null,
+            $smtpConfig['name'] ?? 'Config File',
+            $result['error'] ?? null,
+            $result['success'] ? date('Y-m-d H:i:s') : null
+        ]);
+    } catch (Exception $e) {
+        // Log error but don't fail
+    }
+
+    echo json_encode($result);
+}
+
+/**
+ * Send email using raw SMTP socket connection
+ */
+function sendSmtpEmail($host, $port, $user, $pass, $from, $to, $subject, $body, $html = null) {
+    $timeout = 15;
+    $errno = 0;
+    $errstr = '';
+    
+    try {
+        // Determine if we need SSL
+        if ($port == 465) {
+            $socket = @fsockopen("ssl://$host", $port, $errno, $errstr, $timeout);
+        } else {
+            $socket = @fsockopen($host, $port, $errno, $errstr, $timeout);
+        }
+        
+        if (!$socket) {
+            return ['success' => false, 'error' => "Connection failed: $errstr ($errno)"];
+        }
+        
+        stream_set_timeout($socket, $timeout);
+        
+        // Read greeting
+        $greeting = fgets($socket, 1024);
+        if (substr($greeting, 0, 3) !== '220') {
+            fclose($socket);
+            return ['success' => false, 'error' => "Invalid greeting: " . trim($greeting)];
+        }
+        
+        // EHLO
+        fputs($socket, "EHLO " . gethostname() . "\r\n");
+        $response = '';
+        while ($line = fgets($socket, 1024)) {
+            $response .= $line;
+            if (substr($line, 3, 1) === ' ') break;
+        }
+        
+        // STARTTLS for non-SSL connections
+        if ($port != 465 && strpos($response, 'STARTTLS') !== false) {
+            fputs($socket, "STARTTLS\r\n");
+            $tlsResp = fgets($socket, 1024);
+            
+            if (substr($tlsResp, 0, 3) === '220') {
+                stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+                
+                // Re-EHLO after TLS
+                fputs($socket, "EHLO " . gethostname() . "\r\n");
+                while ($line = fgets($socket, 1024)) {
+                    if (substr($line, 3, 1) === ' ') break;
+                }
+            }
+        }
+        
+        // AUTH LOGIN
+        fputs($socket, "AUTH LOGIN\r\n");
+        $authResp = fgets($socket, 1024);
+        
+        if (substr($authResp, 0, 3) === '334') {
+            fputs($socket, base64_encode($user) . "\r\n");
+            fgets($socket, 1024);
+            fputs($socket, base64_encode($pass) . "\r\n");
+            $authResult = fgets($socket, 1024);
+            
+            if (substr($authResult, 0, 3) !== '235') {
+                fclose($socket);
+                return ['success' => false, 'error' => "Authentication failed: " . trim($authResult)];
+            }
+        } else {
+            // Try PLAIN auth
+            fputs($socket, "AUTH PLAIN " . base64_encode("\0$user\0$pass") . "\r\n");
+            $authResult = fgets($socket, 1024);
+            
+            if (substr($authResult, 0, 3) !== '235') {
+                fclose($socket);
+                return ['success' => false, 'error' => "Authentication failed: " . trim($authResult)];
+            }
+        }
+        
+        // MAIL FROM
+        fputs($socket, "MAIL FROM:<$from>\r\n");
+        $fromResp = fgets($socket, 1024);
+        if (substr($fromResp, 0, 3) !== '250') {
+            fclose($socket);
+            return ['success' => false, 'error' => "MAIL FROM rejected: " . trim($fromResp)];
+        }
+        
+        // RCPT TO
+        fputs($socket, "RCPT TO:<$to>\r\n");
+        $rcptResp = fgets($socket, 1024);
+        if (substr($rcptResp, 0, 3) !== '250') {
+            fclose($socket);
+            return ['success' => false, 'error' => "RCPT TO rejected: " . trim($rcptResp)];
+        }
+        
+        // DATA
+        fputs($socket, "DATA\r\n");
+        $dataResp = fgets($socket, 1024);
+        if (substr($dataResp, 0, 3) !== '354') {
+            fclose($socket);
+            return ['success' => false, 'error' => "DATA rejected: " . trim($dataResp)];
+        }
+        
+        // Build message
+        $date = date('r');
+        $messageId = '<' . uniqid() . '@' . parse_url($from, PHP_URL_HOST) . '>';
+        $boundary = '----=_Part_' . uniqid();
+        
+        $message = "From: TempMail <$from>\r\n";
+        $message .= "To: <$to>\r\n";
+        $message .= "Subject: $subject\r\n";
+        $message .= "Date: $date\r\n";
+        $message .= "Message-ID: $messageId\r\n";
+        $message .= "MIME-Version: 1.0\r\n";
+        $message .= "X-Mailer: TempMail PHP Backend\r\n";
+        
+        if ($html) {
+            $message .= "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n";
+            $message .= "\r\n";
+            $message .= "--$boundary\r\n";
+            $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
+            $message .= "Content-Transfer-Encoding: 8bit\r\n";
+            $message .= "\r\n";
+            $message .= $body . "\r\n";
+            $message .= "\r\n--$boundary\r\n";
+            $message .= "Content-Type: text/html; charset=UTF-8\r\n";
+            $message .= "Content-Transfer-Encoding: 8bit\r\n";
+            $message .= "\r\n";
+            $message .= $html . "\r\n";
+            $message .= "\r\n--$boundary--\r\n";
+        } else {
+            $message .= "Content-Type: text/plain; charset=UTF-8\r\n";
+            $message .= "Content-Transfer-Encoding: 8bit\r\n";
+            $message .= "\r\n";
+            $message .= $body . "\r\n";
+        }
+        
+        $message .= ".\r\n";
+        
+        fputs($socket, $message);
+        $sendResp = fgets($socket, 1024);
+        
+        if (substr($sendResp, 0, 3) !== '250') {
+            fclose($socket);
+            return ['success' => false, 'error' => "Send failed: " . trim($sendResp)];
+        }
+        
+        // QUIT
+        fputs($socket, "QUIT\r\n");
+        fclose($socket);
+        
+        return ['success' => true, 'message' => 'Email sent successfully'];
+        
+    } catch (Exception $e) {
+        if (isset($socket) && $socket) {
+            fclose($socket);
+        }
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
 }
 
 function summarizeEmail($body, $pdo, $userId) {
