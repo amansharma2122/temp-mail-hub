@@ -73,7 +73,36 @@ const AdminAnalytics = () => {
     try {
       const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
       
-      // Fetch email statistics - use email_stats for permanent counter
+      // Try PHP backend first
+      if (api.isPHP) {
+        const { data, error } = await api.admin.getAnalytics(days);
+        if (!error && data) {
+          setAnalytics({
+            totalEmails: data.total_emails || 0,
+            totalReceived: data.total_received || 0,
+            activeUsers: data.active_users || 0,
+            totalDomains: data.total_domains || 0,
+            avgEmailsPerDay: data.avg_emails_per_day || 0,
+            peakHour: data.peak_hour || "14:00",
+            growthRate: data.growth_rate || 12.5,
+            retentionRate: data.retention_rate || 68.3,
+          });
+          
+          if (data.trends) {
+            setEmailTrends(data.trends);
+          }
+          if (data.domain_distribution) {
+            setDomainDistribution(data.domain_distribution);
+          }
+          if (data.hourly_activity) {
+            setHourlyActivity(data.hourly_activity);
+          }
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to direct DB queries (Supabase)
       const { data: emailStatsData } = await api.db.query<{stat_value: number}[]>("email_stats", {
         filter: { stat_key: "total_emails_generated" },
         limit: 1

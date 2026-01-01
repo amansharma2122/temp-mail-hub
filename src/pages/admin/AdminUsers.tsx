@@ -87,11 +87,10 @@ const AdminUsers = () => {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
-      await api.db.delete("user_roles", { user_id: userId });
-      
-      const { error } = await api.db.insert("user_roles", {
-        user_id: userId,
-        role: newRole as "admin" | "moderator" | "user",
+      // Use api.admin for consistency across backends
+      const { error } = await api.db.rpc('add_admin_role', {
+        target_user_id: userId,
+        target_role: newRole as "admin" | "moderator" | "user",
       });
 
       if (error) throw error;
@@ -107,12 +106,9 @@ const AdminUsers = () => {
   const deleteUser = async (userId: string) => {
     setDeletingUserId(userId);
     try {
-      const { data, error } = await api.functions.invoke<{error?: string}>('delete-user-complete', {
-        body: { userId }
-      });
+      const { error } = await api.admin.deleteUser(userId);
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
       toast.success("User deleted successfully");
       setSelectedUsers(prev => {
@@ -164,7 +160,7 @@ const AdminUsers = () => {
     
     setIsSuspending(true);
     try {
-      let suspendUntil: string | null = null;
+      let suspendUntil: string | undefined = undefined;
       
       if (suspendDuration !== "permanent") {
         const now = new Date();
@@ -173,11 +169,11 @@ const AdminUsers = () => {
         suspendUntil = now.toISOString();
       }
 
-      const { error } = await api.db.rpc('suspend_user', {
-        target_user_id: suspendingUser.user_id,
-        suspension_reason: suspendReason || null,
-        suspend_until: suspendUntil
-      });
+      const { error } = await api.admin.suspendUser(
+        suspendingUser.user_id,
+        suspendReason || undefined,
+        suspendUntil
+      );
 
       if (error) throw error;
 
@@ -194,9 +190,7 @@ const AdminUsers = () => {
 
   const unsuspendUser = async (userId: string) => {
     try {
-      const { error } = await api.db.rpc('unsuspend_user', {
-        target_user_id: userId
-      });
+      const { error } = await api.admin.unsuspendUser(userId);
 
       if (error) throw error;
 
