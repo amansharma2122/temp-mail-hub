@@ -331,6 +331,21 @@ CREATE TABLE IF NOT EXISTS user_2fa (
     INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Blocked IPs for security
+CREATE TABLE IF NOT EXISTS blocked_ips (
+    id CHAR(36) PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL,
+    reason TEXT,
+    blocked_by CHAR(36),
+    is_active BOOLEAN DEFAULT TRUE,
+    expires_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_ip (ip_address),
+    INDEX idx_active (is_active),
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Insert default data
 INSERT INTO email_stats (id, stat_key, stat_value) VALUES 
 (UUID(), 'total_emails_created', 0),
