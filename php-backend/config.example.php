@@ -49,7 +49,7 @@ return [
         ],
     ],
     
-    // Email (SMTP)
+    // Email (SMTP) - Can also be configured via Admin Panel
     'smtp' => [
         'host' => 'smtp.example.com',
         'port' => 587,
@@ -57,5 +57,44 @@ return [
         'pass' => 'your_smtp_password',
         'from' => 'noreply@yourdomain.com',
         'from_name' => 'Trash Mails',
+    ],
+    
+    // IMAP Settings - Can also be configured via Admin Panel
+    'imap' => [
+        'host' => 'imap.example.com',
+        'port' => 993,
+        'user' => 'your_imap_user',
+        'pass' => 'your_imap_password',
+        'encryption' => 'ssl', // ssl or tls
+        'folder' => 'INBOX',
+    ],
+    
+    // Stripe Payment Gateway (optional - can be configured via Admin Panel)
+    'stripe' => [
+        'publishable_key' => '', // pk_test_... or pk_live_...
+        'secret_key' => '', // sk_test_... or sk_live_...
+        'webhook_secret' => '', // whsec_...
+        'test_mode' => true,
+    ],
+    
+    // PayPal Payment Gateway (optional - can be configured via Admin Panel)
+    'paypal' => [
+        'client_id' => '',
+        'client_secret' => '',
+        'webhook_id' => '',
+        'mode' => 'sandbox', // sandbox or live
+    ],
+    
+    // reCAPTCHA (optional)
+    'recaptcha' => [
+        'site_key' => '',
+        'secret_key' => '',
+    ],
+    
+    // Security Settings
+    'security' => [
+        'rate_limit' => 100, // requests per minute
+        'login_attempts' => 5, // max failed login attempts before lockout
+        'lockout_time' => 900, // lockout duration in seconds (15 min)
     ],
 ];

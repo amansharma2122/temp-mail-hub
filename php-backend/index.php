@@ -58,6 +58,10 @@ if (!file_exists(__DIR__ . '/config.php')) {
 
 $config = require __DIR__ . '/config.php';
 
+// Initialize error logging
+require_once __DIR__ . '/error-logger.php';
+$logger = ErrorLogger::getInstance(__DIR__ . '/logs');
+
 // Load routes
 require_once __DIR__ . '/routes/auth.php';
 require_once __DIR__ . '/routes/data.php';
@@ -67,6 +71,8 @@ require_once __DIR__ . '/routes/functions.php';
 require_once __DIR__ . '/routes/admin.php';
 require_once __DIR__ . '/routes/forwarding.php';
 require_once __DIR__ . '/routes/attachments.php';
+require_once __DIR__ . '/routes/webhooks.php';
+require_once __DIR__ . '/routes/logs.php';
 
 // CORS Headers
 $allowedOrigins = $config['cors']['origins'] ?? ['*'];
@@ -132,7 +138,7 @@ array_walk_recursive($body, function(&$value) {
 try {
     switch ($segments[0] ?? '') {
         case 'auth':
-            handleAuthRoute($segments[1] ?? '', $method, $body, $pdo, $config);
+            handleAuth($segments[1] ?? '', $method, $body, $pdo, $config);
             break;
             
         case 'rest':
@@ -166,6 +172,14 @@ try {
             
         case 'sse':
             require_once __DIR__ . '/sse.php';
+            break;
+            
+        case 'webhook':
+            handleWebhook($segments[1] ?? '', $body, $pdo, $config);
+            break;
+            
+        case 'logs':
+            handleLogsRoute($segments[1] ?? '', $method, $body, $pdo, $config);
             break;
             
         case 'health':
