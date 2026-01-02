@@ -46,7 +46,7 @@ const AdminGuide = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="pt-24 pb-12">
+      <main className="pt-28 md:pt-32 pb-12">
         <div className="container mx-auto px-4 max-w-4xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

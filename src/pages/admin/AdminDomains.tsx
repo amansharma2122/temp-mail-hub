@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Globe, Plus, Trash2, Star, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Shield, Loader2 } from "lucide-react";
+import { Globe, Plus, Trash2, Star, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Shield, Loader2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { AdminDomainSkeleton } from "@/components/admin/AdminSkeletons";
+import DomainSetupWizard from "@/components/admin/DomainSetupWizard";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -54,9 +53,7 @@ interface DNSVerificationResult {
 
 const AdminDomains = () => {
   const queryClient = useQueryClient();
-  const [newDomain, setNewDomain] = useState("");
-  const [isPremium, setIsPremium] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [dnsDialogOpen, setDnsDialogOpen] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [dnsResults, setDnsResults] = useState<DNSVerificationResult | null>(null);
@@ -130,32 +127,17 @@ const AdminDomains = () => {
     }
   });
 
-  const handleAddDomain = () => {
-    if (!newDomain.trim()) return;
-    
-    // Normalize domain: trim, lowercase, ensure @ prefix
-    let normalizedDomain = newDomain.trim().toLowerCase();
-    if (!normalizedDomain.startsWith('@')) {
-      normalizedDomain = '@' + normalizedDomain;
-    }
-    
-    addDomainMutation.mutate(
-      { name: normalizedDomain, isPremium },
-      {
-        onSuccess: () => {
-          setNewDomain("");
-          setIsPremium(false);
-          setDialogOpen(false);
-          // Invalidate public domains cache as well
-          queryClient.invalidateQueries({ queryKey: ['domains'] });
-          // Clear all domain-related localStorage caches
-          try {
-            localStorage.removeItem('nullsto_domains_cache');
-            localStorage.removeItem('cached_domains');
-          } catch (e) {}
-        },
-      }
-    );
+  const handleWizardComplete = () => {
+    // Invalidate caches to refresh list
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ['admin', 'domains'] });
+    queryClient.invalidateQueries({ queryKey: ['domains'] });
+    // Clear all domain-related localStorage caches
+    try {
+      localStorage.removeItem('nullsto_domains_cache');
+      localStorage.removeItem('cached_domains');
+    } catch (e) {}
+    setWizardOpen(false);
   };
 
   const handleToggleActive = (domain: Domain) => {
@@ -250,56 +232,19 @@ const AdminDomains = () => {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="neon">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Domain
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Domain</DialogTitle>
-                <DialogDescription>
-                  Enter a domain name for temporary emails (e.g., @example.com)
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Domain Name</label>
-                  <Input
-                    placeholder="@example.com"
-                    value={newDomain}
-                    onChange={(e) => setNewDomain(e.target.value)}
-                    className="bg-secondary/50"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-medium">Premium-Only Domain</label>
-                    <p className="text-xs text-muted-foreground">
-                      If enabled, only paying subscribers can use this domain. Free users won't see it.
-                    </p>
-                  </div>
-                  <Switch checked={isPremium} onCheckedChange={setIsPremium} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  variant="neon" 
-                  onClick={handleAddDomain}
-                  disabled={addDomainMutation.isPending}
-                >
-                  Add Domain
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button variant="neon" onClick={() => setWizardOpen(true)}>
+            <Wand2 className="w-4 h-4 mr-2" />
+            Setup Domain
+          </Button>
         </div>
       </div>
+
+      {/* Domain Setup Wizard */}
+      <DomainSetupWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onComplete={handleWizardComplete}
+      />
 
       {/* Domains List */}
       <motion.div

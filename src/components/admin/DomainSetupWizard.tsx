@@ -13,7 +13,8 @@ import {
   Star,
   RefreshCw,
   ExternalLink,
-  Server
+  Server,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +30,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -396,6 +404,123 @@ const DomainSetupWizard = ({ open, onOpenChange, onComplete, serverIP = '0.0.0.0
                 </span>
               </div>
             )}
+
+            {/* DNS Provider Guides */}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="guides" className="border-none">
+                <AccordionTrigger className="py-2 text-sm text-muted-foreground hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4" />
+                    DNS Provider Setup Guides
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Tabs defaultValue="cloudflare" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4 h-auto">
+                      <TabsTrigger value="cloudflare" className="text-xs py-1">Cloudflare</TabsTrigger>
+                      <TabsTrigger value="godaddy" className="text-xs py-1">GoDaddy</TabsTrigger>
+                      <TabsTrigger value="namecheap" className="text-xs py-1">Namecheap</TabsTrigger>
+                      <TabsTrigger value="other" className="text-xs py-1">Other</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="cloudflare" className="mt-3 space-y-2">
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                        <li>Log in to your Cloudflare dashboard</li>
+                        <li>Select your domain</li>
+                        <li>Click <strong className="text-foreground">DNS</strong> in the sidebar</li>
+                        <li>Click <strong className="text-foreground">Add record</strong></li>
+                        <li>Select type: <code className="bg-secondary px-1 rounded">{record.type}</code></li>
+                        <li>Set Name: <code className="bg-secondary px-1 rounded">{record.host}</code></li>
+                        {record.priority !== undefined && (
+                          <li>Set Priority: <code className="bg-secondary px-1 rounded">{record.priority}</code></li>
+                        )}
+                        <li>Paste the value from above</li>
+                        <li>Click <strong className="text-foreground">Save</strong></li>
+                      </ol>
+                      <a 
+                        href="https://dash.cloudflare.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2"
+                      >
+                        Open Cloudflare Dashboard <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </TabsContent>
+                    
+                    <TabsContent value="godaddy" className="mt-3 space-y-2">
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                        <li>Log in to GoDaddy</li>
+                        <li>Go to <strong className="text-foreground">My Products</strong></li>
+                        <li>Click <strong className="text-foreground">DNS</strong> next to your domain</li>
+                        <li>Scroll to Records section</li>
+                        <li>Click <strong className="text-foreground">Add</strong></li>
+                        <li>Select type: <code className="bg-secondary px-1 rounded">{record.type}</code></li>
+                        <li>Enter Host: <code className="bg-secondary px-1 rounded">{record.host === '@' ? '@' : record.host}</code></li>
+                        {record.priority !== undefined && (
+                          <li>Set Priority: <code className="bg-secondary px-1 rounded">{record.priority}</code></li>
+                        )}
+                        <li>Paste the value</li>
+                        <li>Click <strong className="text-foreground">Save</strong></li>
+                      </ol>
+                      <a 
+                        href="https://dcc.godaddy.com/manage" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2"
+                      >
+                        Open GoDaddy Dashboard <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </TabsContent>
+                    
+                    <TabsContent value="namecheap" className="mt-3 space-y-2">
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                        <li>Log in to Namecheap</li>
+                        <li>Go to <strong className="text-foreground">Domain List</strong></li>
+                        <li>Click <strong className="text-foreground">Manage</strong> on your domain</li>
+                        <li>Click <strong className="text-foreground">Advanced DNS</strong> tab</li>
+                        <li>Click <strong className="text-foreground">Add New Record</strong></li>
+                        <li>Select type: <code className="bg-secondary px-1 rounded">{record.type}</code></li>
+                        <li>Set Host: <code className="bg-secondary px-1 rounded">{record.host}</code></li>
+                        {record.priority !== undefined && (
+                          <li>Set Priority: <code className="bg-secondary px-1 rounded">{record.priority}</code></li>
+                        )}
+                        <li>Paste the value</li>
+                        <li>Click the checkmark to save</li>
+                      </ol>
+                      <a 
+                        href="https://ap.www.namecheap.com/domains/list" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2"
+                      >
+                        Open Namecheap Dashboard <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </TabsContent>
+                    
+                    <TabsContent value="other" className="mt-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        For other providers, the general steps are:
+                      </p>
+                      <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                        <li>Log in to your domain registrar or DNS provider</li>
+                        <li>Find DNS settings or DNS management</li>
+                        <li>Add a new <code className="bg-secondary px-1 rounded">{record.type}</code> record</li>
+                        <li>Set the host/name to <code className="bg-secondary px-1 rounded">{record.host}</code></li>
+                        {record.priority !== undefined && (
+                          <li>Set priority to <code className="bg-secondary px-1 rounded">{record.priority}</code></li>
+                        )}
+                        <li>Paste the value</li>
+                        <li>Set TTL to Auto or 3600</li>
+                        <li>Save the record</li>
+                      </ol>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        DNS changes can take up to 48 hours to propagate, but usually take 15-30 minutes.
+                      </p>
+                    </TabsContent>
+                  </Tabs>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             <div className="flex gap-3">
               <Button
