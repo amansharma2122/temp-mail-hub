@@ -23,7 +23,7 @@ function handleData($path, $method, $body, $pdo, $config) {
     // Get authenticated user
     $user = getAuthUser($pdo, $config);
     $userId = $user['id'] ?? null;
-    $isAdmin = $userId ? checkIsAdmin($pdo, $userId) : false;
+    $isAdmin = $userId ? data_checkIsAdmin($pdo, $userId) : false;
 
     // Table whitelist and access control
     $publicReadTables = [
@@ -451,8 +451,9 @@ function applyRowLevelSecurity($table, $where, &$params, $userId, $isAdmin, $pdo
     return $where;
 }
 
-function checkIsAdmin($pdo, $userId) {
+function data_checkIsAdmin($pdo, $userId) {
     $stmt = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ? AND role = 'admin'");
     $stmt->execute([$userId]);
     return (bool) $stmt->fetch();
 }
+
