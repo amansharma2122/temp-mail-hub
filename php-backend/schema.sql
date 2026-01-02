@@ -346,6 +346,33 @@ CREATE TABLE IF NOT EXISTS blocked_ips (
     INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Alert Logs for automated email alerts
+CREATE TABLE IF NOT EXISTS alert_logs (
+    id CHAR(36) PRIMARY KEY,
+    alert_type VARCHAR(50) NOT NULL,
+    message TEXT,
+    details JSON,
+    sent_to JSON,
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_alert_type (alert_type),
+    INDEX idx_sent_at (sent_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Status Incidents for public status page
+CREATE TABLE IF NOT EXISTS status_incidents (
+    id CHAR(36) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status ENUM('investigating', 'monitoring', 'resolved') DEFAULT 'investigating',
+    service VARCHAR(50) NOT NULL,
+    severity ENUM('minor', 'major', 'critical') DEFAULT 'minor',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_status (status),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Insert default data
 INSERT INTO email_stats (id, stat_key, stat_value) VALUES 
 (UUID(), 'total_emails_created', 0),
