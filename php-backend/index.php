@@ -44,6 +44,49 @@ if (time() - $_SESSION[$rateKey]['start'] > $ratePeriod) {
     }
 }
 
+// Parse request path early (for health check before config)
+$requestUri = $_SERVER['REQUEST_URI'];
+$basePath = '/api';
+$earlyPath = parse_url($requestUri, PHP_URL_PATH);
+$earlyPath = str_replace($basePath, '', $earlyPath);
+$earlyPath = trim($earlyPath, '/');
+
+// Basic health endpoint (works even without config/DB)
+if ($earlyPath === 'health') {
+    header("Content-Type: application/json");
+    $configExists = file_exists(__DIR__ . '/config.php');
+    $healthResponse = [
+        'status' => 'ok',
+        'timestamp' => date('c'),
+        'version' => '1.0.0',
+        'php_version' => phpversion(),
+        'config_present' => $configExists,
+    ];
+    
+    // Try DB connection if config exists
+    if ($configExists) {
+        try {
+            $config = require __DIR__ . '/config.php';
+            $dsn = "mysql:host={$config['db']['host']};dbname={$config['db']['name']};charset={$config['db']['charset']}";
+            $testPdo = new PDO($dsn, $config['db']['user'], $config['db']['pass'], [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_TIMEOUT => 5,
+            ]);
+            $healthResponse['db_connected'] = true;
+            $testPdo = null;
+        } catch (Exception $e) {
+            $healthResponse['db_connected'] = false;
+            $healthResponse['db_error'] = $e->getMessage();
+        }
+    } else {
+        $healthResponse['db_connected'] = false;
+        $healthResponse['db_error'] = 'Configuration not found';
+    }
+    
+    echo json_encode($healthResponse);
+    exit;
+}
+
 // Load configuration
 if (!file_exists(__DIR__ . '/config.php')) {
     // Redirect to installer if not configured
@@ -62,7 +105,7 @@ $config = require __DIR__ . '/config.php';
 require_once __DIR__ . '/error-logger.php';
 $logger = ErrorLogger::getInstance(__DIR__ . '/logs');
 
-// Load routes
+// Load routes with include guards to prevent redeclaration errors
 require_once __DIR__ . '/routes/auth.php';
 require_once __DIR__ . '/routes/data.php';
 require_once __DIR__ . '/routes/rpc.php';
@@ -190,10 +233,12 @@ try {
             break;
             
         case 'health':
+            // Already handled above before DB connection
             echo json_encode([
                 'status' => 'ok', 
                 'timestamp' => date('c'),
-                'version' => '1.0.0'
+                'version' => '1.0.0',
+                'db_connected' => true
             ]);
             break;
             

@@ -18,15 +18,23 @@ RewriteRule .* - [F,L]
     Deny from all
 </FilesMatch>
 
-# Protect log files and directories
+# Protect log files in filesystem (actual .log files)
 <FilesMatch "\.log$">
     Order allow,deny
     Deny from all
 </FilesMatch>
 
-RedirectMatch 403 ^/api/logs/.*$
-RedirectMatch 403 ^/api/cron/.*$
-RedirectMatch 403 ^/api/storage/.*$
+# Block direct access to filesystem directories (not API routes)
+# Note: These protect actual folders, not /api/logs or /api/storage routes
+<DirectoryMatch "^.*/logs/">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
+
+<DirectoryMatch "^.*/cron/">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
 
 # Allow SSE endpoint
 RewriteRule ^sse/?$ sse.php [QSA,L]
