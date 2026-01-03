@@ -61,7 +61,7 @@ const EmailExpiryTimer = ({ expiresAt, onExpired }: EmailExpiryTimerProps) => {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1 sm:py-2 rounded-full border transition-colors ${
+      className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-colors ${
         isCritical
           ? 'bg-destructive/20 border-destructive/30'
           : isLowTime
@@ -69,21 +69,21 @@ const EmailExpiryTimer = ({ expiresAt, onExpired }: EmailExpiryTimerProps) => {
           : 'bg-primary/10 border-primary/20'
       }`}
     >
-      <Clock className={`w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 ${
+      <Clock className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${
         isCritical 
           ? 'text-destructive' 
           : isLowTime 
           ? 'text-amber-500' 
           : 'text-primary'
       }`} />
-      <div className="flex items-center gap-0.5 sm:gap-1 font-mono text-xs sm:text-sm font-medium">
+      <div className="flex items-center gap-0.5 sm:gap-1 font-mono text-sm sm:text-base font-medium">
         <TimeUnit value={timeLeft.hours} label="h" isCritical={isCritical} isLowTime={isLowTime} />
         <span className={isCritical ? 'text-destructive' : isLowTime ? 'text-amber-500' : 'text-muted-foreground'}>:</span>
         <TimeUnit value={timeLeft.minutes} label="m" isCritical={isCritical} isLowTime={isLowTime} />
         <span className={isCritical ? 'text-destructive' : isLowTime ? 'text-amber-500' : 'text-muted-foreground'}>:</span>
         <TimeUnit value={timeLeft.seconds} label="s" isCritical={isCritical} isLowTime={isLowTime} />
       </div>
-      <span className={`hidden sm:inline text-xs ${
+      <span className={`text-xs ${
         isCritical 
           ? 'text-destructive' 
           : isLowTime 

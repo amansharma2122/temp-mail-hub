@@ -425,7 +425,7 @@ function applyRowLevelSecurity($table, $where, &$params, $userId, $isAdmin, $pdo
             $where[] = 'is_active = 1';
             break;
         case 'app_settings':
-            $where[] = "`key` IN ('seo', 'general', 'appearance', 'pricing_content', 'friendly_sites_widget', 'blog_settings', 'announcement', 'seo_settings', 'general_settings', 'appearance_settings')";
+            $where[] = "`key` IN ('seo', 'general', 'appearance', 'pricing_content', 'friendly_sites_widget', 'blog_settings', 'announcement', 'seo_settings', 'general_settings', 'appearance_settings', 'limit_modal_config', 'payment_settings', 'rate_limit_temp_email_create')";
             break;
         case 'profiles':
         case 'temp_emails':

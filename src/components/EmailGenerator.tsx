@@ -570,7 +570,7 @@ const EmailGenerator = () => {
             </div>
 
             {/* Email Display */}
-            <div className="relative mb-10">
+            <div className="relative mb-6">
               <motion.div
                 key={currentEmail?.address}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -579,9 +579,9 @@ const EmailGenerator = () => {
                 className="relative group"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300 opacity-50" />
-                <div className="relative bg-secondary/50 rounded-2xl p-6 md:p-8 border border-primary/20 backdrop-blur-sm">
+                <div className="relative bg-secondary/50 rounded-2xl p-4 sm:p-6 md:p-8 border border-primary/20 backdrop-blur-sm">
                   <motion.p 
-                    className={`font-mono text-xl md:text-2xl lg:text-3xl text-center text-foreground break-all font-medium tracking-wide ${isGenerating ? 'blur-sm' : ''}`}
+                    className={`font-mono text-lg sm:text-xl md:text-2xl lg:text-3xl text-center text-foreground break-all font-medium tracking-wide ${isGenerating ? 'blur-sm' : ''}`}
                     animate={isGenerating ? { opacity: [1, 0.5, 1] } : {}}
                     transition={{ duration: 0.5, repeat: isGenerating ? Infinity : 0 }}
                   >
@@ -593,9 +593,25 @@ const EmailGenerator = () => {
                           ? "Loading domains..." 
                           : "Click Generate to create email"}
                   </motion.p>
+                  
+                  {/* Email Expiry Timer - Now displayed under the email address */}
+                  {currentEmail && !isGenerating && (
+                    <motion.div 
+                      className="flex justify-center mt-4"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      <EmailExpiryTimer 
+                        expiresAt={currentEmail.expires_at} 
+                        onExpired={() => {
+                          toast.info("Email expired. Generate a new one!");
+                        }}
+                      />
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
-              
             </div>
 
             {/* Email Options + Usage Counter - Inline compact layout */}
@@ -889,37 +905,19 @@ const EmailGenerator = () => {
               </Tooltip>
             </div>
 
-            {/* Expiration Timer */}
-            {currentEmail && (
+            {/* Sign in prompt for guests */}
+            {!user && currentEmail && (
               <motion.div 
-                className="flex flex-col items-center gap-2 mt-6"
+                className="flex justify-center mt-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
+                transition={{ delay: 0.5 }}
               >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <EmailExpiryTimer 
-                        expiresAt={currentEmail.expires_at} 
-                        onExpired={() => {
-                          toast.info("Email expired. Generating a new one...");
-                          refreshEmail();
-                        }}
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{tooltips.emailGenerator.timer}</p>
-                  </TooltipContent>
-                </Tooltip>
-                {!user && (
-                  <p className="text-xs text-muted-foreground">
-                    <span className="text-primary cursor-pointer hover:underline" onClick={() => window.location.href = "/auth"}>
-                      {t('signInToExtend')}
-                    </span>
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-primary cursor-pointer hover:underline" onClick={() => window.location.href = "/auth"}>
+                    {t('signInToExtend')}
+                  </span>
+                </p>
               </motion.div>
             )}
           </div>
