@@ -20,6 +20,7 @@ import { api } from '@/lib/api';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import EmailVerificationBanner from '@/components/EmailVerificationBanner';
+import TierComparisonTable from '@/components/TierComparisonTable';
 
 interface PaymentSettings {
   stripe_enabled?: boolean;
@@ -531,6 +532,16 @@ const PricingPage = () => {
               );
             })}
           </div>
+
+          {/* Tier Comparison Table */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-20 mb-16 max-w-5xl mx-auto"
+          >
+            <TierComparisonTable />
+          </motion.div>
 
           {/* Testimonials Section */}
           <motion.div
