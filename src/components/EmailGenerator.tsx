@@ -554,8 +554,8 @@ const EmailGenerator = () => {
           address={expiredAddress}
           onClose={() => setShowExpiredModal(false)}
           onGenerateNew={() => {
-            const currentDomainId = currentEmail?.domain?.id || domains[0]?.id;
-            if (currentDomainId) void generateEmail(currentDomainId);
+            const domainId = domains[0]?.id;
+            if (domainId) void generateEmail(domainId);
           }}
         />
 
