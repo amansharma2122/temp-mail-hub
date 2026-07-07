@@ -469,13 +469,6 @@ export type Database = {
             referencedRelation: "temp_emails"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "email_forwarding_temp_email_id_fkey"
-            columns: ["temp_email_id"]
-            isOneToOne: true
-            referencedRelation: "temp_emails_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       email_logs: {
@@ -903,13 +896,6 @@ export type Database = {
             referencedRelation: "temp_emails"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "push_subscriptions_temp_email_id_fkey"
-            columns: ["temp_email_id"]
-            isOneToOne: false
-            referencedRelation: "temp_emails_safe"
-            referencedColumns: ["id"]
-          },
         ]
       }
       rate_limits: {
@@ -979,13 +965,6 @@ export type Database = {
             columns: ["temp_email_id"]
             isOneToOne: false
             referencedRelation: "temp_emails"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "received_emails_temp_email_id_fkey"
-            columns: ["temp_email_id"]
-            isOneToOne: false
-            referencedRelation: "temp_emails_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1180,34 +1159,28 @@ export type Database = {
       user_2fa: {
         Row: {
           backup_codes: string[] | null
-          backup_codes_encrypted: string | null
           created_at: string
           id: string
           is_enabled: boolean
           totp_secret: string
-          totp_secret_encrypted: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           backup_codes?: string[] | null
-          backup_codes_encrypted?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean
           totp_secret: string
-          totp_secret_encrypted?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           backup_codes?: string[] | null
-          backup_codes_encrypted?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean
           totp_secret?: string
-          totp_secret_encrypted?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1424,44 +1397,7 @@ export type Database = {
       }
     }
     Views: {
-      temp_emails_safe: {
-        Row: {
-          address: string | null
-          created_at: string | null
-          domain_id: string | null
-          expires_at: string | null
-          id: string | null
-          is_active: boolean | null
-          user_id: string | null
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string | null
-          domain_id?: string | null
-          expires_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          user_id?: string | null
-        }
-        Update: {
-          address?: string | null
-          created_at?: string | null
-          domain_id?: string | null
-          expires_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "temp_emails_domain_id_fkey"
-            columns: ["domain_id"]
-            isOneToOne: false
-            referencedRelation: "domains"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       add_admin_role: {
