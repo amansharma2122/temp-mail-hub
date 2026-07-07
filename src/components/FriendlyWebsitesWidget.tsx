@@ -50,6 +50,8 @@ interface WidgetSettings {
   triggerIcon?: string;
   autoOpenDelayMs?: number;
   showLabelOnTrigger?: boolean;
+  animationIntensity?: 'subtle' | 'normal' | 'lively';
+  disableEffectsOnReducedMotion?: boolean;
 }
 
 const defaultSettings: WidgetSettings = {
@@ -69,6 +71,8 @@ const defaultSettings: WidgetSettings = {
   triggerIcon: 'Sparkles',
   autoOpenDelayMs: 0,
   showLabelOnTrigger: true,
+  animationIntensity: 'normal',
+  disableEffectsOnReducedMotion: true,
 };
 
 const renderLucide = (name: string | null | undefined, className = "w-5 h-5") => {
@@ -78,7 +82,17 @@ const renderLucide = (name: string | null | undefined, className = "w-5 h-5") =>
   return <Icon className={className} />;
 };
 
-const FriendlyWebsitesWidget = () => {
+interface FriendlyWebsitesWidgetProps {
+  /** When set, bypass DB and render with these settings (used by admin preview). */
+  overrideSettings?: Partial<WidgetSettings>;
+  /** When set, bypass DB and render with these websites (used by admin preview). */
+  overrideWebsites?: FriendlyWebsite[];
+}
+
+const FriendlyWebsitesWidget = ({
+  overrideSettings,
+  overrideWebsites,
+}: FriendlyWebsitesWidgetProps = {}) => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
@@ -98,7 +112,7 @@ const FriendlyWebsitesWidget = () => {
   }, []);
 
   // Fetch settings with React Query for caching and real-time updates
-  const { data: settings = defaultSettings, isError: settingsError, refetch: refetchSettings } = useQuery({
+  const { data: fetchedSettings = defaultSettings, isError: settingsError, refetch: refetchSettings } = useQuery({
     queryKey: ['app_settings', 'friendly_sites_widget'],
     queryFn: async () => {
       const { data } = await supabase
@@ -115,9 +129,12 @@ const FriendlyWebsitesWidget = () => {
     staleTime: 1000 * 30, // 30 seconds - will refetch when invalidated
     refetchOnWindowFocus: true,
   });
+  const settings: WidgetSettings = overrideSettings
+    ? { ...fetchedSettings, ...overrideSettings }
+    : fetchedSettings;
 
   // Fetch websites with React Query
-  const { data: websites = [], isLoading, isError: sitesError, refetch: refetchSites } = useQuery({
+  const { data: fetchedWebsites = [], isLoading, isError: sitesError, refetch: refetchSites } = useQuery({
     queryKey: ['friendly_websites', 'active'],
     queryFn: async () => {
       const { data } = await supabase
@@ -130,13 +147,28 @@ const FriendlyWebsitesWidget = () => {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+  const websites: FriendlyWebsite[] = overrideWebsites ?? fetchedWebsites;
 
-  const hasSyncError = settingsError || sitesError;
+  const hasSyncError = !overrideSettings && !overrideWebsites && (settingsError || sitesError);
   useEffect(() => {
     if (!hasSyncError) return;
     // eslint-disable-next-line no-console
     console.warn("[friendly-widget] realtime/polling failed — surfacing sync indicator");
   }, [hasSyncError]);
+
+  // ---- Telemetry: render latency (measure until first paint of the trigger) ----
+  const mountRef = useState(() => (typeof performance !== 'undefined' ? performance.now() : Date.now()))[0];
+  useEffect(() => {
+    if (overrideSettings || overrideWebsites) return; // skip telemetry in preview
+    if (isLoading) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const latency = Math.max(0, Math.round(now - mountRef));
+    recordFriendlyWidgetEvent('render_latency', {
+      sample_ms: latency,
+      attention_effect: settings.attentionEffect ?? null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
 
   // Check visibility permissions
   const isVisible = () => {
@@ -168,7 +200,8 @@ const FriendlyWebsitesWidget = () => {
     return () => clearTimeout(t);
   }, [settings.autoOpenDelayMs, settings.attentionEffect, websites, hasAutoOpened, isOpen]);
 
-  if (isLoading || !isVisible()) return null;
+  if (!overrideWebsites && (isLoading || !isVisible())) return null;
+  if (overrideWebsites && !settings.enabled) return null;
 
   const sizeClasses = {
     small: 'w-48',
@@ -225,7 +258,9 @@ const FriendlyWebsitesWidget = () => {
   // wiggle/bounce/pulse into the static `ring` treatment so the widget stays
   // discoverable without any looping animation.
   const rawAttention = settings.attentionEffect ?? 'pulse';
-  const attention = reducedMotion && ['pulse','wiggle','bounce','sparkle','confetti','ripple','rainbow'].includes(rawAttention)
+  const disableOnRM = settings.disableEffectsOnReducedMotion !== false;
+  const attention = reducedMotion && disableOnRM
+    && ['pulse','wiggle','bounce','sparkle','confetti','ripple','rainbow','magnet'].includes(rawAttention)
     ? 'ring'
     : rawAttention;
   const attentionClass =
@@ -271,7 +306,8 @@ const FriendlyWebsitesWidget = () => {
     const next = !isOpen;
     setIsOpen(next);
     if (next) {
-      if (!reducedMotion) setBurstAt(Date.now());
+      const rmBlocks = reducedMotion && disableOnRM;
+      if (!rmBlocks) setBurstAt(Date.now());
       recordFriendlyWidgetEvent('manual_open', {
         attention_effect: settings.attentionEffect ?? null,
       });
@@ -285,8 +321,13 @@ const FriendlyWebsitesWidget = () => {
     });
   };
 
-  // Animation variants — collapse fancy motion when the user prefers reduced motion.
-  const effectiveAnim = reducedMotion ? 'fade' : settings.animationType;
+  // Animation variants — collapse fancy motion when the user prefers reduced motion
+  // AND the admin hasn't disabled that safeguard.
+  const effectiveAnim = (reducedMotion && disableOnRM) ? 'fade' : settings.animationType;
+
+  // Intensity multiplier tunes duration/spring stiffness for panel animations.
+  const intensity = settings.animationIntensity ?? 'normal';
+  const intensityMul = intensity === 'subtle' ? 0.6 : intensity === 'lively' ? 1.35 : 1;
 
   return (
     <>
@@ -332,6 +373,8 @@ const FriendlyWebsitesWidget = () => {
       {/* Toggle Button */}
       <motion.button
         onClick={handleToggle}
+        data-testid="friendly-widget-trigger"
+        data-attention={attention}
         className={`group fixed top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 py-3 pl-3 pr-2 shadow-xl transition-all duration-300 ${toggleButtonPosition} ${buttonColorClasses[settings.colorScheme]} ${settings.showOnMobile ? '' : 'hidden md:block'} ${isOpen ? '' : attentionClass}`}
         whileHover={reducedMotion ? undefined : { scale: 1.05 }}
         whileTap={reducedMotion ? undefined : { scale: 0.95 }}
@@ -374,6 +417,7 @@ const FriendlyWebsitesWidget = () => {
       {hasSyncError && !isOpen && (
         <button
           type="button"
+          data-testid="friendly-widget-sync-error"
           onClick={() => { refetchSettings(); refetchSites(); }}
           className={`fixed top-1/2 mt-14 -translate-y-1/2 z-40 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-sm hover:bg-amber-500/25 transition ${settings.position === 'right' ? 'right-2' : 'left-2'}`}
           aria-label="Widget sync failed — click to retry"
@@ -393,9 +437,23 @@ const FriendlyWebsitesWidget = () => {
             exit="hidden"
              variants={animationVariants[effectiveAnim]}
              transition={effectiveAnim === 'bounce'
-               ? { type: 'spring', stiffness: 260, damping: 18 }
-               : { duration: reducedMotion ? 0.15 : 0.35, ease: 'easeOut' }
+               ? { type: 'spring', stiffness: 260 * intensityMul, damping: 18 }
+               : { duration: (reducedMotion && disableOnRM ? 0.15 : 0.35) / intensityMul, ease: 'easeOut' }
              }
+             onAnimationStart={() => {
+               (window as any).__fw_anim_start = performance.now();
+               recordFriendlyWidgetEvent('anim_start', {
+                 attention_effect: settings.attentionEffect ?? null,
+               });
+             }}
+             onAnimationComplete={() => {
+               const started = (window as any).__fw_anim_start as number | undefined;
+               const dur = started ? Math.max(0, Math.round(performance.now() - started)) : null;
+               recordFriendlyWidgetEvent('anim_complete', {
+                 attention_effect: settings.attentionEffect ?? null,
+                 sample_ms: dur,
+               });
+             }}
             className={`fixed top-1/2 -translate-y-1/2 z-50 ${positionClasses} ${sizeClasses[settings.size]} ${colorClasses[settings.colorScheme]} border p-4 shadow-xl ${settings.showOnMobile ? '' : 'hidden md:block'}`}
           >
             {/* Close button */}
