@@ -752,6 +752,7 @@ export function ClickBurst({
   intensity = 'normal',
   durationMs,
   countScale = 0,
+  speed = 'normal',
 }: {
   variant: BurstVariant;
   onDone: () => void;
@@ -761,6 +762,8 @@ export function ClickBurst({
   durationMs?: number;
   /** Overrides preset particle count; 0 = use preset default. */
   countScale?: number;
+  /** Playback speed multiplier — 'slower' | 'normal' | 'faster'. */
+  speed?: 'slower' | 'normal' | 'faster';
 }) {
   if (variant === 'none') { setTimeout(onDone, 0); return null; }
   // Rain-style presets: particles start above the viewport and fall the
@@ -778,6 +781,8 @@ export function ClickBurst({
   const p = presets[variant];
   // Intensity multiplier tunes count + duration together.
   const iMul = intensity === 'subtle' ? 0.6 : intensity === 'lively' ? 1.4 : 1;
+  // Speed multiplier — >1 stretches (slower), <1 compresses (faster).
+  const sMul = speed === 'slower' ? 1.5 : speed === 'faster' ? 0.6 : 1;
   // Reduced-motion: hard cap to a gentle few-particle shower and short overlay.
   const rmCount = 6;
   const rmMs = 900;
@@ -785,8 +790,8 @@ export function ClickBurst({
   const effectiveCount = reducedMotion ? rmCount : Math.max(4, Math.min(220, baseCount));
   const OVERLAY_MS = reducedMotion
     ? rmMs
-    : Math.max(800, Math.min(8000, Math.round((durationMs ?? 4200) * iMul)));
-  const speedMul = reducedMotion ? 0.5 : 1 / iMul; // lively = faster fall
+    : Math.max(800, Math.min(12000, Math.round((durationMs ?? 4200) * iMul * sMul)));
+  const speedMul = reducedMotion ? 0.5 : (1 / iMul) * sMul; // lively/faster = quicker fall
   return (
     <motion.div
       className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
