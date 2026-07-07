@@ -300,6 +300,9 @@ const AdminFriendlyWebsites = () => {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Live preview of the celebration effect. Toggling this remounts the
+  // ClickBurst overlay so admins can preview each variant without saving.
+  const [previewBurstAt, setPreviewBurstAt] = useState<number | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingWebsite, setEditingWebsite] = useState<FriendlyWebsite | null>(null);
   const [formData, setFormData] = useState({
