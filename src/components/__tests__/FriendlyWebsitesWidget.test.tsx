@@ -148,6 +148,10 @@ describe("FriendlyWebsitesWidget (e2e)", () => {
       { timeout: 3000 },
     );
     expect(pill).toBeInTheDocument();
-    expect(pill.textContent).toMatch(/Sync issue/i);
+    // The button is now labelled "Retry now" and lives inside a pill that
+    // shows "Widget offline …" — either message satisfies the sync-error UI.
+    expect(pill.textContent).toMatch(/retry now/i);
+    const container = pill.closest('[data-testid="friendly-widget-sync-error-pill"]');
+    expect(container?.textContent || "").toMatch(/widget offline/i);
   });
 });

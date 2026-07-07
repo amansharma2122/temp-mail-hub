@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useSupabaseAuth";
@@ -52,6 +52,11 @@ interface WidgetSettings {
   showLabelOnTrigger?: boolean;
   animationIntensity?: 'subtle' | 'normal' | 'lively';
   disableEffectsOnReducedMotion?: boolean;
+  // Admin-forced motion policy — persisted site-wide default.
+  //  'respect_user': honor prefers-reduced-motion (default).
+  //  'always_on':    force reduced motion for every visitor.
+  //  'never':        ignore OS preference (use with caution).
+  reducedMotionMode?: 'respect_user' | 'always_on' | 'never';
 }
 
 const defaultSettings: WidgetSettings = {
@@ -73,6 +78,7 @@ const defaultSettings: WidgetSettings = {
   showLabelOnTrigger: true,
   animationIntensity: 'normal',
   disableEffectsOnReducedMotion: true,
+  reducedMotionMode: 'respect_user',
 };
 
 const renderLucide = (name: string | null | undefined, className = "w-5 h-5") => {
@@ -159,6 +165,43 @@ const FriendlyWebsitesWidget = ({
     // eslint-disable-next-line no-console
     console.warn("[friendly-widget] realtime/polling failed — surfacing sync indicator");
   }, [hasSyncError]);
+
+  // Sync-error exponential backoff. Retries the two failing queries with
+  // jittered exponential delay (2s, 4s, 8s, 16s, 32s, 60s max). A manual
+  // "Retry now" click resets the attempt counter.
+  const [syncAttempt, setSyncAttempt] = useState(0);
+  const [nextRetryIn, setNextRetryIn] = useState<number>(0);
+  const runRetry = () => {
+    refetchSettings();
+    refetchSites();
+  };
+  useEffect(() => {
+    if (!hasSyncError) {
+      if (syncAttempt !== 0) setSyncAttempt(0);
+      if (nextRetryIn !== 0) setNextRetryIn(0);
+      return;
+    }
+    const base = Math.min(60_000, 2_000 * Math.pow(2, syncAttempt));
+    const jitter = Math.floor(base * 0.25 * Math.random());
+    const delay = base + jitter;
+    setNextRetryIn(delay);
+    const tick = setInterval(() => {
+      setNextRetryIn((ms) => Math.max(0, ms - 1000));
+    }, 1000);
+    const timer = setTimeout(() => {
+      setSyncAttempt((n) => n + 1);
+      runRetry();
+    }, delay);
+    return () => { clearTimeout(timer); clearInterval(tick); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSyncError, syncAttempt]);
+
+  const manualRetry = () => {
+    setSyncAttempt(0);
+    setNextRetryIn(0);
+    runRetry();
+  };
+  const nextRetrySec = Math.max(0, Math.ceil(nextRetryIn / 1000));
 
   // Derive a single consistent live-region announcement. Priority: sync error
   // beats interactive state (a screen reader user needs to know the widget is
@@ -256,16 +299,12 @@ const FriendlyWebsitesWidget = ({
   if (!overrideWebsites && (isLoading || !isVisible())) {
     if (hasSyncError && !isLoading && settings.enabled) {
       return (
-        <button
-          type="button"
-          data-testid="friendly-widget-sync-error"
-          onClick={() => { refetchSettings(); refetchSites(); }}
-          className={`fixed top-1/2 -translate-y-1/2 z-40 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-sm hover:bg-amber-500/25 transition ${settings.position === 'right' ? 'right-2' : 'left-2'}`}
-          aria-label="Widget sync failed — click to retry"
-        >
-          <AlertCircle className="w-3 h-3" />
-          <span>Sync issue — retry</span>
-        </button>
+        <SyncErrorPill
+          position={settings.position}
+          attempt={syncAttempt}
+          nextRetrySec={nextRetrySec}
+          onRetry={manualRetry}
+        />
       );
     }
     return null;
@@ -328,7 +367,13 @@ const FriendlyWebsitesWidget = ({
   // discoverable without any looping animation.
   const rawAttention = settings.attentionEffect ?? 'pulse';
   const disableOnRM = settings.disableEffectsOnReducedMotion !== false;
-  const attention = reducedMotion && disableOnRM
+  // Effective reduced-motion combines admin policy and OS preference.
+  const rmMode = settings.reducedMotionMode ?? 'respect_user';
+  const effectiveReducedMotion =
+    rmMode === 'always_on' ? true
+    : rmMode === 'never' ? false
+    : (reducedMotion && disableOnRM);
+  const attention = effectiveReducedMotion
     && ['pulse','wiggle','bounce','sparkle','confetti','ripple','rainbow','magnet'].includes(rawAttention)
     ? 'ring'
     : rawAttention;
@@ -361,7 +406,7 @@ const FriendlyWebsitesWidget = ({
     const next = !isOpen;
     setIsOpen(next);
     if (next) {
-      const rmBlocks = reducedMotion && disableOnRM;
+      const rmBlocks = effectiveReducedMotion;
       if (!rmBlocks) setBurstAt(Date.now());
       recordFriendlyWidgetEvent('manual_open', {
         attention_effect: settings.attentionEffect ?? null,
@@ -378,7 +423,7 @@ const FriendlyWebsitesWidget = ({
 
   // Animation variants — collapse fancy motion when the user prefers reduced motion
   // AND the admin hasn't disabled that safeguard.
-  const effectiveAnim = (reducedMotion && disableOnRM) ? 'fade' : settings.animationType;
+  const effectiveAnim = effectiveReducedMotion ? 'fade' : settings.animationType;
 
   // Intensity multiplier tunes duration/spring stiffness for panel animations.
   const intensity = settings.animationIntensity ?? 'normal';
@@ -399,7 +444,7 @@ const FriendlyWebsitesWidget = ({
 
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
       <AnimatePresence>
-        {burstAt && !reducedMotion && (
+        {burstAt && !effectiveReducedMotion && (
           <motion.div
             key={burstAt}
             className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
@@ -443,8 +488,8 @@ const FriendlyWebsitesWidget = ({
         data-testid="friendly-widget-trigger"
         data-attention={attention}
         className={`group fixed top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 py-3 pl-3 pr-2 shadow-xl transition-all duration-300 ${toggleButtonPosition} ${buttonColorClasses[settings.colorScheme]} ${settings.showOnMobile ? '' : 'hidden md:block'} ${isOpen ? '' : attentionClass}`}
-        whileHover={reducedMotion ? undefined : { scale: 1.05 }}
-        whileTap={reducedMotion ? undefined : { scale: 0.95 }}
+        whileHover={effectiveReducedMotion ? undefined : { scale: 1.05 }}
+        whileTap={effectiveReducedMotion ? undefined : { scale: 0.95 }}
         aria-label={isOpen ? `Close ${label}` : `Open ${label}`}
       >
         <Tooltip>
@@ -482,17 +527,13 @@ const FriendlyWebsitesWidget = ({
 
       {/* User-visible sync indicator when both realtime + fetches fail. */}
       {hasSyncError && !isOpen && (
-        <button
-          type="button"
-          data-testid="friendly-widget-sync-error"
-          onClick={() => { refetchSettings(); refetchSites(); }}
-          className={`fixed top-1/2 mt-14 -translate-y-1/2 z-40 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-sm hover:bg-amber-500/25 transition ${settings.position === 'right' ? 'right-2' : 'left-2'}`}
-          aria-label="Widget sync failed — click to retry"
-          title="Widget sync failed — click to retry"
-        >
-          <AlertCircle className="w-3 h-3" />
-          <span>Sync issue — retry</span>
-        </button>
+        <SyncErrorPill
+          position={settings.position}
+          attempt={syncAttempt}
+          nextRetrySec={nextRetrySec}
+          onRetry={manualRetry}
+          offsetTop
+        />
       )}
 
       {/* Sidebar Panel */}
@@ -505,7 +546,7 @@ const FriendlyWebsitesWidget = ({
              variants={animationVariants[effectiveAnim]}
              transition={effectiveAnim === 'bounce'
                ? { type: 'spring', stiffness: 260 * intensityMul, damping: 18 }
-               : { duration: (reducedMotion && disableOnRM ? 0.15 : 0.35) / intensityMul, ease: 'easeOut' }
+               : { duration: (effectiveReducedMotion ? 0.15 : 0.35) / intensityMul, ease: 'easeOut' }
              }
              onAnimationStart={() => {
                (window as any).__fw_anim_start = performance.now();
@@ -549,8 +590,8 @@ const FriendlyWebsitesWidget = ({
                   className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50 hover:border-primary/30 hover:bg-background/80 transition-all duration-200 group"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: reducedMotion ? 0 : index * 0.05 }}
-                  whileHover={reducedMotion ? undefined : { x: 4 }}
+                  transition={{ delay: effectiveReducedMotion ? 0 : index * 0.05 }}
+                  whileHover={effectiveReducedMotion ? undefined : { x: 4 }}
                   onClick={() => handleSiteClick(website)}
                 >
                   {website.icon_name && renderLucide(website.icon_name, 'w-8 h-8 p-1.5 rounded-lg bg-primary/15 text-primary') ? (
@@ -595,3 +636,43 @@ const FriendlyWebsitesWidget = ({
 };
 
 export default FriendlyWebsitesWidget;
+
+// -------------------- Sync-error pill w/ backoff + Retry now ---------------
+
+function SyncErrorPill({
+  position,
+  attempt,
+  nextRetrySec,
+  onRetry,
+  offsetTop = false,
+}: {
+  position: 'left' | 'right';
+  attempt: number;
+  nextRetrySec: number;
+  onRetry: () => void;
+  offsetTop?: boolean;
+}) {
+  const label = nextRetrySec > 0
+    ? `Widget offline — retrying in ${nextRetrySec}s`
+    : `Widget offline — reconnecting…`;
+  return (
+    <div
+      role="alert"
+      className={`fixed top-1/2 ${offsetTop ? 'mt-14 ' : ''}-translate-y-1/2 z-40 flex items-center gap-2 pl-2.5 pr-1 py-1 rounded-full text-[11px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-sm ${position === 'right' ? 'right-2' : 'left-2'}`}
+      data-testid="friendly-widget-sync-error-pill"
+    >
+      <AlertCircle className="w-3 h-3 shrink-0" aria-hidden />
+      <span className="whitespace-nowrap">{label}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        data-testid="friendly-widget-sync-error"
+        aria-label={`Retry widget sync now (attempt ${attempt + 1})`}
+        className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/25 hover:bg-amber-500/40 text-amber-900 dark:text-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500/70"
+      >
+        <RefreshCw className="w-3 h-3" aria-hidden />
+        <span>Retry now</span>
+      </button>
+    </div>
+  );
+}

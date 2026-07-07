@@ -89,6 +89,7 @@ interface WidgetSettings {
   showLabelOnTrigger: boolean;
   animationIntensity: 'subtle' | 'normal' | 'lively';
   disableEffectsOnReducedMotion: boolean;
+  reducedMotionMode?: 'respect_user' | 'always_on' | 'never';
 }
 
 const defaultSettings: WidgetSettings = {
@@ -110,6 +111,7 @@ const defaultSettings: WidgetSettings = {
   showLabelOnTrigger: true,
   animationIntensity: 'normal',
   disableEffectsOnReducedMotion: true,
+  reducedMotionMode: 'respect_user',
 };
 
 const emptyForm = {
@@ -907,7 +909,7 @@ const AdminFriendlyWebsites = () => {
                       <SelectItem value="lively">Lively (faster, springier)</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Tunes panel + trigger motion speed.</p>
+                  <p className="text-xs text-muted-foreground">Default intensity for all visitors. Persisted site-wide.</p>
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
@@ -922,6 +924,25 @@ const AdminFriendlyWebsites = () => {
                       setSettings({ ...settings, disableEffectsOnReducedMotion: v })
                     }
                   />
+                </div>
+                <div className="space-y-2 p-4 border rounded-lg md:col-span-2">
+                  <Label>Site-wide Reduced-Motion Policy</Label>
+                  <Select
+                    value={settings.reducedMotionMode ?? 'respect_user'}
+                    onValueChange={(v: 'respect_user' | 'always_on' | 'never') =>
+                      setSettings({ ...settings, reducedMotionMode: v })
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="respect_user">Respect user preference (recommended)</SelectItem>
+                      <SelectItem value="always_on">Always reduce motion (force calm)</SelectItem>
+                      <SelectItem value="never">Never reduce motion (ignore OS)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Persisted default applied to every visitor. Overrides individual browser preferences when set to "always" or "never".
+                  </p>
                 </div>
               </div>
 
