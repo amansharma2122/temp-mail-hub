@@ -271,7 +271,7 @@ export const useSubscription = () => {
   // Subscribe to realtime tier changes
   useEffect(() => {
     const channel = supabase
-      .channel('subscription_tiers_changes')
+      .channel(`useSub_tiers_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -295,7 +295,7 @@ export const useSubscription = () => {
       });
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [fetchTiers]);
 
@@ -304,7 +304,7 @@ export const useSubscription = () => {
     if (!user) return;
 
     const channel = supabase
-      .channel('user_subscription_changes')
+      .channel(`useSub_user_${user.id}_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -328,7 +328,7 @@ export const useSubscription = () => {
       });
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [user, fetchSubscription]);
 
