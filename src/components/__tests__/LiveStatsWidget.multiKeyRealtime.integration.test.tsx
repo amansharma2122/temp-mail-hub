@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, act, waitFor, cleanup } from "@testing-library/react";
+import { render, act, cleanup } from "@testing-library/react";
 
 // Reuses the pattern from LiveStatsRealtime.animation.test.tsx but drives
 // rapid postgres_changes updates across MULTIPLE stat_keys simultaneously
@@ -61,14 +61,9 @@ describe("LiveStatsWidget — rapid multi-key realtime integration", () => {
       act(() => { vi.advanceTimersByTime(20); });
     }
 
-    await waitFor(() => {
-      const cards = container.querySelectorAll('[class*="rounded-xl"][class*="border"]');
-      expect(cards.length).toBeGreaterThanOrEqual(4);
-    });
-
-    // Advance past the animation window and confirm the tree is stable
-    // with no accumulated duplicate cards.
     act(() => { vi.advanceTimersByTime(2000); });
+    const cards = container.querySelectorAll('[class*="rounded-xl"][class*="border"]');
+    expect(cards.length).toBeGreaterThanOrEqual(4);
     const cardsAfter = container.querySelectorAll('[class*="rounded-xl"][class*="border"]');
     // Should still be the same 4 cards (allowing for wrappers), never grow
     // unboundedly from the 25 updates.
