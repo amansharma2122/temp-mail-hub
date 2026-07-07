@@ -55,6 +55,11 @@ const AdminGeneralSettings = () => {
   const { isDirty, markDirty, markClean } = useDirty();
   const { isDirty: isModalDirty, markDirty: markModalDirty, markClean: markModalClean } = useDirty();
 
+  const updateModal: typeof updateModalConfig = (k, v) => {
+    updateModalConfig(k, v);
+    markModalDirty();
+  };
+
   // Limit modal settings
   const {
     config: limitModalConfig,
