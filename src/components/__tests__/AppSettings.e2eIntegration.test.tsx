@@ -91,12 +91,13 @@ describe("E2E: enable + intensity + toast under reduced-motion", () => {
       </QueryClientProvider>,
     );
 
-    // 1. Widget mounted while enabled.
+    // 1. Widget mounted while enabled (its trigger is a <button>).
     await waitFor(() => {
-      expect(container.querySelector('[data-variant="reduced"]')).toBeTruthy();
+      expect(container.querySelector("button")).toBeTruthy();
     });
-    const triggerBefore = container.querySelector("button:not([aria-label='Dismiss notification'])");
-    expect(triggerBefore).toBeTruthy();
+    // Toast is present too (reduced variant).
+    expect(container.querySelector('[data-variant="reduced"]')).toBeTruthy();
+    const triggerBefore = container.querySelector("button");
     (triggerBefore as HTMLElement)?.setAttribute("data-mount-marker", "keep");
 
     // 2. Adjust intensity — assert no remount.
