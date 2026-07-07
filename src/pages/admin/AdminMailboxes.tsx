@@ -111,7 +111,7 @@ const AdminMailboxes = () => {
 
   const openDialog = (mailbox?: Mailbox) => {
     if (mailbox) {
-      setEditingMailbox({ ...mailbox });
+      setEditingMailbox({ ...mailbox, smtp_password: "", imap_password: "" });
     } else {
       setEditingMailbox({ ...defaultMailbox });
     }
@@ -137,12 +137,10 @@ const AdminMailboxes = () => {
         smtp_host: editingMailbox.smtp_host || null,
         smtp_port: editingMailbox.smtp_port,
         smtp_user: editingMailbox.smtp_user || null,
-        smtp_password: editingMailbox.smtp_password || null,
         smtp_from: editingMailbox.smtp_from || null,
         imap_host: editingMailbox.imap_host || null,
         imap_port: editingMailbox.imap_port,
         imap_user: editingMailbox.imap_user || null,
-        imap_password: editingMailbox.imap_password || null,
         receiving_email: editingMailbox.receiving_email || null,
         hourly_limit: editingMailbox.hourly_limit,
         daily_limit: editingMailbox.daily_limit,
@@ -151,9 +149,29 @@ const AdminMailboxes = () => {
         priority: editingMailbox.priority,
       };
 
-      const { error } = await api.admin.saveMailbox(mailboxData);
+      const { data, error } = await api.admin.saveMailbox(mailboxData);
 
       if (error) throw error;
+      const saved = Array.isArray(data) ? data[0] : data;
+      const mailboxId = editingMailbox.id || saved?.id;
+
+      if (mailboxId && editingMailbox.smtp_password) {
+        const { data: stored, error: pwError } = await api.db.rpc<boolean>("set_mailbox_smtp_password", {
+          p_mailbox_id: mailboxId,
+          p_password: editingMailbox.smtp_password,
+        });
+        if (pwError) throw new Error(pwError.message);
+        if (stored === false) throw new Error("Failed to store SMTP password");
+      }
+
+      if (mailboxId && editingMailbox.imap_password) {
+        const { data: stored, error: pwError } = await api.db.rpc<boolean>("set_mailbox_imap_password", {
+          p_mailbox_id: mailboxId,
+          p_password: editingMailbox.imap_password,
+        });
+        if (pwError) throw new Error(pwError.message);
+        if (stored === false) throw new Error("Failed to store IMAP password");
+      }
       toast.success(editingMailbox.id ? "Mailbox updated" : "Mailbox created");
 
       closeDialog();
@@ -190,7 +208,6 @@ const AdminMailboxes = () => {
         host: mailbox.smtp_host,
         port: mailbox.smtp_port,
         user: mailbox.smtp_user,
-        password: mailbox.smtp_password,
       });
 
       if (error) throw error;

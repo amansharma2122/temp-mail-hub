@@ -125,7 +125,7 @@ export const IMAPHealthTable = ({ onRefresh }: IMAPHealthTableProps) => {
     setTestingId(mailbox.id);
     try {
       const { data, error } = await supabase.functions.invoke("fetch-imap-emails", {
-        body: { mailboxId: mailbox.id, mode: "latest", limit: 5 },
+        body: { mailbox_id: mailbox.id, mode: "latest", limit: 5 },
       });
 
       if (error) throw error;

@@ -43,13 +43,19 @@ export const useCaptchaSettings = () => {
 
       if (error) {
         console.error('Error fetching captcha settings:', error);
+      }
+
+      if (!error && data?.value) {
+        return { ...defaultSettings, ...(data.value as unknown as CaptchaSettings) };
+      }
+
+      const { data: publicSettings, error: publicError } = await (supabase.rpc as any)('get_public_captcha_settings');
+      if (publicError) {
+        console.error('Error fetching public captcha settings:', publicError);
         return defaultSettings;
       }
 
-      if (data?.value) {
-        return { ...defaultSettings, ...(data.value as unknown as CaptchaSettings) };
-      }
-      return defaultSettings;
+      return { ...defaultSettings, ...(publicSettings as unknown as Partial<CaptchaSettings>) };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - prevents refetching on tab switches
     gcTime: 30 * 60 * 1000, // 30 minutes cache

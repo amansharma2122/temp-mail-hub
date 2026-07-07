@@ -18,12 +18,15 @@ interface Sample {
   remote?: boolean;
   delay_ms?: number;
   toast_visible_delay_ms?: number;
+  delay_threshold_ms?: number;
+  delay_exceeded_threshold?: boolean;
   observed_at: string;
 }
 
 const BUFFER: Sample[] = [];
 const FLUSH_MS = 15_000;
 const MAX_BUFFER = 40;
+export const APP_SETTINGS_TOAST_DELAY_THRESHOLD_MS = 5_000;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 // Sampling + per-key throttling keeps this pipeline light: we never emit
@@ -138,6 +141,8 @@ export function reportAppSettingsToastEvent(sample: AppSettingsToastRum): void {
     remote: sample.remote,
     delay_ms: visibleDelay,
     toast_visible_delay_ms: visibleDelay,
+    delay_threshold_ms: APP_SETTINGS_TOAST_DELAY_THRESHOLD_MS,
+    delay_exceeded_threshold: visibleDelay > APP_SETTINGS_TOAST_DELAY_THRESHOLD_MS,
     latency_ms: visibleDelay,
     observed_at: new Date().toISOString(),
   });
