@@ -712,8 +712,7 @@ function ClickBurst({ variant, onDone }: { variant: BurstVariant; onDone: () => 
             key={i}
             className="absolute left-1/2 top-1/2 select-none font-bold"
             style={{
-              // @ts-expect-error CSS custom props
-              '--dx': `${dx}px`,
+              ['--dx' as any]: `${dx}px`,
               '--dy': `${dy}px`,
               fontSize: `${size}px`,
               width: glyph ? undefined : `${size}px`,
