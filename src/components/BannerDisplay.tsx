@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink, RadioTower, RefreshCw } from "lucide-react";
 import DOMPurify from "dompurify";
