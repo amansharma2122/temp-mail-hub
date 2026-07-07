@@ -9,6 +9,7 @@ import SubscriptionStatsWidget from "@/components/admin/SubscriptionStatsWidget"
 import PaymentStatsWidget from "@/components/admin/PaymentStatsWidget";
 import RealtimeHealthWidget from "@/components/admin/RealtimeHealthWidget";
 import StatsHealthWidget from "@/components/admin/StatsHealthWidget";
+import MailboxQuotaAlerts from "@/components/admin/MailboxQuotaAlerts";
 
 interface Stats {
   totalUsers: number;
@@ -375,6 +376,7 @@ const AdminDashboard = () => {
       <RealtimeHealthWidget />
 
       {/* Public stats + mailbox storage health */}
+      <MailboxQuotaAlerts />
       <StatsHealthWidget />
 
       {/* Recent Activity */}
