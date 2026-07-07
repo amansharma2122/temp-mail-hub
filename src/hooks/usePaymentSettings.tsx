@@ -65,7 +65,7 @@ export function usePaymentSettings() {
   // Subscribe to real-time changes
   useEffect(() => {
     const channel = supabase
-      .channel('payment_settings_changes')
+      .channel(`payment_settings_changes_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

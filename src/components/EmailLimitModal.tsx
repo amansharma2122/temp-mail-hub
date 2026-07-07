@@ -64,7 +64,7 @@ const EmailLimitModal = ({ isOpen, onClose, resetAt, limit }: EmailLimitModalPro
 
     // Subscribe to real-time changes
     const channel = supabase
-      .channel('limit_modal_config')
+      .channel(`limit_modal_config_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -85,7 +85,7 @@ const EmailLimitModal = ({ isOpen, onClose, resetAt, limit }: EmailLimitModalPro
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 

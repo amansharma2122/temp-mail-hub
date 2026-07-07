@@ -75,7 +75,7 @@ const AdminIPBlocking = () => {
     
     // Setup realtime subscription
     const channel = supabase
-      .channel('blocked-ips-realtime')
+      .channel(`blocked-ips-realtime-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
