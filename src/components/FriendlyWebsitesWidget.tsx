@@ -636,3 +636,43 @@ const FriendlyWebsitesWidget = ({
 };
 
 export default FriendlyWebsitesWidget;
+
+// -------------------- Sync-error pill w/ backoff + Retry now ---------------
+
+function SyncErrorPill({
+  position,
+  attempt,
+  nextRetrySec,
+  onRetry,
+  offsetTop = false,
+}: {
+  position: 'left' | 'right';
+  attempt: number;
+  nextRetrySec: number;
+  onRetry: () => void;
+  offsetTop?: boolean;
+}) {
+  const label = nextRetrySec > 0
+    ? `Widget offline — retrying in ${nextRetrySec}s`
+    : `Widget offline — reconnecting…`;
+  return (
+    <div
+      role="alert"
+      className={`fixed top-1/2 ${offsetTop ? 'mt-14 ' : ''}-translate-y-1/2 z-40 flex items-center gap-2 pl-2.5 pr-1 py-1 rounded-full text-[11px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-sm ${position === 'right' ? 'right-2' : 'left-2'}`}
+      data-testid="friendly-widget-sync-error-pill"
+    >
+      <AlertCircle className="w-3 h-3 shrink-0" aria-hidden />
+      <span className="whitespace-nowrap">{label}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        data-testid="friendly-widget-sync-error"
+        aria-label={`Retry widget sync now (attempt ${attempt + 1})`}
+        className="ml-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/25 hover:bg-amber-500/40 text-amber-900 dark:text-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500/70"
+      >
+        <RefreshCw className="w-3 h-3" aria-hidden />
+        <span>Retry now</span>
+      </button>
+    </div>
+  );
+}
