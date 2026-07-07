@@ -5,6 +5,8 @@ import { NewEmailToast } from "@/components/NewEmailToast";
 import {
   getNewEmailNotificationStyle,
   getNewEmailNotificationStyleSync,
+  getNewEmailSoundAdminEnabled,
+  getNewEmailSoundAdminEnabledSync,
 } from "@/lib/newEmailNotificationStyle";
 
 interface ReceivedEmail {
