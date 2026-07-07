@@ -1553,6 +1553,7 @@ export type Database = {
         Args: { p_key_name?: string; p_plaintext: string }
         Returns: string
       }
+      enforce_single_active_mailbox: { Args: never; Returns: Json }
       find_user_by_email: {
         Args: { search_email: string }
         Returns: {
