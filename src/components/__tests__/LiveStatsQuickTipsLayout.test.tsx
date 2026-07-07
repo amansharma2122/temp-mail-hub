@@ -66,4 +66,16 @@ describe("LiveStats + Quick Tips compact layout", () => {
     // Base layout is grid-cols-1; sm: variant only applies above 640px.
     expect(grid.className.split(/\s+/)).toContain("grid-cols-1");
   });
+
+  it("keeps the same structure under a .dark theme wrapper (dark visual baseline)", () => {
+    const { asFragment, getByTestId } = render(
+      <div className="dark">
+        <LayoutFixture />
+      </div>,
+    );
+    const section = getByTestId("stats-tips-section");
+    // dark: variant still applied via className list; snapshot proves parity.
+    expect(section.className).toMatch(/dark:bg-muted\/60/);
+    expect(asFragment()).toMatchSnapshot();
+  });
 });
