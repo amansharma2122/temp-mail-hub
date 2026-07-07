@@ -142,6 +142,7 @@ export const translations = {
     adminSettingsUpdatedTitle: 'Settings updated in another tab',
     adminSettingsUpdatedDescription: '"{key}" merged and applied ({version}).',
     adminSettingsUpdatedVersionFallback: 'latest version',
+    adminSettingsUpdatedOpen: 'Open setting',
   },
   
   ar: {
@@ -211,6 +212,7 @@ export const translations = {
     adminSettingsUpdatedTitle: 'تم تحديث الإعدادات في علامة تبويب أخرى',
     adminSettingsUpdatedDescription: 'تم دمج "{key}" وتطبيقه ({version}).',
     adminSettingsUpdatedVersionFallback: 'أحدث إصدار',
+    adminSettingsUpdatedOpen: 'فتح الإعداد',
   },
   
   es: {
@@ -260,6 +262,7 @@ export const translations = {
     adminSettingsUpdatedTitle: 'Configuración actualizada en otra pestaña',
     adminSettingsUpdatedDescription: '"{key}" fusionado y aplicado ({version}).',
     adminSettingsUpdatedVersionFallback: 'última versión',
+    adminSettingsUpdatedOpen: 'Abrir ajuste',
   },
   
   fr: {
@@ -296,6 +299,7 @@ export const translations = {
     adminSettingsUpdatedTitle: 'Paramètres mis à jour dans un autre onglet',
     adminSettingsUpdatedDescription: '« {key} » fusionné et appliqué ({version}).',
     adminSettingsUpdatedVersionFallback: 'dernière version',
+    adminSettingsUpdatedOpen: 'Ouvrir le réglage',
   },
 };
 
