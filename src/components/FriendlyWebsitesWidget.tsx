@@ -200,6 +200,25 @@ const FriendlyWebsitesWidget = ({
     return () => clearTimeout(t);
   }, [settings.autoOpenDelayMs, settings.attentionEffect, websites, hasAutoOpened, isOpen]);
 
+  // Per-site badge: only show if at least one active site allows a badge today.
+  // Computed here (before any early return) so all hooks below are called every
+  // render — required by React's rules of hooks.
+  const showBadgeSetting = settings.showBadge !== false;
+  const _badgeSite = websites.find(w =>
+    w.badge_enabled !== false && canShowBadge(w.id, w.max_badge_per_day ?? 0)
+  );
+  const _badgeAllowed = showBadgeSetting && !!_badgeSite;
+  useEffect(() => {
+    if (_badgeAllowed && _badgeSite) {
+      noteBadgeShown(_badgeSite.id);
+      recordFriendlyWidgetEvent('badge_shown', {
+        website_id: _badgeSite.id,
+        attention_effect: _badgeSite.attention_effect || settings.attentionEffect || null,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_badgeAllowed, _badgeSite?.id]);
+
   if (!overrideWebsites && (isLoading || !isVisible())) return null;
   if (overrideWebsites && !settings.enabled) return null;
 
@@ -278,29 +297,15 @@ const FriendlyWebsitesWidget = ({
 
   const label = settings.buttonLabel || 'Partner Sites';
   const tooltip = settings.tooltipText || label;
-  const showBadge = settings.showBadge !== false;
+  const showBadge = showBadgeSetting;
   const TriggerIcon = settings.triggerIcon
     ? (LucideIcons as any)[settings.triggerIcon]
     : null;
   const showLabelOnTrigger = settings.showLabelOnTrigger !== false;
 
-  // Per-site badge: only show if at least one active site allows a badge today.
-  const badgeSite = websites.find(w =>
-    w.badge_enabled !== false && canShowBadge(w.id, w.max_badge_per_day ?? 0)
-  );
-  const badgeAllowed = showBadge && !!badgeSite;
+  const badgeSite = _badgeSite;
+  const badgeAllowed = _badgeAllowed;
   const badgeText = badgeSite?.badge_text || settings.badgeText || String(websites.length);
-  useEffect(() => {
-    if (badgeAllowed && badgeSite) {
-      noteBadgeShown(badgeSite.id);
-      recordFriendlyWidgetEvent('badge_shown', {
-        website_id: badgeSite.id,
-        attention_effect: badgeSite.attention_effect || settings.attentionEffect || null,
-      });
-    }
-    // Only when the visible badge site changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [badgeAllowed, badgeSite?.id]);
 
   const handleToggle = () => {
     const next = !isOpen;
