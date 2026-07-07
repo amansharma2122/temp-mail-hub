@@ -106,10 +106,11 @@ export const useRecaptcha = () => {
       return 'skip';
     }
 
-    // If there's a load error, we can't proceed
+    // Fail-safe: if reCAPTCHA failed to load (bad key, blocked domain, network),
+    // don't block the user. Log a warning and skip verification.
     if (loadError) {
-      console.error('reCAPTCHA load error:', loadError);
-      return null;
+      console.warn('[reCAPTCHA] Load error, skipping verification (fail-safe):', loadError);
+      return 'skip';
     }
 
     // Wait for ready state (avoid false failures right after page load)
@@ -130,6 +131,21 @@ export const useRecaptcha = () => {
       console.log(`reCAPTCHA token generated for action: ${action}`);
       return token;
     } catch (error) {
+      // Detect the common "Invalid domain for site key" misconfiguration and
+      // similar site-key errors — skip verification rather than lock users out.
+      const msg = error instanceof Error ? error.message : String(error);
+      const isKeyDomainError =
+        /invalid.*(domain|site.?key)/i.test(msg) ||
+        /site.?key.*(invalid|not.*valid)/i.test(msg) ||
+        /dominio.*clave/i.test(msg); // Spanish variant seen in the wild
+      if (isKeyDomainError) {
+        console.warn(
+          '[reCAPTCHA] Site key not valid for this domain — skipping verification (fail-safe). ' +
+          'Add this domain in the reCAPTCHA admin console to enforce verification.',
+          msg,
+        );
+        return 'skip';
+      }
       console.error('reCAPTCHA execution failed:', error);
       return null;
     }
