@@ -44,6 +44,10 @@ interface WidgetSettings {
   attentionEffect?:
     | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring'
     | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
+  /** Fired once when the user clicks/opens the trigger. Purely decorative. */
+  clickEffect?:
+    | 'none' | 'sparkle' | 'confetti' | 'bomb' | 'fireworks'
+    | 'hearts' | 'stars' | 'rainbow-burst';
   buttonLabel?: string;
   tooltipText?: string;
   showBadge?: boolean;
@@ -82,6 +86,7 @@ const defaultSettings: WidgetSettings = {
   animationIntensity: 'subtle',
   disableEffectsOnReducedMotion: true,
   reducedMotionMode: 'respect_user',
+  clickEffect: 'sparkle',
 };
 
 // -------- Module-scoped constants (do NOT depend on component state) -------
