@@ -24,7 +24,13 @@ vi.mock("@/integrations/supabase/client", () => {
     const b: any = {
       _resolve: async () =>
         table === "friendly_websites"
-          ? { data: [], error: null }
+          ? { data: [{
+              id: "w1", name: "Partner", url: "https://partner.example",
+              icon_url: null, icon_name: "Sparkles", description: null,
+              display_order: 0, is_active: true, open_in_new_tab: true,
+              attention_effect: null, badge_enabled: false, badge_text: null,
+              auto_open_override: null, max_badge_per_day: 0,
+            }], error: null }
           : table === "app_settings"
             ? { data: { value: currentSettings }, error: null }
             : { data: null, error: null },
