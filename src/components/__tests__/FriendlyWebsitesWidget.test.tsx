@@ -67,7 +67,7 @@ vi.mock("@/integrations/supabase/client", () => {
             maybeSingle: async () =>
               mockState.settingsOk
                 ? { data: { value: settingsPayload }, error: null }
-                : { data: null, error: new Error("boom") },
+                : Promise.reject(new Error("settings boom")),
           }),
         }),
       };
@@ -79,7 +79,7 @@ vi.mock("@/integrations/supabase/client", () => {
             order: async () =>
               mockState.sitesOk
                 ? { data: [siteRow], error: null }
-                : { data: null, error: new Error("boom") },
+                : Promise.reject(new Error("sites boom")),
           }),
         }),
       };
