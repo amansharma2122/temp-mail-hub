@@ -58,22 +58,18 @@ export default function FriendlyWidgetRateLimitSettings() {
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from("app_settings").upsert(
-      {
-        key: "rate_limit_friendly_widget_events",
-        value: {
-          max_requests: maxRequests,
-          window_minutes: windowMinutes,
-          per_effect: perEffect,
-        },
-      } as any,
-      { onConflict: "key" },
-    );
-    setSaving(false);
-    if (error) {
-      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+    try {
+      await saveAppSetting("rate_limit_friendly_widget_events", {
+        max_requests: maxRequests,
+        window_minutes: windowMinutes,
+        per_effect: perEffect,
+      });
+    } catch (error: any) {
+      setSaving(false);
+      toast({ title: "Save failed", description: error?.message, variant: "destructive" });
       return;
     }
+    setSaving(false);
     const overrides = Object.keys(perEffect).length;
     toast({
       title: "Rate limit updated",
