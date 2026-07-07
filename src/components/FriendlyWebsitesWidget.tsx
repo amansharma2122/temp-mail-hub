@@ -486,6 +486,7 @@ const FriendlyWebsitesWidget = ({
         @keyframes fw-shockwave{0%{transform:translate(-50%,-50%) scale(0);opacity:.55}100%{transform:translate(-50%,-50%) scale(6);opacity:0}}
         @keyframes fw-float-up{0%{transform:translate(-50%,-50%) translateY(0);opacity:1}100%{transform:translate(-50%,-50%) translateY(-160px);opacity:0}}
         @keyframes fw-panel-glow{0%,100%{opacity:.35}50%{opacity:.7}}
+        @keyframes fw-rain{0%{transform:translateY(-12vh) rotate(0deg);opacity:0}8%{opacity:1}92%{opacity:1}100%{transform:translateY(112vh) rotate(var(--rot,360deg));opacity:0}}
       `}</style>
 
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
@@ -707,58 +708,63 @@ export default memo(FriendlyWebsitesWidget);
 // -------------------- Click Burst (full-screen decorative effect) ----------
 type BurstVariant = NonNullable<WidgetSettings['clickEffect']>;
 
-function ClickBurst({ variant, onDone }: { variant: BurstVariant; onDone: () => void }) {
+export function ClickBurst({ variant, onDone }: { variant: BurstVariant; onDone: () => void }) {
   if (variant === 'none') { setTimeout(onDone, 0); return null; }
-  // Preset palettes & glyphs per effect.
-  const presets: Record<Exclude<BurstVariant, 'none'>, { count: number; glyph: (i: number) => string; colors: string[]; spread: number; anim: 'burst' | 'float' }> = {
-    sparkle:        { count: 22, glyph: () => '✨', colors: ['#fde68a', '#fbbf24'], spread: 260, anim: 'burst' },
-    confetti:       { count: 40, glyph: (i) => ['🎉','🎊','⭐','💫'][i % 4], colors: [], spread: 320, anim: 'burst' },
-    bomb:           { count: 60, glyph: () => '', colors: ['hsl(var(--destructive))','hsl(var(--primary))','#f97316','#facc15'], spread: 420, anim: 'burst' },
-    fireworks:      { count: 48, glyph: () => '', colors: ['#f43f5e','#3b82f6','#a855f7','#22d3ee','#facc15'], spread: 380, anim: 'burst' },
-    hearts:         { count: 18, glyph: () => '❤️', colors: [], spread: 200, anim: 'float' },
-    stars:          { count: 24, glyph: () => '⭐', colors: [], spread: 260, anim: 'burst' },
-    'rainbow-burst':{ count: 36, glyph: () => '', colors: ['#ef4444','#f97316','#facc15','#22c55e','#3b82f6','#a855f7'], spread: 340, anim: 'burst' },
+  // Rain-style presets: particles start above the viewport and fall the
+  // full screen height. Slower & softer than the old burst so it doesn't
+  // feel jarring — feels like a celebratory shower over the whole page.
+  const presets: Record<Exclude<BurstVariant, 'none'>, { count: number; glyph: (i: number) => string; colors: string[] }> = {
+    sparkle:        { count: 34, glyph: () => '✨', colors: ['#fde68a', '#fbbf24'] },
+    confetti:       { count: 60, glyph: (i) => ['🎉','🎊','⭐','💫','🎈'][i % 5], colors: [] },
+    bomb:           { count: 70, glyph: (i) => (i % 5 === 0 ? '💥' : ''), colors: ['hsl(var(--destructive))','hsl(var(--primary))','#f97316','#facc15'] },
+    fireworks:      { count: 60, glyph: (i) => (i % 6 === 0 ? '🎆' : ''), colors: ['#f43f5e','#3b82f6','#a855f7','#22d3ee','#facc15'] },
+    hearts:         { count: 40, glyph: () => '❤️', colors: [] },
+    stars:          { count: 44, glyph: () => '⭐', colors: [] },
+    'rainbow-burst':{ count: 60, glyph: (i) => (i % 8 === 0 ? '🌈' : ''), colors: ['#ef4444','#f97316','#facc15','#22c55e','#3b82f6','#a855f7'] },
   };
   const p = presets[variant];
+  // Total overlay duration: give the shower time to reach the bottom on
+  // large screens without keeping the veil around too long.
+  const OVERLAY_MS = 4200;
   return (
     <motion.div
       className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
+      data-testid="friendly-widget-click-burst"
+      data-variant={variant}
       initial={{ opacity: 1 }}
-      animate={{ opacity: 0 }}
-      transition={{ duration: 1.6, ease: 'easeOut' }}
-      onAnimationComplete={onDone}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+      onAnimationComplete={() => { setTimeout(onDone, OVERLAY_MS); }}
       aria-hidden
     >
-      {(variant === 'bomb' || variant === 'fireworks') && (
-        <span
-          className="absolute left-1/2 top-1/2 h-6 w-6 rounded-full bg-white/70"
-          style={{ animation: 'fw-shockwave 0.9s ease-out forwards' }}
-        />
-      )}
       {Array.from({ length: p.count }).map((_, i) => {
-        const angle = (i / p.count) * Math.PI * 2 + (i * 0.13);
-        const distance = p.spread * (0.55 + Math.random() * 0.6);
-        const dx = Math.cos(angle) * distance;
-        const dy = Math.sin(angle) * distance;
+        // Even horizontal spread with a small jitter so it doesn't line up.
+        const leftPct = ((i + 0.5) / p.count) * 100 + (Math.random() * 6 - 3);
         const glyph = p.glyph(i);
         const color = p.colors.length ? p.colors[i % p.colors.length] : undefined;
-        const size = glyph ? 18 + Math.random() * 10 : 8 + Math.random() * 6;
-        const delay = (i % 6) * 40;
+        const size = glyph ? 18 + Math.random() * 14 : 8 + Math.random() * 8;
+        // Slower fall: 2.4s – 3.4s per particle, staggered start so it
+        // feels like a shower, not a burst.
+        const dur = 2400 + Math.random() * 1000;
+        const delay = Math.random() * 900;
+        const rot = Math.round((Math.random() * 720) - 360);
         return (
           <span
             key={i}
-            className="absolute left-1/2 top-1/2 select-none font-bold"
+            className="absolute top-0 select-none font-bold"
             style={{
-              ['--dx' as any]: `${dx}px`,
-              '--dy': `${dy}px`,
+              left: `${leftPct}%`,
               fontSize: `${size}px`,
               width: glyph ? undefined : `${size}px`,
               height: glyph ? undefined : `${size}px`,
               borderRadius: glyph ? undefined : '9999px',
               background: glyph ? undefined : color,
               color,
-              animation: `${p.anim === 'float' ? 'fw-float-up' : 'fw-particle'} ${1000 + Math.random() * 400}ms cubic-bezier(.2,.7,.3,1) forwards`,
+              ['--rot' as any]: `${rot}deg`,
+              animation: `fw-rain ${dur}ms cubic-bezier(.25,.6,.35,1) forwards`,
               animationDelay: `${delay}ms`,
+              willChange: 'transform, opacity',
             } as React.CSSProperties}
           >
             {glyph}

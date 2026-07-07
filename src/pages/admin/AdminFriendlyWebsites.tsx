@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import LucideIconPicker from "@/components/admin/LucideIconPicker";
+import { ClickBurst } from "@/components/FriendlyWebsitesWidget";
 import FriendlyWidgetAnalytics from "@/components/admin/FriendlyWidgetAnalytics";
 import FriendlyWidgetRateLimitSettings from "@/components/admin/FriendlyWidgetRateLimitSettings";
 import { Button } from "@/components/ui/button";
@@ -299,6 +300,9 @@ const AdminFriendlyWebsites = () => {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Live preview of the celebration effect. Toggling this remounts the
+  // ClickBurst overlay so admins can preview each variant without saving.
+  const [previewBurstAt, setPreviewBurstAt] = useState<number | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingWebsite, setEditingWebsite] = useState<FriendlyWebsite | null>(null);
   const [formData, setFormData] = useState({
@@ -884,6 +888,29 @@ const AdminFriendlyWebsites = () => {
                   <p className="text-xs text-muted-foreground">
                     Shown at the bottom of the open panel. Fires the selected full-screen effect on click. Respects reduced-motion.
                   </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPreviewBurstAt(Date.now())}
+                      disabled={!(settings.celebrationEnabled ?? true)}
+                      data-testid="celebration-preview-btn"
+                    >
+                      <Sparkles className="w-4 h-4 mr-1" />
+                      Preview effect
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground">
+                      Plays a full-screen preview of “{settings.celebrationEffect ?? 'confetti'}”.
+                    </span>
+                  </div>
+                  {previewBurstAt && (
+                    <ClickBurst
+                      key={previewBurstAt}
+                      variant={settings.celebrationEffect ?? 'confetti'}
+                      onDone={() => setPreviewBurstAt(null)}
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">
