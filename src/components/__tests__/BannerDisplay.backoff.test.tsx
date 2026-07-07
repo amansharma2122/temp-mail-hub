@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act, waitFor } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 
 // Non-admin so we get the "Temporarily syncing…" user-facing chip.
 vi.mock("@/hooks/useAdminRole", () => ({
@@ -65,12 +65,17 @@ import BannerDisplay from "@/components/BannerDisplay";
 
 // Advance timers in small slices so React can flush effects between the
 // setTimeout callback firing and the next assertion.
-async function advance(ms: number) {
+async function flush() {
+  // Flush queued microtasks (promises resolved from fetch mocks).
   await act(async () => {
-    vi.advanceTimersByTime(ms);
-    // allow any queued microtasks / effects to settle
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
   });
+}
+async function advance(ms: number) {
+  await act(async () => { vi.advanceTimersByTime(ms); });
+  await flush();
 }
 
 describe("BannerDisplay realtime exponential backoff", () => {
@@ -90,18 +95,16 @@ describe("BannerDisplay realtime exponential backoff", () => {
 
   it("uses exponential backoff and keeps the syncing indicator until re-subscribed", async () => {
     render(<BannerDisplay position="header" />);
-
     // Let the initial fetch + subscribe callback wiring settle.
-    await act(async () => { await Promise.resolve(); });
+    await flush();
     expect(typeof subscribeCb).toBe("function");
 
     // Force a channel error → widget must switch to polling and schedule a retry.
     await act(async () => { subscribeCb!("CHANNEL_ERROR", new Error("boom")); });
+    await flush();
 
     // Syncing indicator visible.
-    await waitFor(() =>
-      expect(screen.getByText(/Temporarily syncing/i)).toBeInTheDocument()
-    );
+    expect(screen.getByText(/Temporarily syncing/i)).toBeInTheDocument();
 
     // Retry #1 base = 2000ms, jitter = 0 → fires at exactly 2000ms.
     const beforeChannels = channelInstances.length;
@@ -132,9 +135,8 @@ describe("BannerDisplay realtime exponential backoff", () => {
 
     // Finally re-subscribe successfully → syncing indicator disappears.
     await act(async () => { subscribeCb!("SUBSCRIBED"); });
-    await waitFor(() =>
-      expect(screen.queryByText(/Temporarily syncing/i)).not.toBeInTheDocument()
-    );
+    await flush();
+    expect(screen.queryByText(/Temporarily syncing/i)).not.toBeInTheDocument();
   });
 
   it("caps the backoff base at 60s with jitter <= 25%", async () => {
