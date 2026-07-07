@@ -55,8 +55,8 @@ const AdminGeneralSettings = () => {
   const { isDirty, markDirty, markClean } = useDirty();
   const { isDirty: isModalDirty, markDirty: markModalDirty, markClean: markModalClean } = useDirty();
 
-  const updateModal: typeof updateModalConfig = (k, v) => {
-    updateModalConfig(k, v);
+  const updateModal: typeof updateModalConfigConfig = (k, v) => {
+    updateModal(k, v);
     markModalDirty();
   };
 
@@ -312,7 +312,7 @@ const AdminGeneralSettings = () => {
               </div>
               <Switch
                 checked={limitModalConfig.enabled}
-                onCheckedChange={(checked) => updateModalConfig('enabled', checked)}
+                onCheckedChange={(checked) => updateModal('enabled', checked)}
               />
             </div>
 
@@ -322,7 +322,7 @@ const AdminGeneralSettings = () => {
                 <Input
                   id="modalTitle"
                   value={limitModalConfig.title}
-                  onChange={(e) => updateModalConfig('title', e.target.value)}
+                  onChange={(e) => updateModal('title', e.target.value)}
                   placeholder="Daily Limit Reached"
                 />
               </div>
@@ -331,7 +331,7 @@ const AdminGeneralSettings = () => {
                 <Input
                   id="ctaText"
                   value={limitModalConfig.ctaText}
-                  onChange={(e) => updateModalConfig('ctaText', e.target.value)}
+                  onChange={(e) => updateModal('ctaText', e.target.value)}
                   placeholder="Upgrade Now"
                 />
               </div>
@@ -342,7 +342,7 @@ const AdminGeneralSettings = () => {
               <Textarea
                 id="modalDescription"
                 value={limitModalConfig.description}
-                onChange={(e) => updateModalConfig('description', e.target.value)}
+                onChange={(e) => updateModal('description', e.target.value)}
                 placeholder="You've used all {limit} temporary emails for today"
                 rows={2}
               />
@@ -355,7 +355,7 @@ const AdminGeneralSettings = () => {
               <Label>Modal Theme</Label>
               <Select
                 value={limitModalConfig.theme}
-                onValueChange={(value) => updateModalConfig('theme', value as LimitModalConfig['theme'])}
+                onValueChange={(value) => updateModal('theme', value as LimitModalConfig['theme'])}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -376,7 +376,7 @@ const AdminGeneralSettings = () => {
                 </div>
                 <Switch
                   checked={limitModalConfig.showTimer}
-                  onCheckedChange={(checked) => updateModalConfig('showTimer', checked)}
+                  onCheckedChange={(checked) => updateModal('showTimer', checked)}
                 />
               </div>
               <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/30">
@@ -386,7 +386,7 @@ const AdminGeneralSettings = () => {
                 </div>
                 <Switch
                   checked={limitModalConfig.showBenefits}
-                  onCheckedChange={(checked) => updateModalConfig('showBenefits', checked)}
+                  onCheckedChange={(checked) => updateModal('showBenefits', checked)}
                 />
               </div>
             </div>
