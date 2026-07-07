@@ -84,7 +84,7 @@ const Index = () => {
         </section>
 
         {/* Live Stats + Quick Tips (side-by-side: stats left, tips right) */}
-        <section className="py-4 border-y border-border/30 bg-muted/40">
+        <section className="py-4 border-y border-border/50 bg-secondary/60 dark:bg-muted/60">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:items-stretch">
               <div className="min-w-0">
