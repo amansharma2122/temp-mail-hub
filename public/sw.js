@@ -1,6 +1,6 @@
 // Enhanced Service Worker for Push Notifications and Offline Support
 // VERSION is checked on each build - changing it triggers cache invalidation
-const SW_VERSION = "3.2.0";
+const SW_VERSION = "3.3.0";
 const CACHE_NAME = `nullsto-${SW_VERSION}`;
 const STATIC_CACHE = `nullsto-static-${SW_VERSION}`;
 const DYNAMIC_CACHE = `nullsto-dynamic-${SW_VERSION}`;
