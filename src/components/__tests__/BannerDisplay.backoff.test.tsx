@@ -121,11 +121,11 @@ describe("BannerDisplay realtime exponential backoff", () => {
     await advance(1);
     expect(channelInstances.length).toBe(beforeSecond + 1);
 
-    // Third failure with jitter = 25% → base 8000 + 2000 jitter = 10000ms.
+    // Third failure with jitter ≈ 25% → base 8000 + 1999 jitter = 9999ms.
     randomValue = 0.999_999;
     await act(async () => { subscribeCb!("TIMED_OUT"); });
     const beforeThird = channelInstances.length;
-    await advance(9999);
+    await advance(9998);
     expect(channelInstances.length).toBe(beforeThird);
     await advance(1);
     expect(channelInstances.length).toBe(beforeThird + 1);
