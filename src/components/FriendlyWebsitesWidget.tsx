@@ -464,9 +464,28 @@ const FriendlyWebsitesWidget = ({
 
   const handleCelebrate = () => {
     const rmBlocks = effectiveReducedMotion;
-    if (!rmBlocks) {
-      setBurstVariant(settings.celebrationEffect ?? 'confetti');
-      setBurstAt(Date.now());
+    // Even in reduced-motion we still render ClickBurst — the component
+    // itself downgrades to a minimal "gentle" shower (few particles, short
+    // duration, no rotation) so users get feedback without vestibular risk.
+    setBurstVariant(settings.celebrationEffect ?? 'confetti');
+    setBurstAt(Date.now());
+    // Optional short chime — always gated by admin toggle AND reduced-motion.
+    if (!rmBlocks && settings.celebrationSoundEnabled) {
+      try {
+        const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine'; o.frequency.value = 660;
+          g.gain.value = 0.001;
+          o.connect(g); g.connect(ctx.destination);
+          const now = ctx.currentTime;
+          g.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+          o.start(now); o.stop(now + 0.4);
+        }
+      } catch { /* audio is best-effort */ }
     }
     recordFriendlyWidgetEvent('celebrate_click', {
       attention_effect: settings.celebrationEffect ?? null,
@@ -501,10 +520,14 @@ const FriendlyWebsitesWidget = ({
 
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
       <AnimatePresence>
-        {burstAt && !effectiveReducedMotion && (
+        {burstAt && (
           <ClickBurst
             key={burstAt}
             variant={burstVariant as NonNullable<WidgetSettings['clickEffect']>}
+            reducedMotion={effectiveReducedMotion}
+            intensity={settings.celebrationIntensity ?? 'normal'}
+            durationMs={settings.celebrationDurationMs ?? 4200}
+            countScale={settings.celebrationParticleCount ?? 0}
             onDone={() => setBurstAt(null)}
           />
         )}
