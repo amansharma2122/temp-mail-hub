@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, RadioTower } from "lucide-react";
 import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { reportRealtimeStatus, clearRealtimeStatus } from "@/lib/realtimeHealth";
+import { useAdminRole } from "@/hooks/useAdminRole";
 
 interface Banner {
   id: string;
@@ -27,6 +28,8 @@ interface BannerDisplayProps {
 const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [realtimeMode, setRealtimeMode] = useState<"live" | "polling" | "connecting">("connecting");
+  const { isAdmin } = useAdminRole();
 
   const fetchBanners = useCallback(async (attempt = 0) => {
     const maxRetries = 3;
@@ -78,6 +81,10 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
   useEffect(() => {
     let cancelled = false;
     let pollingId: ReturnType<typeof setInterval> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const doFetch = async () => {
       if (!cancelled) await fetchBanners();
@@ -85,56 +92,77 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
 
     doFetch();
 
-    // Attempt realtime subscription; if it throws (e.g. `postgres_changes`
-    // callbacks added after `subscribe()` due to channel reuse), fall back
-    // to interval polling so banners still render and refresh.
     const healthKey = `BannerDisplay:${position}`;
-    const channelName = `banners_realtime_${position}_${Math.random().toString(36).slice(2)}`;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const startPolling = () => {
       if (pollingId) return;
+      setRealtimeMode("polling");
       pollingId = setInterval(() => {
         if (!cancelled) fetchBanners();
       }, 30_000);
     };
 
-    try {
-      reportRealtimeStatus(healthKey, channelName, "subscribing");
-      channel = supabase.channel(channelName);
-      channel
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "banners" },
-          (payload) => {
-            if (!cancelled) {
-              console.log("[BannerDisplay] Realtime update received:", payload.eventType);
-              fetchBanners();
+    const attemptSubscribe = () => {
+      if (cancelled) return;
+      const channelName = `banners_realtime_${position}_${Math.random().toString(36).slice(2)}`;
+      setRealtimeMode("connecting");
+      try {
+        reportRealtimeStatus(healthKey, channelName, "subscribing");
+        channel = supabase.channel(channelName);
+        channel
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "banners" },
+            (payload) => {
+              if (!cancelled) {
+                console.log("[BannerDisplay] Realtime update received:", payload.eventType);
+                fetchBanners();
+              }
+            },
+          )
+          .subscribe((status, err) => {
+            if (status === "SUBSCRIBED") {
+              reportRealtimeStatus(healthKey, channelName, "subscribed");
+              retryCount = 0;
+              if (pollingId) { clearInterval(pollingId); pollingId = null; }
+              setRealtimeMode("live");
+            } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+              reportRealtimeStatus(healthKey, channelName, status === "TIMED_OUT" ? "timed_out" : "error", err);
+              startPolling();
+              scheduleRetry();
+            } else if (status === "CLOSED") {
+              reportRealtimeStatus(healthKey, channelName, "closed");
             }
-          },
-        )
-        .subscribe((status, err) => {
-          if (status === "SUBSCRIBED") {
-            reportRealtimeStatus(healthKey, channelName, "subscribed");
-          } else if (status === "CHANNEL_ERROR") {
-            reportRealtimeStatus(healthKey, channelName, "error", err);
-            startPolling();
-          } else if (status === "TIMED_OUT") {
-            reportRealtimeStatus(healthKey, channelName, "timed_out", err);
-            startPolling();
-          } else if (status === "CLOSED") {
-            reportRealtimeStatus(healthKey, channelName, "closed");
-          }
-        });
-    } catch (err) {
-      console.warn("[BannerDisplay] Realtime subscription failed, using polling fallback:", err);
-      reportRealtimeStatus(healthKey, channelName, "error", err);
-      startPolling();
-    }
+          });
+      } catch (err) {
+        console.warn("[BannerDisplay] Realtime subscription failed, using polling fallback:", err);
+        reportRealtimeStatus(healthKey, channelName, "error", err);
+        startPolling();
+        scheduleRetry();
+      }
+    };
+
+    const scheduleRetry = () => {
+      if (cancelled || retryCount >= MAX_RETRIES) return;
+      retryCount += 1;
+      const delay = 60_000; // 60s between retries
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        if (cancelled) return;
+        if (channel) {
+          try { supabase.removeChannel(channel); } catch { /* ignore */ }
+          channel = null;
+        }
+        attemptSubscribe();
+      }, delay);
+    };
+
+    attemptSubscribe();
 
     return () => {
       cancelled = true;
       if (pollingId) clearInterval(pollingId);
+      if (retryTimer) clearTimeout(retryTimer);
       if (channel) {
         try {
           supabase.removeChannel(channel);
