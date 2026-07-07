@@ -113,3 +113,99 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "mailbox failover: concurrent quota-fill + promote calls never split traffic across mailboxes",
+  ignore: !runIt,
+  async fn() {
+    const supabase = createClient(SUPABASE_URL!, SERVICE_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const tag = `smoke-c-${crypto.randomUUID().slice(0, 8)}`;
+    const mk = (i: number) => ({
+      name: `${tag}-mb-${i}`,
+      smtp_host: "smoke.invalid",
+      smtp_user: `${tag}${i}@smoke.invalid`,
+      smtp_from: `${tag}${i}@smoke.invalid`,
+      smtp_port: 587,
+      imap_host: "smoke.invalid",
+      imap_user: `${tag}${i}@smoke.invalid`,
+      imap_port: 993,
+      is_active: true,
+      priority: i,
+      storage_bytes_limit: 10 * 1024 * 1024 * 1024,
+      storage_bytes_used: 0,
+      is_full: false,
+      is_primary: false,
+    });
+
+    const seeded = await supabase.from("mailboxes")
+      .insert([mk(1), mk(2), mk(3), mk(4)])
+      .select("id, priority");
+    if (seeded.error) throw seeded.error;
+    const ids = (seeded.data ?? []).sort((a, b) => a.priority - b.priority);
+
+    const cleanup = async () => {
+      await supabase.from("mailboxes").delete().like("name", `${tag}%`);
+    };
+
+    try {
+      // Establish an initial primary.
+      await supabase.rpc("promote_mailbox_as_primary", { p_mailbox_id: ids[0].id });
+
+      // Fill the current primary AND fire a burst of concurrent operations:
+      //   - many enforce_single_active_mailbox() runs (auto-failover)
+      //   - many promote_mailbox_as_primary() targeting different mailboxes
+      //   - many select_available_mailbox() as the delivery path would
+      // The DB advisory lock + partial unique index must ensure that at
+      // every observation there is at most one primary and the delivery
+      // selector never fans out to a full mailbox.
+      await supabase.from("mailboxes")
+        .update({ storage_bytes_used: 10 * 1024 * 1024 * 1024, is_full: true })
+        .eq("id", ids[0].id);
+
+      const ops: Promise<unknown>[] = [];
+      for (let i = 0; i < 20; i++) {
+        ops.push(supabase.rpc("enforce_single_active_mailbox"));
+        ops.push(supabase.rpc("promote_mailbox_as_primary", {
+          p_mailbox_id: ids[1 + (i % 3)].id,
+        }));
+        ops.push(supabase.rpc("select_available_mailbox"));
+      }
+      const results = await Promise.allSettled(ops);
+
+      // No individual op should throw a unique-constraint violation — the
+      // advisory lock serialises them behind the scenes.
+      for (const r of results) {
+        if (r.status === "rejected") {
+          throw new Error(`concurrent op failed: ${(r.reason as Error)?.message}`);
+        }
+        const err = (r.value as { error: { message: string } | null } | undefined)?.error;
+        if (err && /duplicate key|unique/i.test(err.message)) {
+          throw new Error(`unique violation leaked to client: ${err.message}`);
+        }
+      }
+
+      // Final invariant: exactly one primary, and it must be a non-full mailbox.
+      const { data: primaries } = await supabase
+        .from("mailboxes")
+        .select("id, is_full")
+        .eq("is_primary", true);
+      assertEquals(primaries?.length, 1,
+        `expected exactly one primary mailbox globally, got ${primaries?.length ?? 0}`);
+      assertEquals(primaries?.[0].is_full, false,
+        "the sole primary must not be a full mailbox");
+
+      // Delivery selector must never point at the full mailbox.
+      const { data: avail } = await supabase.rpc("select_available_mailbox");
+      if (Array.isArray(avail) && avail.length > 0) {
+        const returned = (avail[0] as { mailbox_id: string }).mailbox_id;
+        assert(returned !== ids[0].id,
+          "select_available_mailbox must not return the full mailbox");
+      }
+    } finally {
+      await cleanup();
+    }
+  },
+});
