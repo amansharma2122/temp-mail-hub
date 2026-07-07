@@ -6,6 +6,8 @@ import {
 } from "@/lib/appSettingsSync";
 import { reportAppSettingsToastEvent } from "@/lib/appSettingsRum";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getAppSettingsRoute } from "@/lib/appSettingsKeyRoutes";
+import { useNavigate } from "react-router-dom";
 
 /**
  * Renders nothing. Listens for `app_settings` changes that did NOT
@@ -17,6 +19,7 @@ const AdminAppSettingsUpdateToast = () => {
   // Coalesce rapid bursts on the same key so we don't spam the admin.
   const lastShown = useRef<Map<string, number>>(new Map());
   const { t, isRTL } = useLanguage();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const off = subscribeAllAppSettings((key, change) => {
@@ -47,24 +50,44 @@ const AdminAppSettingsUpdateToast = () => {
         .replace("{key}", key)
         .replace("{version}", versionLabel);
 
+      const route = getAppSettingsRoute(key);
+      const shownAt = Date.now();
       toast(t("adminSettingsUpdatedTitle"), {
         description,
         duration: 4000,
         // The document-level `dir` attribute (set by LanguageProvider) is
         // what actually flips the toast layout — including here as a data
         // attribute so tests can assert per-toast direction.
-        className: isRTL ? "rtl" : "ltr",
+        className: `app-settings-update-toast max-w-full break-words ${isRTL ? "rtl" : "ltr"}`,
+        action: route
+          ? {
+              label: t("adminSettingsUpdatedOpen"),
+              onClick: () => navigate(route),
+            }
+          : undefined,
       });
 
-      reportAppSettingsToastEvent({
-        key,
-        remote: true,
-        version: change.version ?? null,
-        delay_ms: now - change.emittedAt,
-      });
+      // Measure end-to-end delay from remote patch receipt to the moment
+      // the toast is actually painted. Using rAF gives us the first frame
+      // after sonner commits the DOM node.
+      const measureVisible = () => {
+        const visibleAt = Date.now();
+        reportAppSettingsToastEvent({
+          key,
+          remote: true,
+          version: change.version ?? null,
+          delay_ms: shownAt - change.emittedAt,
+          toast_visible_delay_ms: visibleAt - change.emittedAt,
+        });
+      };
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(measureVisible);
+      } else {
+        measureVisible();
+      }
     });
     return off;
-  }, [t, isRTL]);
+  }, [t, isRTL, navigate]);
 
   return null;
 };

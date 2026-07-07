@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ShieldCheck, Save, Loader2 } from "lucide-react";
 import { useCaptchaSettings, CaptchaSettings } from "@/hooks/useCaptchaSettings";
+import { useRecaptcha } from "@/hooks/useRecaptcha";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 const AdminCaptcha = () => {
   const { settings, isLoading, updateSettings, isSaving } = useCaptchaSettings();
   const [localSettings, setLocalSettings] = useState<CaptchaSettings>(settings);
+  const { loadError } = useRecaptcha();
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const isDomainError =
+    !!loadError && /invalid.*(domain|site.?key)|misconfigured/i.test(loadError);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -59,6 +64,53 @@ const AdminCaptcha = () => {
         <Alert className="border-amber-500/50 bg-amber-500/10">
           <AlertDescription className="text-amber-200">
             Captcha is enabled but no Site Key is configured. Please add your reCAPTCHA site key.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isDomainError && (
+        <Alert
+          role="alert"
+          data-testid="recaptcha-invalid-domain-alert"
+          className="border-destructive/60 bg-destructive/10"
+        >
+          <AlertDescription className="space-y-2 text-destructive-foreground">
+            <p className="font-semibold">
+              reCAPTCHA site key is not authorized for this domain.
+            </p>
+            <p className="text-sm">
+              Current hostname:{" "}
+              <code className="rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
+                {hostname || "(unknown)"}
+              </code>
+            </p>
+            <div className="text-sm">
+              <p className="mb-1">Fix checklist:</p>
+              <ol className="list-decimal space-y-1 pl-5">
+                <li>
+                  Open the{" "}
+                  <a
+                    href="https://www.google.com/recaptcha/admin"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    Google reCAPTCHA admin console
+                  </a>
+                  .
+                </li>
+                <li>Select the site key currently configured above.</li>
+                <li>
+                  Under <strong>Domains</strong>, add{" "}
+                  <code className="rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
+                    {hostname || "your-domain.com"}
+                  </code>{" "}
+                  (and any preview / www / staging variants you use).
+                </li>
+                <li>Save and reload this page — the warning will clear automatically.</li>
+              </ol>
+            </div>
+            <p className="text-xs opacity-80">Raw error: {loadError}</p>
           </AlertDescription>
         </Alert>
       )}

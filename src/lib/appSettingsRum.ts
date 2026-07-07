@@ -103,11 +103,21 @@ export interface AppSettingsToastRum {
   remote: boolean;
   version: number | null;
   delay_ms: number;
+  /**
+   * End-to-end delay measured from remote patch receipt (broadcast/realtime
+   * event) to the moment sonner actually rendered the toast in the DOM.
+   * Included in the RUM payload as `toast_visible_delay_ms`.
+   */
+  toast_visible_delay_ms?: number;
 }
 
 export function reportAppSettingsToastEvent(sample: AppSettingsToastRum): void {
+  const visible =
+    typeof sample.toast_visible_delay_ms === "number"
+      ? `+visible${Math.round(sample.toast_visible_delay_ms)}ms`
+      : "";
   BUFFER.push({
-    key: `toast:${sample.key}:${sample.remote ? "remote" : "local"}`,
+    key: `toast:${sample.key}:${sample.remote ? "remote" : "local"}${visible}`,
     version: sample.version,
     latency_ms: Math.max(0, sample.delay_ms),
     observed_at: new Date().toISOString(),
