@@ -93,8 +93,8 @@ const Index = () => {
               {isSectionEnabled("quick_tips") && (
                 <motion.div
                   className="relative flex h-full flex-col overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 shadow-lg shadow-primary/5 md:col-span-1"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
