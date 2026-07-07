@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Sparkles } from "lucide-react";
 import DOMPurify from "dompurify";
 import EmailGenerator from "./EmailGenerator";
@@ -84,4 +85,4 @@ const HeroSection = () => {
   );
 };
 
-export default HeroSection;
+export default memo(HeroSection);

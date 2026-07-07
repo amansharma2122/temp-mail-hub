@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
 import DOMPurify from "dompurify";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
@@ -66,4 +67,4 @@ const HowItWorks = () => {
   );
 };
 
-export default HowItWorks;
+export default memo(HowItWorks);

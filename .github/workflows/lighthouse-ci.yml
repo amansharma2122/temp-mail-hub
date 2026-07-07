@@ -1,0 +1,63 @@
+name: Lighthouse CI
+
+# Runs bundle-size + Lighthouse audits against the built app on every PR
+# targeting main and on pushes to main. Uploads reports as artifacts and
+# fails the job if any performance / a11y / SEO budget regresses.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build (analyzer on)
+        env:
+          ANALYZE: "1"
+        run: bun run build
+
+      - name: Upload bundle stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-stats
+          path: dist/stats.html
+          if-no-files-found: warn
+
+      - name: Install Lighthouse CI
+        run: bun add -g @lhci/cli@0.14.x
+
+      - name: Serve built app
+        run: |
+          bunx --bun serve -s dist -l 4173 &
+          for i in {1..30}; do
+            curl -sf http://localhost:4173 >/dev/null && exit 0
+            sleep 1
+          done
+          echo "Preview server never came up" >&2
+          exit 1
+
+      - name: Run Lighthouse
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+        run: lhci autorun --config=./lighthouserc.json
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          if-no-files-found: warn

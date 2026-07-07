@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
 import DOMPurify from "dompurify";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
@@ -64,4 +65,4 @@ const FeaturesSection = () => {
   );
 };
 
-export default FeaturesSection;
+export default memo(FeaturesSection);

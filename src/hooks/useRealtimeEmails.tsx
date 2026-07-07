@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { NewEmailToast } from "@/components/NewEmailToast";
@@ -8,6 +8,72 @@ import {
   getNewEmailSoundAdminEnabled,
   getNewEmailSoundAdminEnabledSync,
 } from "@/lib/newEmailNotificationStyle";
+
+// ---------------------------------------------------------------------------
+// Module-level subscription registry.
+// Guarantees ONE realtime channel per tempEmailId across the whole app —
+// even if multiple components mount `useRealtimeEmails` for the same mailbox
+// or React StrictMode double-invokes the effect in development.
+// ---------------------------------------------------------------------------
+type Listener = (payload: any) => void;
+interface Entry {
+  channel: ReturnType<typeof api.realtime.channel>;
+  listeners: Set<Listener>;
+  refCount: number;
+  disposeTimer: ReturnType<typeof setTimeout> | null;
+}
+const registry = new Map<string, Entry>();
+
+function subscribe(tempEmailId: string, listener: Listener): () => void {
+  let entry = registry.get(tempEmailId);
+  if (!entry) {
+    console.log('[useRealtimeEmails] Opening shared channel for', tempEmailId);
+    const listeners = new Set<Listener>();
+    const channel = api.realtime
+      .channel(`received-emails-${tempEmailId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT' as const,
+          schema: 'public',
+          table: 'received_emails',
+          filter: `temp_email_id=eq.${tempEmailId}`,
+        },
+        (payload) => {
+          listeners.forEach((fn) => {
+            try { fn(payload); }
+            catch (e) { console.warn('[useRealtimeEmails] listener error', e); }
+          });
+        },
+      );
+    channel.subscribe((status, err) => {
+      console.log('[useRealtimeEmails] Subscription status:', status, err ?? '');
+    });
+    entry = { channel, listeners, refCount: 0, disposeTimer: null };
+    registry.set(tempEmailId, entry);
+  }
+  if (entry.disposeTimer) {
+    clearTimeout(entry.disposeTimer);
+    entry.disposeTimer = null;
+  }
+  entry.listeners.add(listener);
+  entry.refCount += 1;
+
+  return () => {
+    const current = registry.get(tempEmailId);
+    if (!current) return;
+    current.listeners.delete(listener);
+    current.refCount -= 1;
+    if (current.refCount <= 0) {
+      // Defer teardown briefly so StrictMode remounts don't churn the channel.
+      current.disposeTimer = setTimeout(() => {
+        console.log('[useRealtimeEmails] Removing shared channel for', tempEmailId);
+        api.realtime.removeChannel(current.channel);
+        registry.delete(tempEmailId);
+      }, 250);
+    }
+  };
+}
 
 interface ReceivedEmail {
   id: string;
@@ -32,6 +98,20 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
   const [newEmailCount, setNewEmailCount] = useState(0);
   const [lastEmail, setLastEmail] = useState<ReceivedEmail | null>(null);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
+
+  // Keep the latest callback references in refs so the subscription effect
+  // depends only on `tempEmailId`. Prevents the "subscribe/unsubscribe on
+  // every parent render" bug that produces duplicate handlers and log spam.
+  const onNewEmailRef = useRef(onNewEmail);
+  const playSoundRef = useRef(playSoundCallback);
+  const showToastRef = useRef(showToast);
+  const enablePushRef = useRef(enablePushNotifications);
+  const pushPermissionRef = useRef(pushPermission);
+  useEffect(() => { onNewEmailRef.current = onNewEmail; }, [onNewEmail]);
+  useEffect(() => { playSoundRef.current = playSoundCallback; }, [playSoundCallback]);
+  useEffect(() => { showToastRef.current = showToast; }, [showToast]);
+  useEffect(() => { enablePushRef.current = enablePushNotifications; }, [enablePushNotifications]);
+  useEffect(() => { pushPermissionRef.current = pushPermission; }, [pushPermission]);
 
   // Check push notification permission
   useEffect(() => {
@@ -90,7 +170,7 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
   }, [isInIframe]);
 
   const showPushNotification = useCallback((email: ReceivedEmail) => {
-    if (!enablePushNotifications || pushPermission !== "granted") return;
+    if (!enablePushRef.current || pushPermissionRef.current !== "granted") return;
 
     try {
       if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
@@ -114,89 +194,50 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
     } catch (error) {
       console.log("Could not show push notification:", error);
     }
-  }, [enablePushNotifications, pushPermission]);
+  }, []);
 
   useEffect(() => {
     if (!tempEmailId) {
       console.log('[useRealtimeEmails] No tempEmailId, skipping subscription');
       return;
     }
+    const unsubscribe = subscribe(tempEmailId, (payload) => {
+      const newEmail = payload.new as ReceivedEmail;
+      setNewEmailCount((prev) => prev + 1);
+      setLastEmail(newEmail);
 
-    const filterConfig = {
-      event: 'INSERT' as const,
-      schema: 'public',
-      table: 'received_emails',
-      filter: `temp_email_id=eq.${tempEmailId}`
-    };
+      if (onNewEmailRef.current) {
+        requestAnimationFrame(() => onNewEmailRef.current?.(newEmail));
+      }
 
-    console.log('[useRealtimeEmails] Setting up realtime subscription for', tempEmailId);
+      if (showToastRef.current) {
+        const style = getNewEmailNotificationStyleSync();
+        toast.custom(
+          (t) => (
+            <NewEmailToast
+              from={newEmail.from_address}
+              subject={newEmail.subject || ""}
+              style={style}
+              onClose={() => toast.dismiss(t)}
+            />
+          ),
+          { duration: 5000 },
+        );
+        void getNewEmailNotificationStyle();
+      }
 
-    const channelName = `received-emails-${tempEmailId}`;
+      if (playSoundRef.current && getNewEmailSoundAdminEnabledSync()) {
+        playSoundRef.current();
+      }
+      void getNewEmailSoundAdminEnabled();
 
-    const channel = api.realtime
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        filterConfig,
-        (payload) => {
-          console.log('[useRealtimeEmails] New email received via realtime:', payload);
-          
-          const newEmail = payload.new as ReceivedEmail;
-          setNewEmailCount(prev => prev + 1);
-          setLastEmail(newEmail);
-
-          // Call the callback immediately for instant UI update
-          if (onNewEmail) {
-            requestAnimationFrame(() => {
-              onNewEmail(newEmail);
-            });
-          }
-
-          // Show toast notification
-          if (showToast) {
-            const style = getNewEmailNotificationStyleSync();
-            toast.custom(
-              (t) => (
-                <NewEmailToast
-                  from={newEmail.from_address}
-                  subject={newEmail.subject || ""}
-                  style={style}
-                  onClose={() => toast.dismiss(t)}
-                />
-              ),
-              { duration: 5000 },
-            );
-            // Refresh style cache in the background so future toasts pick up
-            // admin changes without waiting for a page reload.
-            void getNewEmailNotificationStyle();
-          }
-
-          // Play sound using the callback from parent, gated by the
-          // site-wide admin toggle (defaults on). Users can additionally
-          // silence sounds via NotificationSoundSettings.
-          if (playSoundCallback && getNewEmailSoundAdminEnabledSync()) {
-            playSoundCallback();
-          }
-          // Refresh admin-side sound flag in the background.
-          void getNewEmailSoundAdminEnabled();
-
-          // Show push notification if page is hidden
-          if (document.hidden) {
-            showPushNotification(newEmail);
-          }
-        }
-      );
-    
-    // Subscribe asynchronously
-    channel.subscribe((status, err) => {
-      console.log('[useRealtimeEmails] Subscription status:', status, err ? err : '');
+      if (document.hidden) {
+        showPushNotification(newEmail);
+      }
     });
-
-    return () => {
-      console.log('[useRealtimeEmails] Cleaning up subscription');
-      api.realtime.removeChannel(channel);
-    };
-  }, [tempEmailId, onNewEmail, showToast, playSoundCallback, showPushNotification]);
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempEmailId]);
 
   const resetCount = useCallback(() => {
     setNewEmailCount(0);

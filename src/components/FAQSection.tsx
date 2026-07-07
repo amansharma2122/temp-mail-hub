@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
 import DOMPurify from "dompurify";
 import {
@@ -73,4 +74,4 @@ const FAQSection = () => {
   );
 };
 
-export default FAQSection;
+export default memo(FAQSection);

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { Github, Twitter, Linkedin, Send, Mail, Shield, Zap, Globe } from "lucide-react";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
@@ -197,4 +198,4 @@ const Footer = () => {
   );
 };
 
-export default Footer;
+export default memo(Footer);
