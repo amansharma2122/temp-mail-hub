@@ -78,7 +78,7 @@ interface WidgetSettings {
   position: 'left' | 'right';
   showOnMobile: boolean;
   animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
-  attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring';
+  attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring' | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
   buttonLabel: string;
   tooltipText: string;
   showBadge: boolean;
@@ -114,7 +114,7 @@ const emptyForm = {
   icon_name: '',
   description: '',
   open_in_new_tab: true,
-  attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring',
+  attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring' | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet',
   badge_enabled: true,
   badge_text: '',
   auto_open_override: 'inherit' as 'inherit' | 'force_on' | 'force_off',
@@ -284,7 +284,7 @@ const AdminFriendlyWebsites = () => {
     icon_name: '',
     description: '',
     open_in_new_tab: true,
-    attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring',
+    attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring' | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet',
     badge_enabled: true,
     badge_text: '',
     auto_open_override: 'inherit' as 'inherit' | 'force_on' | 'force_off',
@@ -784,6 +784,11 @@ const AdminFriendlyWebsites = () => {
                       <SelectItem value="wiggle">Wiggle</SelectItem>
                       <SelectItem value="bounce">Bounce</SelectItem>
                       <SelectItem value="ring">Ring</SelectItem>
+                      <SelectItem value="sparkle">Sparkle ✨</SelectItem>
+                      <SelectItem value="confetti">Confetti 🎉</SelectItem>
+                      <SelectItem value="ripple">Ripple</SelectItem>
+                      <SelectItem value="rainbow">Rainbow 🌈</SelectItem>
+                      <SelectItem value="magnet">Magnet</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">Makes the widget more noticeable while closed.</p>
@@ -978,6 +983,11 @@ const AdminFriendlyWebsites = () => {
                       <SelectItem value="wiggle">Wiggle</SelectItem>
                       <SelectItem value="bounce">Bounce</SelectItem>
                       <SelectItem value="ring">Ring</SelectItem>
+                      <SelectItem value="sparkle">Sparkle ✨</SelectItem>
+                      <SelectItem value="confetti">Confetti 🎉</SelectItem>
+                      <SelectItem value="ripple">Ripple</SelectItem>
+                      <SelectItem value="rainbow">Rainbow 🌈</SelectItem>
+                      <SelectItem value="magnet">Magnet</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1104,6 +1114,11 @@ const AdminFriendlyWebsites = () => {
                       <SelectItem value="wiggle">Wiggle</SelectItem>
                       <SelectItem value="bounce">Bounce</SelectItem>
                       <SelectItem value="ring">Ring</SelectItem>
+                      <SelectItem value="sparkle">Sparkle ✨</SelectItem>
+                      <SelectItem value="confetti">Confetti 🎉</SelectItem>
+                      <SelectItem value="ripple">Ripple</SelectItem>
+                      <SelectItem value="rainbow">Rainbow 🌈</SelectItem>
+                      <SelectItem value="magnet">Magnet</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
