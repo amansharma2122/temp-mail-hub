@@ -635,7 +635,10 @@ const FriendlyWebsitesWidget = ({
   );
 };
 
-export default FriendlyWebsitesWidget;
+// Memoize to skip re-renders when parents (e.g. Index) re-render but props
+// (overrideSettings/overrideWebsites) are unchanged. React Query caches keep
+// internal state stable, so parent renders shouldn't propagate down here.
+export default memo(FriendlyWebsitesWidget);
 
 // -------------------- Sync-error pill w/ backoff + Retry now ---------------
 
