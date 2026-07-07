@@ -65,7 +65,7 @@ const AdminEmailBlocking = () => {
     
     // Setup realtime subscription
     const channel = supabase
-      .channel('blocked-emails-realtime')
+      .channel(`blocked-emails-realtime-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

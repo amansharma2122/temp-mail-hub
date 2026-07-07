@@ -144,7 +144,7 @@ const AdminGeoBlocking = () => {
     
     // Setup realtime subscription
     const channel = supabase
-      .channel('blocked-countries-realtime')
+      .channel(`blocked-countries-realtime-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

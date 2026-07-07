@@ -42,7 +42,7 @@ export function usePricingContent() {
 
     // Subscribe to realtime changes
     const channel = supabase
-      .channel('pricing_content_changes')
+      .channel(`pricing_content_changes_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -74,7 +74,7 @@ export function usePricingContent() {
     window.addEventListener('focus', handleFocus);
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
       window.removeEventListener('focus', handleFocus);
     };
   }, [fetchContent]);

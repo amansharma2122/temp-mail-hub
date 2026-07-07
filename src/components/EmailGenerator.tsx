@@ -245,7 +245,7 @@ const EmailGenerator = () => {
     init();
 
     // Subscribe to real-time changes in settings, tiers, and temp_emails
-    const channel = supabase.channel('email_usage_tracking');
+    const channel = supabase.channel(`email_usage_tracking_${Math.random().toString(36).slice(2)}`);
     
     channel
       .on(
@@ -308,7 +308,7 @@ const EmailGenerator = () => {
 
     return () => {
       cancelled = true;
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [loadRateLimitSettings, updateEmailUsage, user, rateLimitSettings.max_requests, rateLimitSettings.guest_max_requests]);
 

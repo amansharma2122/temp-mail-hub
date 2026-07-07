@@ -83,8 +83,10 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     
     doFetch();
 
-    // Subscribe to real-time banner changes - use stable channel name
-    const channelName = `banners_realtime_${position}`;
+    // Subscribe to real-time banner changes with a per-mount channel name.
+    // Supabase reuses channels by topic, so stable names can reattach to an
+    // already-subscribed channel during remounts and throw when adding .on().
+    const channelName = `banners_realtime_${position}_${Math.random().toString(36).slice(2)}`;
     const channel = supabase.channel(channelName);
     
     channel
@@ -106,8 +108,7 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
 
     return () => {
       cancelled = true;
-      // Use unsubscribe instead of removeChannel to avoid stack overflow
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [position, fetchBanners]);
 

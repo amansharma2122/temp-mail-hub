@@ -143,7 +143,7 @@ const SubscriptionStatsWidget = () => {
 
     // Set up realtime subscription
     const channel = supabase
-      .channel('subscription_stats')
+      .channel(`subscription_stats_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -158,7 +158,7 @@ const SubscriptionStatsWidget = () => {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [trendPeriod]);
 
