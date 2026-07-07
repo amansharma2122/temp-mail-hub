@@ -652,6 +652,10 @@ export type Database = {
       }
       friendly_websites: {
         Row: {
+          attention_effect: string | null
+          auto_open_override: boolean | null
+          badge_enabled: boolean
+          badge_text: string | null
           created_at: string | null
           description: string | null
           display_order: number | null
@@ -659,12 +663,17 @@ export type Database = {
           icon_url: string | null
           id: string
           is_active: boolean | null
+          max_badge_per_day: number
           name: string
           open_in_new_tab: boolean | null
           updated_at: string | null
           url: string
         }
         Insert: {
+          attention_effect?: string | null
+          auto_open_override?: boolean | null
+          badge_enabled?: boolean
+          badge_text?: string | null
           created_at?: string | null
           description?: string | null
           display_order?: number | null
@@ -672,12 +681,17 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_active?: boolean | null
+          max_badge_per_day?: number
           name: string
           open_in_new_tab?: boolean | null
           updated_at?: string | null
           url: string
         }
         Update: {
+          attention_effect?: string | null
+          auto_open_override?: boolean | null
+          badge_enabled?: boolean
+          badge_text?: string | null
           created_at?: string | null
           description?: string | null
           display_order?: number | null
@@ -685,12 +699,51 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_active?: boolean | null
+          max_badge_per_day?: number
           name?: string
           open_in_new_tab?: boolean | null
           updated_at?: string | null
           url?: string
         }
         Relationships: []
+      }
+      friendly_widget_events: {
+        Row: {
+          attention_effect: string | null
+          created_at: string
+          event_type: string
+          id: string
+          session_id: string | null
+          user_id: string | null
+          website_id: string | null
+        }
+        Insert: {
+          attention_effect?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+          website_id?: string | null
+        }
+        Update: {
+          attention_effect?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          session_id?: string | null
+          user_id?: string | null
+          website_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "friendly_widget_events_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "friendly_websites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       homepage_sections: {
         Row: {
@@ -1646,6 +1699,16 @@ export type Database = {
           total_bounced: number
           total_failed: number
           total_sent: number
+        }[]
+      }
+      get_friendly_widget_stats: {
+        Args: { p_days?: number }
+        Returns: {
+          attention_effect: string
+          event_count: number
+          event_type: string
+          website_id: string
+          website_name: string
         }[]
       }
       get_mailbox_imap_password: {

@@ -6,6 +6,12 @@ import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useSupabaseAuth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  recordFriendlyWidgetEvent,
+  canShowBadge,
+  noteBadgeShown,
+  prefersReducedMotion,
+} from "@/lib/friendlyWidgetAnalytics";
 
 interface FriendlyWebsite {
   id: string;
@@ -17,6 +23,12 @@ interface FriendlyWebsite {
   display_order: number;
   is_active: boolean;
   open_in_new_tab: boolean;
+  // Per-site notification rules (all optional; nulls inherit widget settings).
+  attention_effect?: string | null;
+  badge_enabled?: boolean | null;
+  badge_text?: string | null;
+  auto_open_override?: boolean | null;
+  max_badge_per_day?: number | null;
 }
 
 interface WidgetSettings {
@@ -68,6 +80,17 @@ const FriendlyWebsitesWidget = () => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
+  // Track OS-level reduce-motion. Updates live if the user toggles it.
+  const [reducedMotion, setReducedMotion] = useState<boolean>(() => prefersReducedMotion());
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReducedMotion(mq.matches);
+    try { mq.addEventListener("change", onChange); } catch { mq.addListener(onChange); }
+    return () => {
+      try { mq.removeEventListener("change", onChange); } catch { mq.removeListener(onChange); }
+    };
+  }, []);
 
   // Fetch settings with React Query for caching and real-time updates
   const { data: settings = defaultSettings } = useQuery({
@@ -94,7 +117,7 @@ const FriendlyWebsitesWidget = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from('friendly_websites')
-        .select('id,name,url,icon_url,icon_name,description,display_order,is_active,open_in_new_tab')
+        .select('id,name,url,icon_url,icon_name,description,display_order,is_active,open_in_new_tab,attention_effect,badge_enabled,badge_text,auto_open_override,max_badge_per_day')
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
@@ -114,18 +137,24 @@ const FriendlyWebsitesWidget = () => {
     return true;
   };
 
-  // Auto-open once per session if admin configured a delay > 0.
+  // Auto-open once per session. A site with `auto_open_override = false` blocks
+  // the auto-open even if the widget default enables it; `true` forces it on.
   useEffect(() => {
     const delay = settings.autoOpenDelayMs ?? 0;
-    if (!delay || hasAutoOpened || isOpen) return;
+    const anyBlocks = websites.some(w => w.auto_open_override === false);
+    const anyForces = websites.some(w => w.auto_open_override === true);
+    const shouldAuto = anyForces || (delay > 0 && !anyBlocks);
+    if (!shouldAuto || hasAutoOpened || isOpen) return;
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('nullsto:friendly-auto-opened')) return;
+    const effectiveDelay = anyForces && !delay ? 3000 : Math.max(500, delay);
     const t = setTimeout(() => {
       setIsOpen(true);
       setHasAutoOpened(true);
+      recordFriendlyWidgetEvent('auto_open', { attention_effect: settings.attentionEffect ?? null });
       try { sessionStorage.setItem('nullsto:friendly-auto-opened', '1'); } catch { /* ignore */ }
-    }, Math.max(500, delay));
+    }, effectiveDelay);
     return () => clearTimeout(t);
-  }, [settings.autoOpenDelayMs, hasAutoOpened, isOpen]);
+  }, [settings.autoOpenDelayMs, settings.attentionEffect, websites, hasAutoOpened, isOpen]);
 
   if (isLoading || !isVisible()) return null;
 
@@ -180,24 +209,66 @@ const FriendlyWebsitesWidget = () => {
     ? 'right-0 rounded-l-xl'
     : 'left-0 rounded-r-xl';
 
-  // Attention effect classes for the toggle button.
-  const attention = settings.attentionEffect ?? 'pulse';
+  // Attention effect for the toggle button. Reduced-motion callers collapse
+  // wiggle/bounce/pulse into the static `ring` treatment so the widget stays
+  // discoverable without any looping animation.
+  const rawAttention = settings.attentionEffect ?? 'pulse';
+  const attention = reducedMotion && ['pulse','wiggle','bounce'].includes(rawAttention)
+    ? 'ring'
+    : rawAttention;
   const attentionClass =
     attention === 'pulse' ? 'animate-pulse'
     : attention === 'glow' ? 'shadow-[0_0_20px_hsl(var(--primary)/0.6)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.8)]'
     : attention === 'wiggle' ? 'animate-[wiggle_2.4s_ease-in-out_infinite]'
     : attention === 'bounce' ? 'animate-bounce'
-    : attention === 'ring' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-background animate-[pulse_2s_ease-in-out_infinite]'
+    : attention === 'ring' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-background'
     : '';
 
   const label = settings.buttonLabel || 'Partner Sites';
   const tooltip = settings.tooltipText || label;
   const showBadge = settings.showBadge !== false;
-  const badgeText = settings.badgeText || String(websites.length);
   const TriggerIcon = settings.triggerIcon
     ? (LucideIcons as any)[settings.triggerIcon]
     : null;
   const showLabelOnTrigger = settings.showLabelOnTrigger !== false;
+
+  // Per-site badge: only show if at least one active site allows a badge today.
+  const badgeSite = websites.find(w =>
+    w.badge_enabled !== false && canShowBadge(w.id, w.max_badge_per_day ?? 0)
+  );
+  const badgeAllowed = showBadge && !!badgeSite;
+  const badgeText = badgeSite?.badge_text || settings.badgeText || String(websites.length);
+  useEffect(() => {
+    if (badgeAllowed && badgeSite) {
+      noteBadgeShown(badgeSite.id);
+      recordFriendlyWidgetEvent('badge_shown', {
+        website_id: badgeSite.id,
+        attention_effect: badgeSite.attention_effect || settings.attentionEffect || null,
+      });
+    }
+    // Only when the visible badge site changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [badgeAllowed, badgeSite?.id]);
+
+  const handleToggle = () => {
+    const next = !isOpen;
+    setIsOpen(next);
+    if (next) {
+      recordFriendlyWidgetEvent('manual_open', {
+        attention_effect: settings.attentionEffect ?? null,
+      });
+    }
+  };
+
+  const handleSiteClick = (site: FriendlyWebsite) => {
+    recordFriendlyWidgetEvent('click', {
+      website_id: site.id,
+      attention_effect: site.attention_effect || settings.attentionEffect || null,
+    });
+  };
+
+  // Animation variants — collapse fancy motion when the user prefers reduced motion.
+  const effectiveAnim = reducedMotion ? 'fade' : settings.animationType;
 
   return (
     <>
@@ -206,10 +277,10 @@ const FriendlyWebsitesWidget = () => {
 
       {/* Toggle Button */}
       <motion.button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className={`group fixed top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 py-3 pl-3 pr-2 shadow-xl transition-all duration-300 ${toggleButtonPosition} ${buttonColorClasses[settings.colorScheme]} ${settings.showOnMobile ? '' : 'hidden md:block'} ${isOpen ? '' : attentionClass}`}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={reducedMotion ? undefined : { scale: 1.05 }}
+        whileTap={reducedMotion ? undefined : { scale: 0.95 }}
         aria-label={isOpen ? `Close ${label}` : `Open ${label}`}
       >
         <Tooltip>
@@ -225,7 +296,7 @@ const FriendlyWebsitesWidget = () => {
                   {label}
                 </span>
               )}
-              {showBadge && !isOpen && websites.length > 0 && (
+              {badgeAllowed && !isOpen && websites.length > 0 && (
                 <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center border-2 border-background">
                   {badgeText}
                 </span>
@@ -252,11 +323,11 @@ const FriendlyWebsitesWidget = () => {
             initial="hidden"
             animate="visible"
             exit="hidden"
-            variants={animationVariants[settings.animationType]}
-            transition={settings.animationType === 'bounce'
-              ? { type: 'spring', stiffness: 260, damping: 18 }
-              : { duration: 0.35, ease: 'easeOut' }
-            }
+             variants={animationVariants[effectiveAnim]}
+             transition={effectiveAnim === 'bounce'
+               ? { type: 'spring', stiffness: 260, damping: 18 }
+               : { duration: reducedMotion ? 0.15 : 0.35, ease: 'easeOut' }
+             }
             className={`fixed top-1/2 -translate-y-1/2 z-50 ${positionClasses} ${sizeClasses[settings.size]} ${colorClasses[settings.colorScheme]} border p-4 shadow-xl ${settings.showOnMobile ? '' : 'hidden md:block'}`}
           >
             {/* Close button */}
@@ -285,8 +356,9 @@ const FriendlyWebsitesWidget = () => {
                   className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50 hover:border-primary/30 hover:bg-background/80 transition-all duration-200 group"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ x: 4 }}
+                  transition={{ delay: reducedMotion ? 0 : index * 0.05 }}
+                  whileHover={reducedMotion ? undefined : { x: 4 }}
+                  onClick={() => handleSiteClick(website)}
                 >
                   {website.icon_name && renderLucide(website.icon_name, 'w-8 h-8 p-1.5 rounded-lg bg-primary/15 text-primary') ? (
                     renderLucide(website.icon_name, 'w-8 h-8 p-1.5 rounded-lg bg-primary/15 text-primary')

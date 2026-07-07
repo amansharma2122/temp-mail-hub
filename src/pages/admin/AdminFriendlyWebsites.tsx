@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import LucideIconPicker from "@/components/admin/LucideIconPicker";
+import FriendlyWidgetAnalytics from "@/components/admin/FriendlyWidgetAnalytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +62,11 @@ interface FriendlyWebsite {
   open_in_new_tab: boolean;
   created_at: string;
   updated_at: string;
+  attention_effect?: string | null;
+  badge_enabled?: boolean | null;
+  badge_text?: string | null;
+  auto_open_override?: boolean | null;
+  max_badge_per_day?: number | null;
 }
 
 interface WidgetSettings {
@@ -100,6 +106,27 @@ const defaultSettings: WidgetSettings = {
   autoOpenDelayMs: 0,
   showLabelOnTrigger: true,
 };
+
+const emptyForm = {
+  name: '',
+  url: '',
+  icon_url: '',
+  icon_name: '',
+  description: '',
+  open_in_new_tab: true,
+  attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring',
+  badge_enabled: true,
+  badge_text: '',
+  auto_open_override: 'inherit' as 'inherit' | 'force_on' | 'force_off',
+  max_badge_per_day: 0,
+};
+
+function toAutoOpenValue(v: 'inherit' | 'force_on' | 'force_off'): boolean | null {
+  return v === 'force_on' ? true : v === 'force_off' ? false : null;
+}
+function fromAutoOpenValue(v: boolean | null | undefined): 'inherit' | 'force_on' | 'force_off' {
+  return v === true ? 'force_on' : v === false ? 'force_off' : 'inherit';
+}
 
 // Sortable Website Card Component
 const SortableWebsiteCard = ({ 
@@ -257,6 +284,11 @@ const AdminFriendlyWebsites = () => {
     icon_name: '',
     description: '',
     open_in_new_tab: true,
+    attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring',
+    badge_enabled: true,
+    badge_text: '',
+    auto_open_override: 'inherit' as 'inherit' | 'force_on' | 'force_off',
+    max_badge_per_day: 0,
   });
 
   // DnD sensors
@@ -373,13 +405,18 @@ const AdminFriendlyWebsites = () => {
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
           display_order: maxOrder + 1,
+          attention_effect: formData.attention_effect || null,
+          badge_enabled: formData.badge_enabled,
+          badge_text: formData.badge_text || null,
+          auto_open_override: toAutoOpenValue(formData.auto_open_override),
+          max_badge_per_day: formData.max_badge_per_day,
         } as any);
 
       if (error) throw error;
 
       toast.success('Website added successfully');
       setAddDialogOpen(false);
-      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
+      setFormData({ ...emptyForm });
       fetchData();
     } catch (error) {
       console.error('Error adding website:', error);
@@ -400,6 +437,11 @@ const AdminFriendlyWebsites = () => {
           icon_name: formData.icon_name || null,
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
+          attention_effect: formData.attention_effect || null,
+          badge_enabled: formData.badge_enabled,
+          badge_text: formData.badge_text || null,
+          auto_open_override: toAutoOpenValue(formData.auto_open_override),
+          max_badge_per_day: formData.max_badge_per_day,
         } as any)
         .eq('id', editingWebsite.id);
 
@@ -407,7 +449,7 @@ const AdminFriendlyWebsites = () => {
 
       toast.success('Website updated successfully');
       setEditingWebsite(null);
-      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
+      setFormData({ ...emptyForm });
       fetchData();
     } catch (error) {
       console.error('Error updating website:', error);
@@ -493,6 +535,11 @@ const AdminFriendlyWebsites = () => {
       icon_name: website.icon_name || '',
       description: website.description || '',
       open_in_new_tab: website.open_in_new_tab,
+      attention_effect: (website.attention_effect ?? '') as typeof emptyForm.attention_effect,
+      badge_enabled: website.badge_enabled ?? true,
+      badge_text: website.badge_text ?? '',
+      auto_open_override: fromAutoOpenValue(website.auto_open_override ?? null),
+      max_badge_per_day: website.max_badge_per_day ?? 0,
     });
   };
 
@@ -525,6 +572,10 @@ const AdminFriendlyWebsites = () => {
           <TabsTrigger value="settings">
             <Settings className="w-4 h-4 mr-2" />
             Widget Settings
+          </TabsTrigger>
+          <TabsTrigger value="analytics">
+            <Sparkles className="w-4 h-4 mr-2" />
+            Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -837,6 +888,10 @@ const AdminFriendlyWebsites = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4 mt-4">
+          <FriendlyWidgetAnalytics days={30} />
+        </TabsContent>
       </Tabs>
 
       {/* Add Website Dialog */}
@@ -848,7 +903,7 @@ const AdminFriendlyWebsites = () => {
               Add a partner or related website to show in the sidebar widget
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
             <div className="space-y-2">
               <Label>Name *</Label>
               <Input
@@ -903,6 +958,59 @@ const AdminFriendlyWebsites = () => {
                 checked={formData.open_in_new_tab}
                 onCheckedChange={(checked) => setFormData({ ...formData, open_in_new_tab: checked })}
               />
+            </div>
+
+            <div className="pt-2 border-t space-y-3">
+              <p className="text-sm font-medium">Per-site notification rules</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Attention effect</Label>
+                  <Select
+                    value={formData.attention_effect || 'inherit'}
+                    onValueChange={(v) => setFormData({ ...formData, attention_effect: (v === 'inherit' ? '' : v) as typeof formData.attention_effect })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit">Inherit widget</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="pulse">Pulse</SelectItem>
+                      <SelectItem value="glow">Glow</SelectItem>
+                      <SelectItem value="wiggle">Wiggle</SelectItem>
+                      <SelectItem value="bounce">Bounce</SelectItem>
+                      <SelectItem value="ring">Ring</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Auto-open</Label>
+                  <Select
+                    value={formData.auto_open_override}
+                    onValueChange={(v) => setFormData({ ...formData, auto_open_override: v as typeof formData.auto_open_override })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit">Inherit widget</SelectItem>
+                      <SelectItem value="force_on">Always auto-open</SelectItem>
+                      <SelectItem value="force_off">Never auto-open</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Badge text (blank = widget default)</Label>
+                  <Input maxLength={12} value={formData.badge_text}
+                    onChange={(e) => setFormData({ ...formData, badge_text: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max badge displays / day (0 = ∞)</Label>
+                  <Input type="number" min={0} max={100} value={formData.max_badge_per_day}
+                    onChange={(e) => setFormData({ ...formData, max_badge_per_day: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Show badge for this site</Label>
+                <Switch checked={formData.badge_enabled}
+                  onCheckedChange={(v) => setFormData({ ...formData, badge_enabled: v })} />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -921,7 +1029,7 @@ const AdminFriendlyWebsites = () => {
               Update the website details
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
             <div className="space-y-2">
               <Label>Name *</Label>
               <Input
@@ -976,6 +1084,59 @@ const AdminFriendlyWebsites = () => {
                 checked={formData.open_in_new_tab}
                 onCheckedChange={(checked) => setFormData({ ...formData, open_in_new_tab: checked })}
               />
+            </div>
+
+            <div className="pt-2 border-t space-y-3">
+              <p className="text-sm font-medium">Per-site notification rules</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Attention effect</Label>
+                  <Select
+                    value={formData.attention_effect || 'inherit'}
+                    onValueChange={(v) => setFormData({ ...formData, attention_effect: (v === 'inherit' ? '' : v) as typeof formData.attention_effect })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit">Inherit widget</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="pulse">Pulse</SelectItem>
+                      <SelectItem value="glow">Glow</SelectItem>
+                      <SelectItem value="wiggle">Wiggle</SelectItem>
+                      <SelectItem value="bounce">Bounce</SelectItem>
+                      <SelectItem value="ring">Ring</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Auto-open</Label>
+                  <Select
+                    value={formData.auto_open_override}
+                    onValueChange={(v) => setFormData({ ...formData, auto_open_override: v as typeof formData.auto_open_override })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit">Inherit widget</SelectItem>
+                      <SelectItem value="force_on">Always auto-open</SelectItem>
+                      <SelectItem value="force_off">Never auto-open</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Badge text (blank = widget default)</Label>
+                  <Input maxLength={12} value={formData.badge_text}
+                    onChange={(e) => setFormData({ ...formData, badge_text: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max badge displays / day (0 = ∞)</Label>
+                  <Input type="number" min={0} max={100} value={formData.max_badge_per_day}
+                    onChange={(e) => setFormData({ ...formData, max_badge_per_day: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Show badge for this site</Label>
+                <Switch checked={formData.badge_enabled}
+                  onCheckedChange={(v) => setFormData({ ...formData, badge_enabled: v })} />
+              </div>
             </div>
           </div>
           <DialogFooter>
