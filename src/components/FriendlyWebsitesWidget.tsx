@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useSupabaseAuth";
@@ -40,7 +40,9 @@ interface WidgetSettings {
   position: 'left' | 'right';
   showOnMobile: boolean;
   animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
-  attentionEffect?: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring';
+  attentionEffect?:
+    | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring'
+    | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
   buttonLabel?: string;
   tooltipText?: string;
   showBadge?: boolean;
@@ -80,6 +82,9 @@ const FriendlyWebsitesWidget = () => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
+  // Burst effect triggered when the user clicks the trigger — a lightweight
+  // site-wide sparkle overlay that respects reduced-motion.
+  const [burstAt, setBurstAt] = useState<number | null>(null);
   // Track OS-level reduce-motion. Updates live if the user toggles it.
   const [reducedMotion, setReducedMotion] = useState<boolean>(() => prefersReducedMotion());
   useEffect(() => {
@@ -93,7 +98,7 @@ const FriendlyWebsitesWidget = () => {
   }, []);
 
   // Fetch settings with React Query for caching and real-time updates
-  const { data: settings = defaultSettings } = useQuery({
+  const { data: settings = defaultSettings, isError: settingsError, refetch: refetchSettings } = useQuery({
     queryKey: ['app_settings', 'friendly_sites_widget'],
     queryFn: async () => {
       const { data } = await supabase
@@ -112,7 +117,7 @@ const FriendlyWebsitesWidget = () => {
   });
 
   // Fetch websites with React Query
-  const { data: websites = [], isLoading } = useQuery({
+  const { data: websites = [], isLoading, isError: sitesError, refetch: refetchSites } = useQuery({
     queryKey: ['friendly_websites', 'active'],
     queryFn: async () => {
       const { data } = await supabase
@@ -125,6 +130,13 @@ const FriendlyWebsitesWidget = () => {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  const hasSyncError = settingsError || sitesError;
+  useEffect(() => {
+    if (!hasSyncError) return;
+    // eslint-disable-next-line no-console
+    console.warn("[friendly-widget] realtime/polling failed — surfacing sync indicator");
+  }, [hasSyncError]);
 
   // Check visibility permissions
   const isVisible = () => {
@@ -213,7 +225,7 @@ const FriendlyWebsitesWidget = () => {
   // wiggle/bounce/pulse into the static `ring` treatment so the widget stays
   // discoverable without any looping animation.
   const rawAttention = settings.attentionEffect ?? 'pulse';
-  const attention = reducedMotion && ['pulse','wiggle','bounce'].includes(rawAttention)
+  const attention = reducedMotion && ['pulse','wiggle','bounce','sparkle','confetti','ripple','rainbow'].includes(rawAttention)
     ? 'ring'
     : rawAttention;
   const attentionClass =
@@ -222,6 +234,11 @@ const FriendlyWebsitesWidget = () => {
     : attention === 'wiggle' ? 'animate-[wiggle_2.4s_ease-in-out_infinite]'
     : attention === 'bounce' ? 'animate-bounce'
     : attention === 'ring' ? 'ring-2 ring-primary/40 ring-offset-2 ring-offset-background'
+    : attention === 'sparkle' ? 'animate-[fw-sparkle_2.2s_ease-in-out_infinite] shadow-[0_0_18px_hsl(var(--primary)/0.55)]'
+    : attention === 'confetti' ? 'animate-[fw-confetti-pop_2.8s_ease-in-out_infinite]'
+    : attention === 'ripple' ? 'relative after:absolute after:inset-0 after:rounded-l-xl after:ring-2 after:ring-primary/40 after:animate-[fw-ripple_1.8s_ease-out_infinite]'
+    : attention === 'rainbow' ? 'animate-[fw-rainbow_4s_linear_infinite] bg-[length:200%_200%] bg-gradient-to-r from-primary via-accent to-primary text-primary-foreground'
+    : attention === 'magnet' ? 'animate-[fw-magnet_3.2s_ease-in-out_infinite]'
     : '';
 
   const label = settings.buttonLabel || 'Partner Sites';
@@ -254,6 +271,7 @@ const FriendlyWebsitesWidget = () => {
     const next = !isOpen;
     setIsOpen(next);
     if (next) {
+      if (!reducedMotion) setBurstAt(Date.now());
       recordFriendlyWidgetEvent('manual_open', {
         attention_effect: settings.attentionEffect ?? null,
       });
@@ -273,7 +291,43 @@ const FriendlyWebsitesWidget = () => {
   return (
     <>
       {/* Local keyframes for the wiggle effect — kept scoped so we don't touch tailwind config. */}
-      <style>{`@keyframes wiggle{0%,100%{transform:translateY(-50%) rotate(-3deg)}50%{transform:translateY(-50%) rotate(3deg)}}`}</style>
+      <style>{`
+        @keyframes wiggle{0%,100%{transform:translateY(-50%) rotate(-3deg)}50%{transform:translateY(-50%) rotate(3deg)}}
+        @keyframes fw-sparkle{0%,100%{filter:brightness(1) drop-shadow(0 0 0 hsl(var(--primary)/0))}50%{filter:brightness(1.25) drop-shadow(0 0 12px hsl(var(--primary)/0.75))}}
+        @keyframes fw-confetti-pop{0%,90%,100%{transform:translateY(-50%) scale(1)}45%{transform:translateY(-50%) scale(1.08)}}
+        @keyframes fw-ripple{0%{box-shadow:0 0 0 0 hsl(var(--primary)/0.55)}100%{box-shadow:0 0 0 18px hsl(var(--primary)/0)}}
+        @keyframes fw-rainbow{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+        @keyframes fw-magnet{0%,100%{transform:translateY(-50%) translateX(0)}50%{transform:translateY(-50%) translateX(-4px)}}
+        @keyframes fw-burst{0%{transform:translate(-50%,-50%) scale(0);opacity:.9}100%{transform:translate(-50%,-50%) scale(3.2);opacity:0}}
+      `}</style>
+
+      {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
+      <AnimatePresence>
+        {burstAt && !reducedMotion && (
+          <motion.div
+            key={burstAt}
+            className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 1.4, ease: 'easeOut' }}
+            onAnimationComplete={() => setBurstAt(null)}
+            aria-hidden
+          >
+            {Array.from({ length: 14 }).map((_, i) => (
+              <span
+                key={i}
+                className="absolute w-2 h-2 rounded-full bg-primary/70"
+                style={{
+                  top: `${50 + (Math.sin(i) * 30)}%`,
+                  left: `${50 + (Math.cos(i) * 30)}%`,
+                  animation: `fw-burst 1.2s ease-out forwards`,
+                  animationDelay: `${(i % 5) * 60}ms`,
+                }}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toggle Button */}
       <motion.button
@@ -315,6 +369,20 @@ const FriendlyWebsitesWidget = () => {
           </TooltipContent>
         </Tooltip>
       </motion.button>
+
+      {/* User-visible sync indicator when both realtime + fetches fail. */}
+      {hasSyncError && !isOpen && (
+        <button
+          type="button"
+          onClick={() => { refetchSettings(); refetchSites(); }}
+          className={`fixed top-1/2 mt-14 -translate-y-1/2 z-40 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-sm hover:bg-amber-500/25 transition ${settings.position === 'right' ? 'right-2' : 'left-2'}`}
+          aria-label="Widget sync failed — click to retry"
+          title="Widget sync failed — click to retry"
+        >
+          <AlertCircle className="w-3 h-3" />
+          <span>Sync issue — retry</span>
+        </button>
+      )}
 
       {/* Sidebar Panel */}
       <AnimatePresence>
