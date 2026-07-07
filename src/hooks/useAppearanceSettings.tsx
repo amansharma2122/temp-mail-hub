@@ -90,7 +90,7 @@ export const useAppearanceSettings = () => {
 
     // Real-time subscription for instant updates across all tabs
     const channel = supabase
-      .channel('appearance-settings-changes')
+      .channel()
       .on(
         'postgres_changes',
         {
@@ -115,7 +115,7 @@ export const useAppearanceSettings = () => {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 

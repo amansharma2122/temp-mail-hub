@@ -163,7 +163,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Subscribe to real-time updates on app_settings for instant admin sync
     const channel = supabase
-      .channel('settings-realtime')
+      .channel()
       .on(
         'postgres_changes',
         {
@@ -179,7 +179,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 

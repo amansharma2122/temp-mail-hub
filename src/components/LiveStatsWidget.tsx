@@ -171,7 +171,7 @@ const LiveStatsWidget = () => {
   // Subscribe to realtime changes on email_stats for live counter updates (persistent counter)
   useEffect(() => {
     const channel = supabase
-      .channel('email-stats-updates')
+      .channel()
       .on(
         'postgres_changes',
         {
@@ -194,7 +194,7 @@ const LiveStatsWidget = () => {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [updateStats]);
 

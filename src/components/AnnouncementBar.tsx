@@ -53,7 +53,7 @@ const AnnouncementBar = () => {
 
     // Real-time subscription for instant updates across all tabs
     const channel = supabase
-      .channel('announcement-settings-changes')
+      .channel()
       .on(
         'postgres_changes',
         {
@@ -73,7 +73,7 @@ const AnnouncementBar = () => {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 
