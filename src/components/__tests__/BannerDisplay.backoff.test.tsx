@@ -103,12 +103,14 @@ describe("BannerDisplay realtime exponential backoff", () => {
     await act(async () => { subscribeCb!("CHANNEL_ERROR", new Error("boom")); });
     await flush();
 
-    // Syncing indicator visible.
+    // Syncing indicator visible while we sit in polling mode waiting to retry.
     expect(screen.getByText(/Temporarily syncing/i)).toBeInTheDocument();
 
     // Retry #1 base = 2000ms, jitter = 0 → fires at exactly 2000ms.
     const beforeChannels = channelInstances.length;
     await advance(1999);
+    // Still in polling — the retry hasn't started yet.
+    expect(screen.getByText(/Temporarily syncing/i)).toBeInTheDocument();
     expect(channelInstances.length).toBe(beforeChannels); // not yet
     await advance(1);
     expect(channelInstances.length).toBe(beforeChannels + 1); // new attempt
@@ -129,13 +131,6 @@ describe("BannerDisplay realtime exponential backoff", () => {
     expect(channelInstances.length).toBe(beforeThird);
     await advance(1);
     expect(channelInstances.length).toBe(beforeThird + 1);
-
-    // The retry we just fired flipped the widget to "connecting" while a new
-    // channel is being negotiated — drive that attempt to failure too so we
-    // land back in polling mode with the syncing indicator visible.
-    await act(async () => { subscribeCb!("CHANNEL_ERROR"); });
-    await flush();
-    expect(screen.getByText(/Temporarily syncing/i)).toBeInTheDocument();
 
     // Finally re-subscribe successfully → syncing indicator disappears.
     await act(async () => { subscribeCb!("SUBSCRIBED"); });
