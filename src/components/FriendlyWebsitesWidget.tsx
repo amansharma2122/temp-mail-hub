@@ -373,7 +373,7 @@ const FriendlyWebsitesWidget = ({
     const next = !isOpen;
     setIsOpen(next);
     if (next) {
-      const rmBlocks = reducedMotion && disableOnRM;
+      const rmBlocks = effectiveReducedMotion;
       if (!rmBlocks) setBurstAt(Date.now());
       recordFriendlyWidgetEvent('manual_open', {
         attention_effect: settings.attentionEffect ?? null,
@@ -390,7 +390,7 @@ const FriendlyWebsitesWidget = ({
 
   // Animation variants — collapse fancy motion when the user prefers reduced motion
   // AND the admin hasn't disabled that safeguard.
-  const effectiveAnim = (reducedMotion && disableOnRM) ? 'fade' : settings.animationType;
+  const effectiveAnim = effectiveReducedMotion ? 'fade' : settings.animationType;
 
   // Intensity multiplier tunes duration/spring stiffness for panel animations.
   const intensity = settings.animationIntensity ?? 'normal';
@@ -455,8 +455,8 @@ const FriendlyWebsitesWidget = ({
         data-testid="friendly-widget-trigger"
         data-attention={attention}
         className={`group fixed top-1/2 -translate-y-1/2 z-40 flex items-center gap-2 py-3 pl-3 pr-2 shadow-xl transition-all duration-300 ${toggleButtonPosition} ${buttonColorClasses[settings.colorScheme]} ${settings.showOnMobile ? '' : 'hidden md:block'} ${isOpen ? '' : attentionClass}`}
-        whileHover={reducedMotion ? undefined : { scale: 1.05 }}
-        whileTap={reducedMotion ? undefined : { scale: 0.95 }}
+        whileHover={effectiveReducedMotion ? undefined : { scale: 1.05 }}
+        whileTap={effectiveReducedMotion ? undefined : { scale: 0.95 }}
         aria-label={isOpen ? `Close ${label}` : `Open ${label}`}
       >
         <Tooltip>
@@ -517,7 +517,7 @@ const FriendlyWebsitesWidget = ({
              variants={animationVariants[effectiveAnim]}
              transition={effectiveAnim === 'bounce'
                ? { type: 'spring', stiffness: 260 * intensityMul, damping: 18 }
-               : { duration: (reducedMotion && disableOnRM ? 0.15 : 0.35) / intensityMul, ease: 'easeOut' }
+               : { duration: (effectiveReducedMotion ? 0.15 : 0.35) / intensityMul, ease: 'easeOut' }
              }
              onAnimationStart={() => {
                (window as any).__fw_anim_start = performance.now();
@@ -561,8 +561,8 @@ const FriendlyWebsitesWidget = ({
                   className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50 hover:border-primary/30 hover:bg-background/80 transition-all duration-200 group"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: reducedMotion ? 0 : index * 0.05 }}
-                  whileHover={reducedMotion ? undefined : { x: 4 }}
+                  transition={{ delay: effectiveReducedMotion ? 0 : index * 0.05 }}
+                  whileHover={effectiveReducedMotion ? undefined : { x: 4 }}
                   onClick={() => handleSiteClick(website)}
                 >
                   {website.icon_name && renderLucide(website.icon_name, 'w-8 h-8 p-1.5 rounded-lg bg-primary/15 text-primary') ? (
