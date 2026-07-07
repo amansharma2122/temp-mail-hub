@@ -9,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import LucideIconPicker from "@/components/admin/LucideIconPicker";
 import FriendlyWebsitesWidget from "@/components/FriendlyWebsitesWidget";
-import { useState as useReactState } from "react";
 import { Moon, Sun, Languages } from "lucide-react";
 
 /**
@@ -102,8 +101,8 @@ export default function AdminFriendlyWidgetPreview() {
   // Preview-only toggles: LTR/RTL direction and light/dark theme applied
   // scoped to the preview canvas so admins can validate rendering without
   // affecting the surrounding admin app.
-  const [previewDir, setPreviewDir] = useReactState<"ltr" | "rtl">("ltr");
-  const [previewTheme, setPreviewTheme] = useReactState<"light" | "dark">("light");
+  const [previewDir, setPreviewDir] = useState<"ltr" | "rtl">("ltr");
+  const [previewTheme, setPreviewTheme] = useState<"light" | "dark">("light");
 
   return (
     <div className="container max-w-5xl py-8 space-y-6">
