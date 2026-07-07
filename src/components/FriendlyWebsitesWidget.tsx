@@ -398,7 +398,7 @@ const FriendlyWebsitesWidget = ({
   const badgeAllowed = _badgeAllowed;
   const badgeText = badgeSite?.badge_text || settings.badgeText || String(websites.length);
 
-  const handleToggle = useCallback(() => {
+  const handleToggle = () => {
     const next = !isOpen;
     setIsOpen(next);
     if (next) {
@@ -408,14 +408,14 @@ const FriendlyWebsitesWidget = ({
         attention_effect: settings.attentionEffect ?? null,
       });
     }
-  }, [isOpen, effectiveReducedMotion, settings.attentionEffect]);
+  };
 
-  const handleSiteClick = useCallback((site: FriendlyWebsite) => {
+  const handleSiteClick = (site: FriendlyWebsite) => {
     recordFriendlyWidgetEvent('click', {
       website_id: site.id,
       attention_effect: site.attention_effect || settings.attentionEffect || null,
     });
-  }, [settings.attentionEffect]);
+  };
 
   // Animation variants — collapse fancy motion when the user prefers reduced motion
   // AND the admin hasn't disabled that safeguard.
