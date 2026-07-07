@@ -531,6 +531,7 @@ const FriendlyWebsitesWidget = ({
             intensity={settings.celebrationIntensity ?? 'normal'}
             durationMs={settings.celebrationDurationMs ?? 4200}
             countScale={settings.celebrationParticleCount ?? 0}
+            speed={settings.celebrationSpeed ?? 'normal'}
             onDone={() => setBurstAt(null)}
           />
         )}
