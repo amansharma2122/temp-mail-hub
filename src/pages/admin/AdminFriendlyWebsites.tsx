@@ -349,46 +349,20 @@ const AdminFriendlyWebsites = () => {
   const saveSettings = async () => {
     setIsSaving(true);
     try {
-      // Check if settings exist first
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'friendly_sites_widget')
-        .maybeSingle();
-
-      // Convert settings to JSON-compatible format
-      const settingsJson = JSON.parse(JSON.stringify(settings));
-
-      if (existing) {
-        // Update existing
-        const { error } = await supabase
-          .from('app_settings')
-          .update({
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', 'friendly_sites_widget');
-
-        if (error) throw error;
+      // Deterministic conflict resolution: send the full settings object as
+      // a patch and let the server deep-merge it on top of the current row.
+      // Concurrent admin edits to different fields both survive; overlapping
+      // fields resolve last-writer-wins with a monotonic version bump.
+      const patch = JSON.parse(JSON.stringify(settings));
+      const result = await applyAppSettingsPatch('friendly_sites_widget', patch);
+      if (result.merged) {
+        toast.success('Settings saved and merged with a concurrent change');
       } else {
-        // Insert new
-        const { error } = await supabase
-          .from('app_settings')
-          .insert([{
-            key: 'friendly_sites_widget',
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          }]);
-
-        if (error) throw error;
+        toast.success('Settings saved successfully');
       }
-
-      toast.success('Settings saved successfully');
-      // Invalidate this tab's cache…
       queryClient.invalidateQueries({ queryKey: ['app_settings'] });
       queryClient.invalidateQueries({ queryKey: ['app_settings', 'friendly_sites_widget'] });
-      // …and fan out to every other tab / device so the homepage widget
-      // reflects the change instantly, no reload required.
+      // applyAppSettingsPatch already broadcasts; retained for clarity.
       broadcastAppSettingsChange('friendly_sites_widget');
     } catch (error) {
       console.error('Error saving settings:', error);
