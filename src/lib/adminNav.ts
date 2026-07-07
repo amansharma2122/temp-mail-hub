@@ -1,9 +1,6 @@
 import {
-  LayoutDashboard, Users, Globe, Mail, Settings, FileText, Palette, Newspaper,
-  Link as LinkIcon, Cog, Paintbrush, Shield, Search, Languages, Megaphone,
-  ShieldCheck, Key, Clock, Database, MailOpen, UserCog, BarChart3, Wand2,
-  LayoutList, CreditCard, Crown, Ban, FileWarning, Activity, Bell, HardDrive,
-  Heart, DollarSign, Wrench, Rocket, Server, Lock, Zap, type LucideIcon,
+  LayoutDashboard, Users, Mail, Settings, Server, Shield, Megaphone,
+  FileWarning, Palette, CreditCard, Newspaper, type LucideIcon,
 } from "lucide-react";
 
 export interface AdminNavItem {
@@ -11,6 +8,7 @@ export interface AdminNavItem {
   url: string;
   icon: LucideIcon;
   keywords?: string[];
+  hidden?: boolean; // shown in breadcrumbs but not sidebar
 }
 
 export interface AdminNavGroup {
@@ -19,127 +17,132 @@ export interface AdminNavGroup {
   items: AdminNavItem[];
 }
 
-// Single source of truth for admin sidebar, breadcrumbs, and search.
+// Consolidated sidebar: 6 groups. Legacy per-feature pages remain reachable at
+// their original URLs and are exposed as `hidden: true` entries so breadcrumbs
+// and command-palette search still find them.
 export const ADMIN_NAV: AdminNavGroup[] = [
   {
-    id: "main",
-    label: "Main",
+    id: "overview",
+    label: "Overview",
     items: [
-      { title: "Dashboard", url: "/admin", icon: LayoutDashboard, keywords: ["home", "overview"] },
-      { title: "Analytics", url: "/admin/analytics", icon: BarChart3, keywords: ["stats", "metrics"] },
+      { title: "Dashboard", url: "/admin", icon: LayoutDashboard,
+        keywords: ["home", "analytics", "deployment", "cache", "backup", "health"] },
     ],
   },
   {
-    id: "users-subs",
-    label: "Users & Subscriptions",
+    id: "users-access",
+    label: "Users & Access",
     items: [
-      { title: "Users", url: "/admin/users", icon: Users, keywords: ["accounts", "members"] },
-      { title: "Admins", url: "/admin/admins", icon: Shield, keywords: ["staff", "roles"] },
-      { title: "Subscriptions", url: "/admin/subscriptions", icon: Crown, keywords: ["plans", "billing"] },
-      { title: "Pricing", url: "/admin/pricing", icon: DollarSign, keywords: ["tiers", "cost"] },
-      { title: "Role Approvals", url: "/admin/role-approvals", icon: ShieldCheck, keywords: ["requests"] },
-      { title: "User & Guest", url: "/admin/user-settings", icon: UserCog, keywords: ["defaults"] },
+      { title: "Users", url: "/admin/hub/users", icon: Users,
+        keywords: ["accounts", "admins", "roles", "approvals", "guests"] },
+      { title: "Subscriptions", url: "/admin/hub/subscriptions", icon: CreditCard,
+        keywords: ["plans", "pricing", "payments", "webhooks", "billing"] },
+      { title: "Security", url: "/admin/hub/security", icon: Shield,
+        keywords: ["ip", "geo", "captcha", "rate limits", "registration"] },
     ],
   },
   {
-    id: "emails-mail",
-    label: "Emails & Mail Servers",
+    id: "mail",
+    label: "Mail",
     items: [
-      { title: "Emails", url: "/admin/emails", icon: Mail, keywords: ["inbox", "messages"] },
-      { title: "Mailboxes", url: "/admin/mailboxes", icon: Mail, keywords: ["accounts"] },
-      { title: "Mailbox Health", url: "/admin/mailbox-health", icon: Activity, keywords: ["capacity", "status"] },
-      { title: "IMAP", url: "/admin/imap", icon: MailOpen, keywords: ["fetch", "receive"] },
-      { title: "SMTP", url: "/admin/smtp", icon: Cog, keywords: ["send", "outgoing"] },
-      { title: "Email Setup", url: "/admin/email-setup", icon: Wand2, keywords: ["wizard"] },
-      { title: "Email Templates", url: "/admin/email-templates", icon: MailOpen, keywords: ["messages"] },
-      { title: "Email Restrictions", url: "/admin/email-restrictions", icon: Ban, keywords: ["blocks"] },
-      { title: "Email Blocking", url: "/admin/email-blocking", icon: Ban, keywords: ["deny"] },
-      { title: "Email Logs", url: "/admin/email-logs", icon: FileWarning, keywords: ["history"] },
-      { title: "Domains", url: "/admin/domains", icon: Globe, keywords: ["hosts"] },
-      { title: "Custom Domains", url: "/admin/custom-domains", icon: LinkIcon, keywords: ["dns"] },
+      { title: "Emails", url: "/admin/hub/emails", icon: Mail,
+        keywords: ["inbox", "messages", "logs"] },
+      { title: "Mail Servers", url: "/admin/hub/mail-servers", icon: Server,
+        keywords: ["mailboxes", "imap", "smtp", "capacity", "setup"] },
+      { title: "Email Rules", url: "/admin/hub/email-rules", icon: FileWarning,
+        keywords: ["templates", "restrictions", "blocking"] },
+      { title: "Domains", url: "/admin/hub/domains", icon: Mail,
+        keywords: ["dns", "custom"] },
     ],
   },
   {
-    id: "content",
-    label: "Content",
+    id: "content-promo",
+    label: "Content & Promo",
     items: [
-      { title: "Homepage", url: "/admin/homepage", icon: LayoutDashboard, keywords: ["landing"] },
-      { title: "Blogs", url: "/admin/blogs", icon: Newspaper, keywords: ["posts", "articles"] },
-      { title: "Blog Settings", url: "/admin/blog-settings", icon: Newspaper, keywords: ["config"] },
-      { title: "Pages", url: "/admin/pages", icon: FileText, keywords: ["static"] },
-      { title: "Friendly Sites", url: "/admin/friendly-websites", icon: Heart, keywords: ["partners", "links"] },
-      { title: "Banners", url: "/admin/banners", icon: Megaphone, keywords: ["promo"] },
-      { title: "Ads", url: "/admin/ads", icon: Megaphone, keywords: ["advertising"] },
-      { title: "Announcement", url: "/admin/announcement", icon: Megaphone, keywords: ["notice"] },
-    ],
-  },
-  {
-    id: "payments",
-    label: "Payments",
-    items: [
-      { title: "Payments", url: "/admin/payments", icon: CreditCard, keywords: ["gateway", "checkout"] },
-      { title: "Webhooks", url: "/admin/webhooks", icon: Globe, keywords: ["callbacks"] },
-    ],
-  },
-  {
-    id: "appearance",
-    label: "Appearance & UI",
-    items: [
-      { title: "Appearance", url: "/admin/appearance", icon: Paintbrush, keywords: ["style", "colors"] },
-      { title: "Themes", url: "/admin/themes", icon: Palette, keywords: ["design"] },
-      { title: "Languages", url: "/admin/languages", icon: Languages, keywords: ["i18n", "translation"] },
-      { title: "SEO", url: "/admin/seo", icon: Search, keywords: ["metadata"] },
-    ],
-  },
-  {
-    id: "security",
-    label: "Security",
-    items: [
-      { title: "IP Blocking", url: "/admin/ip-blocking", icon: ShieldCheck, keywords: ["deny"] },
-      { title: "Geo Blocking", url: "/admin/geo-blocking", icon: Globe, keywords: ["country"] },
-      { title: "Registration IPs", url: "/admin/registration-ips", icon: Globe, keywords: ["signup"] },
-      { title: "Registration", url: "/admin/registration", icon: Shield, keywords: ["signup"] },
-      { title: "Captcha", url: "/admin/captcha", icon: ShieldCheck, keywords: ["recaptcha"] },
-      { title: "Rate Limits", url: "/admin/rate-limits", icon: Clock, keywords: ["throttle"] },
-      { title: "Audit Logs", url: "/admin/audit-logs", icon: Clock, keywords: ["history"] },
-      { title: "Error Logs", url: "/admin/error-logs", icon: FileWarning, keywords: ["debug"] },
-    ],
-  },
-  {
-    id: "automation",
-    label: "Automation",
-    items: [
-      { title: "Cron Jobs", url: "/admin/cron", icon: Clock, keywords: ["schedule"] },
-      { title: "Alerts", url: "/admin/alerts", icon: Bell, keywords: ["notify"] },
-      { title: "Maintenance", url: "/admin/maintenance", icon: Wrench, keywords: ["service"] },
-      { title: "Status Settings", url: "/admin/status-settings", icon: Activity, keywords: ["uptime"] },
+      { title: "Content", url: "/admin/hub/content", icon: Newspaper,
+        keywords: ["homepage", "pages", "blogs", "friendly"] },
+      { title: "Promotions", url: "/admin/hub/promotions", icon: Megaphone,
+        keywords: ["banners", "ads", "announcement"] },
     ],
   },
   {
     id: "system",
     label: "System",
     items: [
-      { title: "Overview", url: "/admin/settings-overview", icon: LayoutList, keywords: ["settings"] },
-      { title: "General", url: "/admin/general-settings", icon: Settings, keywords: ["config"] },
-      { title: "Advanced", url: "/admin/advanced", icon: Cog, keywords: ["dev"] },
-      { title: "API", url: "/admin/api", icon: Key, keywords: ["access"] },
-      { title: "Cache", url: "/admin/cache", icon: Database, keywords: ["performance"] },
-      { title: "Backup", url: "/admin/backup", icon: HardDrive, keywords: ["export"] },
-    ],
-  },
-  {
-    id: "deploy",
-    label: "Deploy",
-    items: [
-      { title: "Deployment Health", url: "/admin/deployment-health", icon: Server, keywords: ["ops"] },
+      { title: "Settings", url: "/admin/hub/settings", icon: Settings,
+        keywords: ["general", "advanced", "overview", "api"] },
+      { title: "Appearance", url: "/admin/hub/appearance", icon: Palette,
+        keywords: ["themes", "seo", "languages"] },
+      { title: "Automation", url: "/admin/hub/automation", icon: Server,
+        keywords: ["cron", "alerts", "maintenance", "status"] },
+      { title: "Logs", url: "/admin/hub/logs", icon: FileWarning,
+        keywords: ["audit", "errors"] },
     ],
   },
 ];
 
-export const ADMIN_NAV_FLAT: (AdminNavItem & { groupId: string; groupLabel: string })[] =
-  ADMIN_NAV.flatMap((g) =>
+// Hidden legacy entries — kept so old bookmarks still show a breadcrumb.
+const LEGACY_ITEMS: AdminNavItem[] = [
+  { title: "Analytics", url: "/admin/analytics", icon: LayoutDashboard, hidden: true },
+  { title: "Deployment Health", url: "/admin/deployment-health", icon: Server, hidden: true },
+  { title: "Cache", url: "/admin/cache", icon: Server, hidden: true },
+  { title: "Backup", url: "/admin/backup", icon: Server, hidden: true },
+  { title: "Users (legacy)", url: "/admin/users", icon: Users, hidden: true },
+  { title: "Admins", url: "/admin/admins", icon: Shield, hidden: true },
+  { title: "Role Approvals", url: "/admin/role-approvals", icon: Shield, hidden: true },
+  { title: "User & Guest", url: "/admin/user-settings", icon: Users, hidden: true },
+  { title: "Subscriptions", url: "/admin/subscriptions", icon: CreditCard, hidden: true },
+  { title: "Pricing", url: "/admin/pricing", icon: CreditCard, hidden: true },
+  { title: "Payments", url: "/admin/payments", icon: CreditCard, hidden: true },
+  { title: "Webhooks", url: "/admin/webhooks", icon: CreditCard, hidden: true },
+  { title: "IP Blocking", url: "/admin/ip-blocking", icon: Shield, hidden: true },
+  { title: "Geo Blocking", url: "/admin/geo-blocking", icon: Shield, hidden: true },
+  { title: "Registration IPs", url: "/admin/registration-ips", icon: Shield, hidden: true },
+  { title: "Registration", url: "/admin/registration", icon: Shield, hidden: true },
+  { title: "Captcha", url: "/admin/captcha", icon: Shield, hidden: true },
+  { title: "Rate Limits", url: "/admin/rate-limits", icon: Shield, hidden: true },
+  { title: "Emails (legacy)", url: "/admin/emails", icon: Mail, hidden: true },
+  { title: "Email Logs", url: "/admin/email-logs", icon: Mail, hidden: true },
+  { title: "Mailboxes", url: "/admin/mailboxes", icon: Server, hidden: true },
+  { title: "Mailbox Health", url: "/admin/mailbox-health", icon: Server, hidden: true },
+  { title: "IMAP", url: "/admin/imap", icon: Mail, hidden: true },
+  { title: "SMTP", url: "/admin/smtp", icon: Mail, hidden: true },
+  { title: "Email Setup", url: "/admin/email-setup", icon: Mail, hidden: true },
+  { title: "Email Templates", url: "/admin/email-templates", icon: Mail, hidden: true },
+  { title: "Email Restrictions", url: "/admin/email-restrictions", icon: Mail, hidden: true },
+  { title: "Email Blocking", url: "/admin/email-blocking", icon: Mail, hidden: true },
+  { title: "Domains (legacy)", url: "/admin/domains", icon: Mail, hidden: true },
+  { title: "Custom Domains", url: "/admin/custom-domains", icon: Mail, hidden: true },
+  { title: "Homepage", url: "/admin/homepage", icon: Newspaper, hidden: true },
+  { title: "Pages", url: "/admin/pages", icon: Newspaper, hidden: true },
+  { title: "Blogs", url: "/admin/blogs", icon: Newspaper, hidden: true },
+  { title: "Blog Settings", url: "/admin/blog-settings", icon: Newspaper, hidden: true },
+  { title: "Friendly Sites", url: "/admin/friendly-websites", icon: Newspaper, hidden: true },
+  { title: "Banners", url: "/admin/banners", icon: Megaphone, hidden: true },
+  { title: "Ads", url: "/admin/ads", icon: Megaphone, hidden: true },
+  { title: "Announcement", url: "/admin/announcement", icon: Megaphone, hidden: true },
+  { title: "General Settings", url: "/admin/general-settings", icon: Settings, hidden: true },
+  { title: "Advanced", url: "/admin/advanced", icon: Settings, hidden: true },
+  { title: "Settings Overview", url: "/admin/settings-overview", icon: Settings, hidden: true },
+  { title: "API", url: "/admin/api", icon: Settings, hidden: true },
+  { title: "Appearance", url: "/admin/appearance", icon: Palette, hidden: true },
+  { title: "Themes", url: "/admin/themes", icon: Palette, hidden: true },
+  { title: "SEO", url: "/admin/seo", icon: Palette, hidden: true },
+  { title: "Languages", url: "/admin/languages", icon: Palette, hidden: true },
+  { title: "Cron Jobs", url: "/admin/cron", icon: Server, hidden: true },
+  { title: "Alerts", url: "/admin/alerts", icon: Server, hidden: true },
+  { title: "Maintenance", url: "/admin/maintenance", icon: Server, hidden: true },
+  { title: "Status Settings", url: "/admin/status-settings", icon: Server, hidden: true },
+  { title: "Audit Logs", url: "/admin/audit-logs", icon: FileWarning, hidden: true },
+  { title: "Error Logs", url: "/admin/error-logs", icon: FileWarning, hidden: true },
+];
+
+export const ADMIN_NAV_FLAT: (AdminNavItem & { groupId: string; groupLabel: string })[] = [
+  ...ADMIN_NAV.flatMap((g) =>
     g.items.map((it) => ({ ...it, groupId: g.id, groupLabel: g.label })),
-  );
+  ),
+  ...LEGACY_ITEMS.map((it) => ({ ...it, groupId: "legacy", groupLabel: "Legacy" })),
+];
 
 export function findNavItem(pathname: string) {
   // Prefer exact match, then longest prefix match.

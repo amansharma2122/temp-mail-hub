@@ -125,6 +125,23 @@ const AdminAlertSettings = lazyWithRetry(() => import("./pages/admin/AdminAlertS
 const AdminMaintenance = lazyWithRetry(() => import("./pages/admin/AdminMaintenance"));
 const AdminGeoBlocking = lazyWithRetry(() => import("./pages/admin/AdminGeoBlocking"));
 
+// Consolidated hub pages (6-group sidebar). Each hub renders the existing
+// admin pages inside tabs so all legacy URLs keep working while sidebar
+// clutter is removed.
+const UsersHub = lazyWithRetry(() => import("./pages/admin/hub/UsersHub"));
+const SubscriptionsHub = lazyWithRetry(() => import("./pages/admin/hub/SubscriptionsHub"));
+const SecurityHub = lazyWithRetry(() => import("./pages/admin/hub/SecurityHub"));
+const EmailsHub = lazyWithRetry(() => import("./pages/admin/hub/EmailsHub"));
+const MailServersHub = lazyWithRetry(() => import("./pages/admin/hub/MailServersHub"));
+const EmailRulesHub = lazyWithRetry(() => import("./pages/admin/hub/EmailRulesHub"));
+const DomainsHub = lazyWithRetry(() => import("./pages/admin/hub/DomainsHub"));
+const ContentHub = lazyWithRetry(() => import("./pages/admin/hub/ContentHub"));
+const PromotionsHub = lazyWithRetry(() => import("./pages/admin/hub/PromotionsHub"));
+const SettingsHub = lazyWithRetry(() => import("./pages/admin/hub/SettingsHub"));
+const AppearanceHub = lazyWithRetry(() => import("./pages/admin/hub/AppearanceHub"));
+const AutomationHub = lazyWithRetry(() => import("./pages/admin/hub/AutomationHub"));
+const LogsHub = lazyWithRetry(() => import("./pages/admin/hub/LogsHub"));
+
 // Redirect www to non-www
 if (typeof window !== 'undefined' && window.location.hostname.startsWith('www.')) {
   const nonWwwUrl = window.location.href.replace('://www.', '://');
@@ -348,6 +365,21 @@ const App = () => (
                             <Route path="alerts" element={<AdminAlertSettings />} />
                             <Route path="maintenance" element={<AdminMaintenance />} />
                             <Route path="geo-blocking" element={<AdminGeoBlocking />} />
+
+                            {/* Consolidated hub routes (6-group sidebar) */}
+                            <Route path="hub/users" element={<UsersHub />} />
+                            <Route path="hub/subscriptions" element={<SubscriptionsHub />} />
+                            <Route path="hub/security" element={<SecurityHub />} />
+                            <Route path="hub/emails" element={<EmailsHub />} />
+                            <Route path="hub/mail-servers" element={<MailServersHub />} />
+                            <Route path="hub/email-rules" element={<EmailRulesHub />} />
+                            <Route path="hub/domains" element={<DomainsHub />} />
+                            <Route path="hub/content" element={<ContentHub />} />
+                            <Route path="hub/promotions" element={<PromotionsHub />} />
+                            <Route path="hub/settings" element={<SettingsHub />} />
+                            <Route path="hub/appearance" element={<AppearanceHub />} />
+                            <Route path="hub/automation" element={<AutomationHub />} />
+                            <Route path="hub/logs" element={<LogsHub />} />
                           </Route>
 
                           <Route path="*" element={<NotFound />} />

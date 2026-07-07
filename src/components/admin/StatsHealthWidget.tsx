@@ -28,6 +28,20 @@ interface MailboxRow {
   last_quota_check_at: string | null;
 }
 
+interface CounterRow {
+  stat_key: string;
+  stat_value: number;
+  stat_date: string | null;
+  updated_at: string | null;
+}
+
+const COUNTER_LABELS: Record<string, string> = {
+  emails_today_ist: "Emails today (IST)",
+  total_emails_received: "Total emails received",
+  total_inboxes_created: "Total inboxes created",
+  total_emails_generated: "Total emails generated",
+};
+
 const fmtBytes = (n: number) => {
   if (!n) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -38,11 +52,12 @@ const fmtBytes = (n: number) => {
 const StatsHealthWidget = () => {
   const [health, setHealth] = useState<HealthRow[]>([]);
   const [mailboxes, setMailboxes] = useState<MailboxRow[]>([]);
+  const [counters, setCounters] = useState<CounterRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [reconciling, setReconciling] = useState(false);
 
   const load = async () => {
-    const [h, m] = await Promise.all([
+    const [h, m, c] = await Promise.all([
       supabase
         .from("stats_health_log")
         .select("*")
@@ -53,9 +68,14 @@ const StatsHealthWidget = () => {
         .select("id,name,is_active,is_full,storage_bytes_used,storage_bytes_limit,is_primary,last_quota_check_at")
         .order("is_primary", { ascending: false })
         .order("name", { ascending: true }),
+      supabase
+        .from("email_stats")
+        .select("stat_key, stat_value, stat_date, updated_at")
+        .in("stat_key", Object.keys(COUNTER_LABELS)),
     ]);
     setHealth((h.data as HealthRow[]) || []);
     setMailboxes((m.data as MailboxRow[]) || []);
+    setCounters((c.data as CounterRow[]) || []);
     setLoading(false);
   };
 
@@ -136,6 +156,37 @@ const StatsHealthWidget = () => {
                 ))}
               </div>
             </div>
+          )}
+        </div>
+
+        <div>
+          <div className="text-xs font-medium text-muted-foreground mb-2">
+            Counters &middot; last IST reset / update
+          </div>
+          {counters.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No counter data yet.</div>
+          ) : (
+            <ul className="text-sm divide-y divide-border/50">
+              {Object.keys(COUNTER_LABELS).map((key) => {
+                const c = counters.find((x) => x.stat_key === key);
+                return (
+                  <li key={key} className="flex items-center justify-between py-1.5 gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{COUNTER_LABELS[key]}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {key === "emails_today_ist"
+                          ? `Resets daily at IST midnight${c?.stat_date ? ` · date: ${c.stat_date}` : ""}`
+                          : "Monotonic (never resets)"}
+                        {c?.updated_at && ` · updated ${new Date(c.updated_at).toLocaleString()}`}
+                      </div>
+                    </div>
+                    <div className="tabular-nums font-semibold">
+                      {(c?.stat_value ?? 0).toLocaleString()}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
 
