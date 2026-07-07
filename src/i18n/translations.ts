@@ -140,7 +140,7 @@ export const translations = {
 
     // Admin: cross-tab app_settings update toast
     adminSettingsUpdatedTitle: 'Settings updated in another tab',
-    adminSettingsUpdatedDescription: '"{key}" merged and applied ({version}).',
+    adminSettingsUpdatedDescription: '{keyLabel} ("{key}") merged and applied ({version}).',
     adminSettingsUpdatedVersionFallback: 'latest version',
     adminSettingsUpdatedOpen: 'Open setting',
   },
@@ -210,7 +210,7 @@ export const translations = {
 
     // Admin: cross-tab app_settings update toast
     adminSettingsUpdatedTitle: 'تم تحديث الإعدادات في علامة تبويب أخرى',
-    adminSettingsUpdatedDescription: 'تم دمج "{key}" وتطبيقه ({version}).',
+    adminSettingsUpdatedDescription: 'تم دمج {keyLabel} ("{key}") وتطبيقه ({version}).',
     adminSettingsUpdatedVersionFallback: 'أحدث إصدار',
     adminSettingsUpdatedOpen: 'فتح الإعداد',
   },
@@ -260,7 +260,7 @@ export const translations = {
 
     // Admin: cross-tab app_settings update toast
     adminSettingsUpdatedTitle: 'Configuración actualizada en otra pestaña',
-    adminSettingsUpdatedDescription: '"{key}" fusionado y aplicado ({version}).',
+    adminSettingsUpdatedDescription: '{keyLabel} ("{key}") fusionado y aplicado ({version}).',
     adminSettingsUpdatedVersionFallback: 'última versión',
     adminSettingsUpdatedOpen: 'Abrir ajuste',
   },
@@ -297,7 +297,7 @@ export const translations = {
 
     // Admin: cross-tab app_settings update toast
     adminSettingsUpdatedTitle: 'Paramètres mis à jour dans un autre onglet',
-    adminSettingsUpdatedDescription: '« {key} » fusionné et appliqué ({version}).',
+    adminSettingsUpdatedDescription: '{keyLabel} (« {key} ») fusionné et appliqué ({version}).',
     adminSettingsUpdatedVersionFallback: 'dernière version',
     adminSettingsUpdatedOpen: 'Ouvrir le réglage',
   },

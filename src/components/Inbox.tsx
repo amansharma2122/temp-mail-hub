@@ -58,6 +58,8 @@ const Inbox = () => {
   // 4. All useRef hooks together
   const countdownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fastPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fastPollInFlightRef = useRef(false);
 
   // Notification sounds - auto-unlocks on user interaction
   const { playSound } = useNotificationSounds();
@@ -173,6 +175,30 @@ const Inbox = () => {
     };
   }, [autoRefreshEnabled, refreshInterval, handleRefresh, currentEmail?.id]);
 
+  // Active inboxes poll IMAP just under every 5 seconds so messages that are
+  // waiting on mailbox polling are pulled into realtime storage quickly.
+  useEffect(() => {
+    if (!currentEmail?.id || !autoRefreshEnabled) {
+      if (fastPollRef.current) clearInterval(fastPollRef.current);
+      return;
+    }
+
+    fastPollRef.current = setInterval(() => {
+      if (document.hidden || fastPollInFlightRef.current) return;
+      fastPollInFlightRef.current = true;
+      triggerImapFetch({ mode: "latest", limit: 10 })
+        .catch((e) => console.warn("[Inbox] fast IMAP poll failed:", e))
+        .finally(() => {
+          fastPollInFlightRef.current = false;
+        });
+    }, 4000);
+
+    return () => {
+      if (fastPollRef.current) clearInterval(fastPollRef.current);
+      fastPollRef.current = null;
+    };
+  }, [autoRefreshEnabled, currentEmail?.id, triggerImapFetch]);
+
   // When switching to a new temp address, clear selected email UI to prevent “mixed inbox” confusion
   useEffect(() => {
     setSelectedEmail(null);
@@ -280,12 +306,14 @@ const Inbox = () => {
 
       toast.success(`Test email sent via ${smtpConfig.host}! Waiting for delivery...`);
 
-      // Wait a bit for SMTP delivery before fetching
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
       toast.loading('Checking for new mail...');
       const fetchStart = Date.now();
-      const result = await triggerImapFetch({ mode: "latest", limit: 20 });
+      let result: any = null;
+      do {
+        result = await triggerImapFetch({ mode: "latest", limit: 20 });
+        if ((result?.stats?.stored ?? 0) > 0) break;
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      } while (Date.now() - fetchStart < 5000);
       toast.dismiss();
 
       const stats = result?.stats;

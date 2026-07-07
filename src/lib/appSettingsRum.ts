@@ -7,11 +7,17 @@
 // don't need an extra table.
 
 import { supabase } from "@/integrations/supabase/client";
+import { getAppSettingsKeyLabel } from "@/lib/appSettingsKeyRoutes";
 
 interface Sample {
+  event_type: "app_settings_latency" | "app_settings_toast";
   key: string;
+  key_label?: string;
   version: number | null;
   latency_ms: number;
+  remote?: boolean;
+  delay_ms?: number;
+  toast_visible_delay_ms?: number;
   observed_at: string;
 }
 
@@ -47,9 +53,12 @@ async function flush() {
   try {
     await supabase.from("friendly_widget_events").insert(
       batch.map((s) => ({
-        event_type: "app_settings_latency",
+        event_type: s.event_type,
         sample_ms: s.latency_ms,
-        attention_effect: `${s.key}:v${s.version ?? "?"}`,
+        attention_effect:
+          s.event_type === "app_settings_toast"
+            ? `${s.key}:${s.remote ? "remote" : "local"}:v${s.version ?? "?"}`
+            : `${s.key}:v${s.version ?? "?"}`,
       })),
     );
   } catch (err) {
@@ -75,7 +84,9 @@ export function reportAppSettingsLatency(
   lastSampledAt.set(key, now);
 
   BUFFER.push({
+    event_type: "app_settings_latency",
     key,
+    key_label: getAppSettingsKeyLabel(key),
     version,
     latency_ms: latency,
     observed_at: new Date().toISOString(),
@@ -102,6 +113,7 @@ export interface AppSettingsToastRum {
   key: string;
   remote: boolean;
   version: number | null;
+  /** Pre-paint fallback delay from receipt to toast request. */
   delay_ms: number;
   /**
    * End-to-end delay measured from remote patch receipt (broadcast/realtime
@@ -112,14 +124,21 @@ export interface AppSettingsToastRum {
 }
 
 export function reportAppSettingsToastEvent(sample: AppSettingsToastRum): void {
-  const visible =
+  const visibleDelay = Math.max(
+    0,
     typeof sample.toast_visible_delay_ms === "number"
-      ? `+visible${Math.round(sample.toast_visible_delay_ms)}ms`
-      : "";
+      ? sample.toast_visible_delay_ms
+      : sample.delay_ms,
+  );
   BUFFER.push({
-    key: `toast:${sample.key}:${sample.remote ? "remote" : "local"}${visible}`,
+    event_type: "app_settings_toast",
+    key: sample.key,
+    key_label: getAppSettingsKeyLabel(sample.key),
     version: sample.version,
-    latency_ms: Math.max(0, sample.delay_ms),
+    remote: sample.remote,
+    delay_ms: visibleDelay,
+    toast_visible_delay_ms: visibleDelay,
+    latency_ms: visibleDelay,
     observed_at: new Date().toISOString(),
   });
   if (BUFFER.length >= MAX_BUFFER) void flush();

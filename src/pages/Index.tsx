@@ -86,23 +86,23 @@ const Index = () => {
         {/* Live Stats + Quick Tips (side-by-side: stats left, tips right) */}
         <section className="py-4 border-y border-border/30">
           <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:items-stretch">
-              <div className="flex-1 min-w-0">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,4fr)_minmax(0,1fr)] md:grid-cols-5 md:items-stretch">
+              <div className="min-w-0 md:col-span-4">
                 <LiveStatsWidget />
               </div>
               {isSectionEnabled("quick_tips") && (
                 <motion.div
-                  className="w-full md:w-64 lg:w-72 xl:w-80 md:flex-shrink-0 relative overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 sm:p-6 shadow-lg shadow-primary/5 flex flex-col"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
+                  className="relative flex h-full flex-col overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 shadow-lg shadow-primary/5 md:col-span-1"
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary via-accent to-primary opacity-20 blur-sm animate-pulse" />
                   <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full animate-ping opacity-75" />
                   <div className="absolute bottom-4 left-4 w-1.5 h-1.5 bg-accent rounded-full animate-ping opacity-50" style={{ animationDelay: '0.5s' }} />
-                  <div className="relative z-10">
-                    <h3 className="font-bold text-foreground mb-4 flex items-center gap-2 text-base sm:text-lg">
+                  <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+                    <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground lg:text-base">
                       <motion.span
                         className="w-3 h-3 rounded-full bg-gradient-to-r from-primary to-accent"
                         animate={{ scale: [1, 1.2, 1] }}
@@ -112,22 +112,22 @@ const Index = () => {
                         {quickTips.title}
                       </span>
                     </h3>
-                    <ul className="space-y-3 sm:space-y-4 text-sm">
+                    <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
                       {quickTips.tips.map((tip, index) => (
                         <motion.li
                           key={index}
-                          className="flex items-start gap-3 p-3 rounded-lg bg-background/50 border border-border/50 hover:border-primary/30 transition-colors"
+                          className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/50 p-2 transition-colors hover:border-primary/30"
                           whileHover={{ x: 4 }}
                         >
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
                             {index + 1}
                           </span>
-                          <span className="text-foreground text-xs sm:text-sm">{tip}</span>
+                          <span className="text-xs leading-snug text-foreground">{tip}</span>
                         </motion.li>
                       ))}
                     </ul>
                   </div>
-                  <div className="mt-6">
+                  <div className="mt-3">
                     <BannerDisplay position="sidebar" />
                   </div>
                 </motion.div>
