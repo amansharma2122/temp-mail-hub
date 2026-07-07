@@ -32,6 +32,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { broadcastAppSettingsChange } from "@/lib/appSettingsSync";
+import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import {
   DndContext,
@@ -382,9 +384,12 @@ const AdminFriendlyWebsites = () => {
       }
 
       toast.success('Settings saved successfully');
-      // Invalidate both the general app_settings and the specific widget query
+      // Invalidate this tab's cache…
       queryClient.invalidateQueries({ queryKey: ['app_settings'] });
       queryClient.invalidateQueries({ queryKey: ['app_settings', 'friendly_sites_widget'] });
+      // …and fan out to every other tab / device so the homepage widget
+      // reflects the change instantly, no reload required.
+      broadcastAppSettingsChange('friendly_sites_widget');
     } catch (error) {
       console.error('Error saving settings:', error);
       toast.error('Failed to save settings');
