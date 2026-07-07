@@ -1,0 +1,60 @@
+name: Mailbox Failover Smoke
+
+# Runs the mailbox-failover smoke test on every PR that touches mailbox
+# selection, quota, or failover logic. Uses a deterministic seed so the test
+# picks the same synthetic mailbox ordering on every run and failures are
+# reproducible locally with the same SMOKE_SEED value.
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/mailbox-failover-smoke/**"
+      - "supabase/migrations/**"
+      - "src/components/admin/MailboxQuotaAlerts.tsx"
+      - "src/components/admin/StatsHealthWidget.tsx"
+      - "src/pages/admin/hub/MailServersHub.tsx"
+      - "src/pages/admin/AdminStatsVerification.tsx"
+      - ".github/workflows/mailbox-failover-smoke.yml"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Deterministic seed for the smoke run"
+        required: false
+        default: "42"
+
+concurrency:
+  group: mailbox-failover-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Deno smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Deterministic seed — override per-run via workflow_dispatch input.
+      SMOKE_SEED: ${{ github.event.inputs.seed || '42' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Verify credentials are present
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::warning::SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured — smoke test will self-skip"
+          fi
+          echo "Using deterministic seed: $SMOKE_SEED"
+
+      - name: Run failover smoke test
+        run: |
+          deno test \
+            --allow-net \
+            --allow-env \
+            --allow-read \
+            supabase/functions/mailbox-failover-smoke/
