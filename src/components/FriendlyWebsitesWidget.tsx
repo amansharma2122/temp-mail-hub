@@ -458,6 +458,10 @@ const FriendlyWebsitesWidget = ({
         @keyframes fw-rainbow{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
         @keyframes fw-magnet{0%,100%{transform:translateY(-50%) translateX(0)}50%{transform:translateY(-50%) translateX(-4px)}}
         @keyframes fw-burst{0%{transform:translate(-50%,-50%) scale(0);opacity:.9}100%{transform:translate(-50%,-50%) scale(3.2);opacity:0}}
+        @keyframes fw-particle{0%{transform:translate(-50%,-50%) translate(0,0) scale(1);opacity:1}100%{transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(.3);opacity:0}}
+        @keyframes fw-shockwave{0%{transform:translate(-50%,-50%) scale(0);opacity:.55}100%{transform:translate(-50%,-50%) scale(6);opacity:0}}
+        @keyframes fw-float-up{0%{transform:translate(-50%,-50%) translateY(0);opacity:1}100%{transform:translate(-50%,-50%) translateY(-160px);opacity:0}}
+        @keyframes fw-panel-glow{0%,100%{opacity:.35}50%{opacity:.7}}
       `}</style>
 
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
