@@ -16,7 +16,6 @@ const CHANNEL_NAME = "nullsto:app-settings";
 const STORAGE_KEY = "nullsto:app-settings:ping";
 
 type Listener = (key: string) => void;
-const WILDCARD = "*";
 const listeners = new Set<Listener>();
 
 let bc: BroadcastChannel | null = null;
