@@ -18,9 +18,11 @@ const FriendlyWebsitesWidget = lazy(() => import("@/components/FriendlyWebsitesW
 import BackendHealthBanner from "@/components/BackendHealthBanner";
 import { motion } from "framer-motion";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
+import { useStatsSectionBg } from "@/hooks/useStatsSectionBg";
 
 const Index = () => {
   const { quickTips, isSectionEnabled } = useHomepageContent();
+  const statsBg = useStatsSectionBg();
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -84,7 +86,10 @@ const Index = () => {
         </section>
 
         {/* Live Stats + Quick Tips (side-by-side: stats left, tips right) */}
-        <section className="py-4 border-y border-border/50 bg-secondary/60 dark:bg-muted/60">
+        <section
+          className={`py-4 border-y border-border/50 ${statsBg.className}`}
+          style={statsBg.style}
+        >
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:items-stretch">
               <div className="min-w-0">
