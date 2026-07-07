@@ -69,7 +69,9 @@ const defaultSettings: WidgetSettings = {
   position: 'right',
   showOnMobile: true,
   animationType: 'slide',
-  attentionEffect: 'pulse',
+  // Gentle, non-looping default so the trigger doesn't fatigue the eye.
+  // Admins can pick a livelier effect in the widget settings.
+  attentionEffect: 'glow',
   buttonLabel: 'Partner Sites',
   tooltipText: 'Explore our partner sites',
   showBadge: true,
@@ -77,7 +79,7 @@ const defaultSettings: WidgetSettings = {
   triggerIcon: 'Sparkles',
   autoOpenDelayMs: 0,
   showLabelOnTrigger: true,
-  animationIntensity: 'normal',
+  animationIntensity: 'subtle',
   disableEffectsOnReducedMotion: true,
   reducedMotionMode: 'respect_user',
 };

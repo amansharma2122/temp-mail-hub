@@ -14,6 +14,9 @@ export interface PaymentSettings {
   defaultPaymentMethod: 'stripe' | 'paypal' | 'telegram';
   testMode: boolean;
   currency: string;
+  upiEnabled?: boolean;
+  upiId?: string;
+  keepEmailPrice?: number;
 }
 
 const defaultSettings: PaymentSettings = {
@@ -27,6 +30,9 @@ const defaultSettings: PaymentSettings = {
   defaultPaymentMethod: 'telegram',
   testMode: true,
   currency: 'usd',
+  upiEnabled: true,
+  upiId: '',
+  keepEmailPrice: 2,
 };
 
 export function usePaymentSettings() {
@@ -111,6 +117,10 @@ export function usePaymentSettings() {
     defaultPaymentMethod: currentSettings.defaultPaymentMethod,
     hasAnyPaymentMethod: currentSettings.stripeEnabled || currentSettings.paypalEnabled || currentSettings.telegramUpgradeEnabled,
     hasPaidPaymentMethod: currentSettings.stripeEnabled || currentSettings.paypalEnabled,
+    upiEnabled: !!currentSettings.upiEnabled && !!currentSettings.upiId,
+    upiId: currentSettings.upiId || '',
+    keepEmailPrice: currentSettings.keepEmailPrice ?? 2,
+    currency: currentSettings.currency || 'usd',
   };
 }
 
