@@ -160,15 +160,17 @@ const LiveStatsWidget = () => {
       initialLoadRef.current = false;
     }, 100);
     
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchStats, 60000);
+    // Refresh every 20 seconds so counters stay fresh even if realtime drops.
+    const interval = setInterval(fetchStats, 20000);
     return () => {
       clearTimeout(timeoutId);
       clearInterval(interval);
     };
   }, [updateStats]);
 
-  // Subscribe to realtime changes on email_stats for live counter updates (persistent counter)
+  // Subscribe to realtime UPDATE events on email_stats for live counter updates.
+  // Listens to ALL stat_key rows so today's counter, inbox counter, and
+  // generated counter all stream in real time.
   useEffect(() => {
     const channel = supabase
       .channel(`email-stats-updates-${Math.random().toString(36).slice(2)}`)
@@ -178,15 +180,31 @@ const LiveStatsWidget = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'email_stats',
-          filter: 'stat_key=eq.total_emails_generated'
         },
         (payload) => {
-          // Only animate after initial load
-          if (!initialLoadRef.current && payload.new) {
-            const newValue = parseStatValue((payload.new as { stat_value?: number }).stat_value);
-            updateStats({ totalEmailsGenerated: newValue });
-            // Trigger animation on "Emails Generated" (index 1)
-            setAnimatingIndex(1);
+          const row = payload.new as { stat_key?: string; stat_value?: number } | null;
+          if (!row || initialLoadRef.current) return;
+          const value = parseStatValue(row.stat_value);
+          let animateIdx: number | null = null;
+          switch (row.stat_key) {
+            case 'total_emails_generated':
+              updateStats({ totalEmailsGenerated: value });
+              animateIdx = 1;
+              break;
+            case 'total_inboxes_created':
+              updateStats({ totalInboxesCreated: value });
+              animateIdx = 2;
+              break;
+            case 'emails_today_ist':
+              updateStats({ emailsToday: value });
+              animateIdx = 0;
+              break;
+            case 'total_emails_received':
+              updateStats({ totalEmails: value });
+              break;
+          }
+          if (animateIdx !== null) {
+            setAnimatingIndex(animateIdx);
             setTimeout(() => setAnimatingIndex(null), 500);
           }
         }
