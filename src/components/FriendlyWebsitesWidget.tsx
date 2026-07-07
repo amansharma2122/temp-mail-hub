@@ -106,7 +106,7 @@ const FriendlyWebsitesWidget = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from('friendly_websites')
-        .select('id,name,url,icon_url,icon_name,description,display_order,is_active,open_in_new_tab')
+        .select('id,name,url,icon_url,icon_name,description,display_order,is_active,open_in_new_tab,attention_effect,badge_enabled,badge_text,auto_open_override,max_badge_per_day')
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
