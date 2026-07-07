@@ -52,6 +52,11 @@ interface WidgetSettings {
   showLabelOnTrigger?: boolean;
   animationIntensity?: 'subtle' | 'normal' | 'lively';
   disableEffectsOnReducedMotion?: boolean;
+  // Admin-forced motion policy — persisted site-wide default.
+  //  'respect_user': honor prefers-reduced-motion (default).
+  //  'always_on':    force reduced motion for every visitor.
+  //  'never':        ignore OS preference (use with caution).
+  reducedMotionMode?: 'respect_user' | 'always_on' | 'never';
 }
 
 const defaultSettings: WidgetSettings = {
@@ -73,6 +78,7 @@ const defaultSettings: WidgetSettings = {
   showLabelOnTrigger: true,
   animationIntensity: 'normal',
   disableEffectsOnReducedMotion: true,
+  reducedMotionMode: 'respect_user',
 };
 
 const renderLucide = (name: string | null | undefined, className = "w-5 h-5") => {
