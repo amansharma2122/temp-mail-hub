@@ -122,6 +122,8 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
   useEffect(() => { showToastRef.current = showToast; }, [showToast]);
   useEffect(() => { enablePushRef.current = enablePushNotifications; }, [enablePushNotifications]);
   useEffect(() => { pushPermissionRef.current = pushPermission; }, [pushPermission]);
+  const rumSurfaceRef = useRef<RumSurface>(rumSurface);
+  useEffect(() => { rumSurfaceRef.current = rumSurface; }, [rumSurface]);
 
   // Check push notification permission
   useEffect(() => {
@@ -214,7 +216,7 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
     const unsubscribe = subscribe(tempEmailId, (payload) => {
       const newEmail = payload.new as ReceivedEmail;
       // RUM: end-to-end realtime latency from server received_at to client.
-      reportRealtimeLatency(rumSurface, tempEmailId, newEmail.received_at);
+      reportRealtimeLatency(rumSurfaceRef.current, tempEmailId, newEmail.received_at);
       setNewEmailCount((prev) => prev + 1);
       setLastEmail(newEmail);
 
