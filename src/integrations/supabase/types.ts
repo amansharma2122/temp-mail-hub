@@ -1159,28 +1159,34 @@ export type Database = {
       user_2fa: {
         Row: {
           backup_codes: string[] | null
+          backup_codes_encrypted: string | null
           created_at: string
           id: string
           is_enabled: boolean
           totp_secret: string
+          totp_secret_encrypted: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           backup_codes?: string[] | null
+          backup_codes_encrypted?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean
           totp_secret: string
+          totp_secret_encrypted?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           backup_codes?: string[] | null
+          backup_codes_encrypted?: string | null
           created_at?: string
           id?: string
           is_enabled?: boolean
           totp_secret?: string
+          totp_secret_encrypted?: string | null
           updated_at?: string
           user_id?: string
         }
