@@ -1,45 +1,7 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
-  LayoutDashboard,
-  Users,
-  Globe,
-  Mail,
-  Settings,
-  ArrowLeft,
-  FileText,
-  Palette,
-  Newspaper,
-  Link as LinkIcon,
-  Cog,
-  Paintbrush,
-  Shield,
-  Search,
-  Languages,
-  Megaphone,
-  ShieldCheck,
-  Key,
-  Clock,
-  Database,
-  MailOpen,
-  UserCog,
-  BarChart3,
-  Wand2,
-  LayoutList,
-  CreditCard,
-  Crown,
-  Ban,
-  FileWarning,
-  Activity,
-  X,
-  Bell,
-  HardDrive,
-  Heart,
-  Edit3,
-  Check,
-  LucideIcon,
-  DollarSign,
-  Wrench,
+  Mail, ArrowLeft, Search, X, Edit3, Check, ChevronDown,
 } from "lucide-react";
 import {
   Sidebar,
@@ -64,12 +26,7 @@ import { useSidebarIcons } from "@/hooks/useSidebarIcons";
 import FontAwesomeIconPicker from "@/components/admin/FontAwesomeIconPicker";
 import { toast } from "sonner";
 import { usePrefetchAdmin } from "@/hooks/usePrefetchAdmin";
-
-interface MenuItem {
-  title: string;
-  url: string;
-  icon: LucideIcon;
-}
+import { ADMIN_NAV, ADMIN_NAV_FLAT, SIDEBAR_GROUPS_STORAGE_KEY, findNavItem, type AdminNavItem } from "@/lib/adminNav";
 
 const AdminSidebar = () => {
   const location = useLocation();
@@ -80,93 +37,41 @@ const AdminSidebar = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editingUrl, setEditingUrl] = useState<string | null>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
   const { icons, setIcon, getIcon, isSaving } = useSidebarIcons();
   const { prefetchRoute } = usePrefetchAdmin();
 
-  const mainMenuItems: MenuItem[] = [
-    { title: t('dashboard'), url: "/admin", icon: LayoutDashboard },
-    { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
-    { title: t('users'), url: "/admin/users", icon: Users },
-    { title: t('emails'), url: "/admin/emails", icon: Mail },
-  ];
+  // Collapsible groups w/ localStorage persistence
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return Object.fromEntries(ADMIN_NAV.map((g) => [g.id, true]));
+  });
+  useEffect(() => {
+    try { localStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, JSON.stringify(openGroups)); } catch {}
+  }, [openGroups]);
 
-  const domainMenuItems: MenuItem[] = [
-    { title: t('domains'), url: "/admin/domains", icon: Globe },
-    { title: "Custom Domains", url: "/admin/custom-domains", icon: LinkIcon },
-  ];
+  // Keep group containing active route open.
+  useEffect(() => {
+    const match = findNavItem(location.pathname);
+    if (match && !openGroups[match.groupId]) {
+      setOpenGroups((s) => ({ ...s, [match.groupId]: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
-  const contentMenuItems: MenuItem[] = [
-    { title: "Homepage", url: "/admin/homepage", icon: LayoutDashboard },
-    { title: t('blogs'), url: "/admin/blogs", icon: Newspaper },
-    { title: t('pages'), url: "/admin/pages", icon: FileText },
-    { title: "Email Templates", url: "/admin/email-templates", icon: MailOpen },
-    { title: "Friendly Sites", url: "/admin/friendly-websites", icon: Heart },
-  ];
-
-  const settingsMenuItems: MenuItem[] = [
-    { title: "Overview", url: "/admin/settings-overview", icon: LayoutList },
-    { title: "General", url: "/admin/general-settings", icon: Settings },
-    { title: "Appearance", url: "/admin/appearance", icon: Paintbrush },
-    { title: t('themes'), url: "/admin/themes", icon: Palette },
-    { title: "User & Guest", url: "/admin/user-settings", icon: UserCog },
-    { title: "Registration", url: "/admin/registration", icon: Shield },
-    { title: "Payments", url: "/admin/payments", icon: CreditCard },
-    { title: "Subscriptions", url: "/admin/subscriptions", icon: Crown },
-    { title: "Pricing", url: "/admin/pricing", icon: DollarSign },
-    { title: "Email Restrictions", url: "/admin/email-restrictions", icon: Ban },
-    { title: "Admins", url: "/admin/admins", icon: Shield },
-    { title: "Email Setup", url: "/admin/email-setup", icon: Wand2 },
-    { title: "SMTP", url: "/admin/smtp", icon: Cog },
-    { title: "IMAP", url: "/admin/imap", icon: MailOpen },
-    { title: "Mailboxes", url: "/admin/mailboxes", icon: Mail },
-    { title: "SEO", url: "/admin/seo", icon: Search },
-    { title: "Blog Settings", url: "/admin/blog-settings", icon: Newspaper },
-    { title: "Languages", url: "/admin/languages", icon: Languages },
-  ];
-
-  const advancedMenuItems: MenuItem[] = [
-    { title: "Alerts", url: "/admin/alerts", icon: Bell },
-    { title: "Maintenance", url: "/admin/maintenance", icon: Wrench },
-    { title: "Announcement", url: "/admin/announcement", icon: Megaphone },
-    { title: "Status Settings", url: "/admin/status-settings", icon: Activity },
-    { title: "Mailbox Health", url: "/admin/mailbox-health", icon: Activity },
-    { title: "Deployment Health", url: "/admin/deployment-health", icon: Shield },
-    { title: "Email Logs", url: "/admin/email-logs", icon: FileWarning },
-    { title: "Error Logs", url: "/admin/error-logs", icon: FileWarning },
-    { title: "Webhooks", url: "/admin/webhooks", icon: Globe },
-    { title: "Audit Logs", url: "/admin/audit-logs", icon: Clock },
-    { title: "IP Blocking", url: "/admin/ip-blocking", icon: ShieldCheck },
-    { title: "Geo Blocking", url: "/admin/geo-blocking", icon: Globe },
-    { title: "Email Blocking", url: "/admin/email-blocking", icon: Ban },
-    { title: "Registration IPs", url: "/admin/registration-ips", icon: Globe },
-    { title: "Rate Limits", url: "/admin/rate-limits", icon: Clock },
-    { title: "Role Approvals", url: "/admin/role-approvals", icon: ShieldCheck },
-    { title: "Advanced", url: "/admin/advanced", icon: Cog },
-    { title: "Banners", url: "/admin/banners", icon: Megaphone },
-    { title: "Ads", url: "/admin/ads", icon: Megaphone },
-    { title: "Captcha", url: "/admin/captcha", icon: ShieldCheck },
-    { title: "API", url: "/admin/api", icon: Key },
-    { title: "Cron Jobs", url: "/admin/cron", icon: Clock },
-    { title: "Cache", url: "/admin/cache", icon: Database },
-    { title: "Backup", url: "/admin/backup", icon: HardDrive },
-  ];
-
-  // Combine all menu items for search
-  const allMenuItems = useMemo(() => [
-    ...mainMenuItems.map(item => ({ ...item, group: "Main" })),
-    ...domainMenuItems.map(item => ({ ...item, group: "Domains" })),
-    ...contentMenuItems.map(item => ({ ...item, group: "Content" })),
-    ...settingsMenuItems.map(item => ({ ...item, group: "Settings" })),
-    ...advancedMenuItems.map(item => ({ ...item, group: "Advanced" })),
-  ], [t]);
-
-  // Filter menu items based on search
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return null;
-    return allMenuItems.filter(item => 
-      item.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery, allMenuItems]);
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return null;
+    return ADMIN_NAV_FLAT.filter((item) => {
+      const hay = [item.title, item.groupLabel, ...(item.keywords || [])].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [searchQuery]);
+
+  useEffect(() => { setActiveIdx(0); }, [searchQuery]);
 
   const isActive = (path: string) => {
     if (path === "/admin") return location.pathname === "/admin";
@@ -183,7 +88,7 @@ const AdminSidebar = () => {
     setEditingUrl(null);
   }, [setIcon]);
 
-  const renderIcon = (item: MenuItem) => {
+  const renderIcon = (item: AdminNavItem) => {
     const customIcon = getIcon(item.url);
     
     if (customIcon) {
@@ -193,7 +98,7 @@ const AdminSidebar = () => {
     return <item.icon className="w-4 h-4" />;
   };
 
-  const renderMenuItems = (items: MenuItem[]) => (
+  const renderMenuItems = (items: AdminNavItem[]) => (
     <SidebarMenu>
       {items.map((item) => (
         <SidebarMenuItem key={item.url}>
@@ -249,6 +154,26 @@ const AdminSidebar = () => {
     navigate(url);
   };
 
+  const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!filteredItems || filteredItems.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIdx((i) => Math.min(i + 1, filteredItems.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIdx((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filteredItems[activeIdx];
+      if (item) handleSearchSelect(item.url);
+    } else if (e.key === "Escape") {
+      setSearchQuery("");
+    }
+  };
+
+  const toggleGroup = (id: string) =>
+    setOpenGroups((s) => ({ ...s, [id]: !s[id] }));
+
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <SidebarHeader className="p-4 border-b border-border">
@@ -292,9 +217,10 @@ const AdminSidebar = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search menu..."
+              placeholder="Search menu... (↑/↓/Enter)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKey}
               className="pl-9 pr-8 h-9 bg-secondary/50 border-border/50 text-sm"
             />
             {searchQuery && (
@@ -315,19 +241,21 @@ const AdminSidebar = () => {
                   exit={{ opacity: 0, y: -10 }}
                   className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto"
                 >
-                  {filteredItems.map((item) => (
+                  {filteredItems.map((item, idx) => (
                     <button
                       key={item.url}
                       onClick={() => handleSearchSelect(item.url)}
+                      onMouseEnter={() => setActiveIdx(idx)}
                       className={cn(
                         "flex items-center gap-3 w-full px-3 py-2 text-left hover:bg-secondary/80 transition-colors",
-                        isActive(item.url) && "bg-primary/10"
+                        isActive(item.url) && "bg-primary/10",
+                        idx === activeIdx && "bg-secondary/80"
                       )}
                     >
                       <item.icon className="w-4 h-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.group}</p>
+                        <p className="text-xs text-muted-foreground">{item.groupLabel}</p>
                       </div>
                     </button>
                   ))}
@@ -350,40 +278,30 @@ const AdminSidebar = () => {
 
       <SidebarContent>
         <ScrollArea className="h-[calc(100vh-180px)]">
-          <SidebarGroup>
-            <SidebarGroupLabel>Main</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {renderMenuItems(mainMenuItems)}
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel>Domains</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {renderMenuItems(domainMenuItems)}
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel>Content</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {renderMenuItems(contentMenuItems)}
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel>Settings</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {renderMenuItems(settingsMenuItems)}
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel>Advanced</SidebarGroupLabel>
-            <SidebarGroupContent>
-              {renderMenuItems(advancedMenuItems)}
-            </SidebarGroupContent>
-          </SidebarGroup>
+          {ADMIN_NAV.map((group) => {
+            const isOpen = openGroups[group.id] !== false;
+            return (
+              <SidebarGroup key={group.id}>
+                {!collapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.id)}
+                    className="w-full flex items-center justify-between px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground"
+                  >
+                    <span>{group.label}</span>
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", !isOpen && "-rotate-90")} />
+                  </button>
+                ) : (
+                  <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                )}
+                {(isOpen || collapsed) && (
+                  <SidebarGroupContent>
+                    {renderMenuItems(group.items)}
+                  </SidebarGroupContent>
+                )}
+              </SidebarGroup>
+            );
+          })}
         </ScrollArea>
       </SidebarContent>
 
