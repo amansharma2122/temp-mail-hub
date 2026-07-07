@@ -393,6 +393,24 @@ const FriendlyWebsitesWidget = ({
         )}
       </AnimatePresence>
 
+      {/* Screen-reader-only live region: announces widget state changes
+          (open/close, burst, sync issues) without visual noise. */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="friendly-widget-live-region"
+      >
+        {hasSyncError
+          ? "Widget sync failed. Retry available."
+          : isOpen
+            ? `${label} panel opened`
+            : burstAt
+              ? `${label} activated`
+              : ""}
+      </div>
+
       {/* Toggle Button */}
       <motion.button
         onClick={handleToggle}
