@@ -1,0 +1,1 @@
+UPDATE public.friendly_websites SET is_active = true WHERE is_active = false;
