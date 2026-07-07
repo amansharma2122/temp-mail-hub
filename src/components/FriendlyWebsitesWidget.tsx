@@ -62,6 +62,12 @@ interface WidgetSettings {
   //  'always_on':    force reduced motion for every visitor.
   //  'never':        ignore OS preference (use with caution).
   reducedMotionMode?: 'respect_user' | 'always_on' | 'never';
+  /** Celebration button rendered inside the open panel. */
+  celebrationEnabled?: boolean;
+  celebrationLabel?: string;
+  celebrationEffect?:
+    | 'sparkle' | 'confetti' | 'bomb' | 'fireworks'
+    | 'hearts' | 'stars' | 'rainbow-burst';
 }
 
 const defaultSettings: WidgetSettings = {
@@ -87,6 +93,9 @@ const defaultSettings: WidgetSettings = {
   disableEffectsOnReducedMotion: true,
   reducedMotionMode: 'respect_user',
   clickEffect: 'sparkle',
+  celebrationEnabled: true,
+  celebrationLabel: 'Click Me 🎉',
+  celebrationEffect: 'confetti',
 };
 
 // -------- Module-scoped constants (do NOT depend on component state) -------
@@ -436,6 +445,14 @@ const FriendlyWebsitesWidget = ({
     recordFriendlyWidgetEvent('click', {
       website_id: site.id,
       attention_effect: site.attention_effect || settings.attentionEffect || null,
+    });
+  };
+
+  const handleCelebrate = () => {
+    const rmBlocks = effectiveReducedMotion;
+    if (!rmBlocks) setBurstAt(Date.now());
+    recordFriendlyWidgetEvent('celebrate_click', {
+      attention_effect: settings.celebrationEffect ?? null,
     });
   };
 
