@@ -70,10 +70,7 @@ export const useSidebarIcons = () => {
     delete newIcons[menuUrl];
     
     try {
-      await supabase
-        .from('app_settings')
-        .update({ value: newIcons, updated_at: new Date().toISOString() })
-        .eq('key', STORAGE_KEY);
+      await saveAppSetting(STORAGE_KEY, newIcons);
       
       setIcons(newIcons);
       return true;
