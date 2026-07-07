@@ -32,7 +32,7 @@ describe("EmailExpiredModal end-to-end flow", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("user@nullsto.com")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /generate a new free email/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /dismiss/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^dismiss$/i })).toBeInTheDocument();
   });
 
   it("invokes onGenerateNew when the free-generate button is clicked", () => {
