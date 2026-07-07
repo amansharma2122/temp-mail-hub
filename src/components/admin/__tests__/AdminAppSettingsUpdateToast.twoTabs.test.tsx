@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act, waitFor, cleanup } from "@testing-library/react";
 import { Toaster } from "sonner";
+import { MemoryRouter } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import AdminAppSettingsUpdateToast from "@/components/admin/AdminAppSettingsUpdateToast";
 
@@ -46,10 +47,12 @@ import {
 
 function renderTabA() {
   return render(
-    <LanguageProvider>
-      <AdminAppSettingsUpdateToast />
-      <Toaster />
-    </LanguageProvider>,
+    <MemoryRouter>
+      <LanguageProvider>
+        <AdminAppSettingsUpdateToast />
+        <Toaster />
+      </LanguageProvider>
+    </MemoryRouter>,
   );
 }
 
