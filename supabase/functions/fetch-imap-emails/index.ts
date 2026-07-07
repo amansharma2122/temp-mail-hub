@@ -340,6 +340,8 @@ serve(async (req: Request): Promise<Response> => {
           username,
           password,
           last_error_at: m.last_error_at,
+          storageBytesLimit: Number(m.storage_bytes_limit ?? 10737418240),
+          storageBytesUsed: Number(m.storage_bytes_used ?? 0),
         });
       }
 
