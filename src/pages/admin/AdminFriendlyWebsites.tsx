@@ -86,6 +86,8 @@ interface WidgetSettings {
   triggerIcon: string;
   autoOpenDelayMs: number;
   showLabelOnTrigger: boolean;
+  animationIntensity: 'subtle' | 'normal' | 'lively';
+  disableEffectsOnReducedMotion: boolean;
 }
 
 const defaultSettings: WidgetSettings = {
@@ -105,6 +107,8 @@ const defaultSettings: WidgetSettings = {
   triggerIcon: 'Sparkles',
   autoOpenDelayMs: 0,
   showLabelOnTrigger: true,
+  animationIntensity: 'normal',
+  disableEffectsOnReducedMotion: true,
 };
 
 const emptyForm = {
