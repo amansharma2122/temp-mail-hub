@@ -507,6 +507,50 @@ serve(async (req: Request): Promise<Response> => {
           throw new Error("Failed to select INBOX: " + selectResponse);
         }
 
+        // Storage quota check: prefer IMAP QUOTA, fall back to manual cap.
+        let effectiveLimit = candidate.storageBytesLimit ?? 10737418240;
+        let currentUsed = candidate.storageBytesUsed ?? 0;
+        let quotaSource: "imap" | "manual" = "manual";
+        try {
+          const quotaRootResp = await sendCommand(`GETQUOTAROOT "INBOX"`, tagNum++);
+          // Parse: * QUOTA "" (STORAGE <used> <limit>)  — units are KB per RFC 2087
+          const qm = quotaRootResp.match(/\*\s+QUOTA\s+\S+\s*\(\s*STORAGE\s+(\d+)\s+(\d+)\s*\)/i);
+          if (qm) {
+            const usedKb = parseInt(qm[1], 10);
+            const limitKb = parseInt(qm[2], 10);
+            if (Number.isFinite(usedKb) && Number.isFinite(limitKb) && limitKb > 0) {
+              currentUsed = usedKb * 1024;
+              effectiveLimit = limitKb * 1024;
+              quotaSource = "imap";
+            }
+          }
+        } catch (qErr) {
+          console.warn(`[IMAP] QUOTA not supported / failed for ${candidate.mailboxName || candidate.host}:`, qErr);
+        }
+
+        if (candidate.mailboxId) {
+          try {
+            await supabase.from("mailboxes").update({
+              storage_bytes_used: currentUsed,
+              last_quota_check_at: new Date().toISOString(),
+            }).eq("id", candidate.mailboxId);
+          } catch { /* ignore */ }
+        }
+
+        if (currentUsed >= effectiveLimit) {
+          if (candidate.mailboxId) {
+            try {
+              await supabase.from("mailboxes").update({
+                is_full: true,
+                storage_bytes_used: currentUsed,
+                last_error: `Mailbox full (${quotaSource}): ${currentUsed}/${effectiveLimit} bytes`,
+                last_error_at: new Date().toISOString(),
+              }).eq("id", candidate.mailboxId);
+            } catch { /* ignore */ }
+          }
+          throw new Error(`MAILBOX_FULL: ${candidate.mailboxName || candidate.host} at ${currentUsed}/${effectiveLimit} bytes — failing over`);
+        }
+
         const existsMatch = selectResponse.match(/\* (\d+) EXISTS/);
         const messageCount = existsMatch ? parseInt(existsMatch[1]) : 0;
 
