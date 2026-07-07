@@ -899,7 +899,7 @@ const AdminFriendlyWebsites = () => {
               Add a partner or related website to show in the sidebar widget
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
             <div className="space-y-2">
               <Label>Name *</Label>
               <Input
