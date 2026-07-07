@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 
 import {
   Wand2, Server, Mail, Shield, Globe, CheckCircle, XCircle,
@@ -104,12 +105,7 @@ const AdminEmailSetup = () => {
     const updatedRules = [...forwardingRules, rule];
     
     try {
-      const { error } = await api.db.upsert("app_settings", 
-        { key: "email_forwarding_rules", value: updatedRules },
-        { onConflict: "key" }
-      );
-      if (error) throw error;
-
+      await saveAppSetting("email_forwarding_rules", updatedRules);
       setForwardingRules(updatedRules);
       setNewRule({ pattern: '', forwardTo: '' });
       toast.success("Forwarding rule added");
@@ -124,12 +120,7 @@ const AdminEmailSetup = () => {
     );
 
     try {
-      const { error } = await api.db.upsert("app_settings",
-        { key: "email_forwarding_rules", value: updatedRules },
-        { onConflict: "key" }
-      );
-      if (error) throw error;
-
+      await saveAppSetting("email_forwarding_rules", updatedRules);
       setForwardingRules(updatedRules);
     } catch (error) {
       toast.error("Failed to update rule");
@@ -140,12 +131,7 @@ const AdminEmailSetup = () => {
     const updatedRules = forwardingRules.filter(rule => rule.id !== id);
 
     try {
-      const { error } = await api.db.upsert("app_settings",
-        { key: "email_forwarding_rules", value: updatedRules },
-        { onConflict: "key" }
-      );
-      if (error) throw error;
-
+      await saveAppSetting("email_forwarding_rules", updatedRules);
       setForwardingRules(updatedRules);
       toast.success("Rule deleted");
     } catch (error) {
