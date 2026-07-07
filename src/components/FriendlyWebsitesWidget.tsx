@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
@@ -402,7 +402,7 @@ const FriendlyWebsitesWidget = ({
   const badgeAllowed = _badgeAllowed;
   const badgeText = badgeSite?.badge_text || settings.badgeText || String(websites.length);
 
-  const handleToggle = () => {
+  const handleToggle = useCallback(() => {
     const next = !isOpen;
     setIsOpen(next);
     if (next) {
@@ -412,14 +412,14 @@ const FriendlyWebsitesWidget = ({
         attention_effect: settings.attentionEffect ?? null,
       });
     }
-  };
+  }, [isOpen, effectiveReducedMotion, settings.attentionEffect]);
 
-  const handleSiteClick = (site: FriendlyWebsite) => {
+  const handleSiteClick = useCallback((site: FriendlyWebsite) => {
     recordFriendlyWidgetEvent('click', {
       website_id: site.id,
       attention_effect: site.attention_effect || settings.attentionEffect || null,
     });
-  };
+  }, [settings.attentionEffect]);
 
   // Animation variants — collapse fancy motion when the user prefers reduced motion
   // AND the admin hasn't disabled that safeguard.
@@ -428,6 +428,11 @@ const FriendlyWebsitesWidget = ({
   // Intensity multiplier tunes duration/spring stiffness for panel animations.
   const intensity = settings.animationIntensity ?? 'normal';
   const intensityMul = intensity === 'subtle' ? 0.6 : intensity === 'lively' ? 1.35 : 1;
+
+  // Memoize the manualRetry closure so the SyncErrorPill doesn't rebind on
+  // every render (which was causing the countdown text update to briefly
+  // re-render the whole widget tree).
+  const memoManualRetry = useCallback(manualRetry, [manualRetry]);
 
   return (
     <>
