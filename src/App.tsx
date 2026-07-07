@@ -11,6 +11,7 @@ import { NotificationProvider } from "@/components/NotificationSystem";
 import { initializeDefaultData } from "@/lib/storage";
 import { EmailServiceProvider } from "@/contexts/EmailServiceContext";
 import { createQueryClient } from "@/lib/queryClient";
+import { bindAllAppSettingsToQueryClient } from "@/lib/appSettingsSync";
 
 import ErrorBoundary, { PageErrorBoundary } from "@/components/ErrorBoundary";
 import UpdatePrompt from "@/components/UpdatePrompt";
@@ -161,6 +162,12 @@ if (typeof requestIdleCallback !== 'undefined') {
 
 // Create query client with optimized caching
 const queryClient = createQueryClient();
+
+// Wire global app_settings realtime + cross-tab sync once at boot so any
+// admin change to any setting invalidates its cached query everywhere.
+if (typeof window !== "undefined") {
+  bindAllAppSettingsToQueryClient(queryClient);
+}
 
 // Minimal page loader - reduced delay for faster perceived load
 const PageLoader = () => null;
