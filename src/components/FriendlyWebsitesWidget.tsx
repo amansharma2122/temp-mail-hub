@@ -6,6 +6,12 @@ import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useSupabaseAuth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  recordFriendlyWidgetEvent,
+  canShowBadge,
+  noteBadgeShown,
+  prefersReducedMotion,
+} from "@/lib/friendlyWidgetAnalytics";
 
 interface FriendlyWebsite {
   id: string;
@@ -17,6 +23,12 @@ interface FriendlyWebsite {
   display_order: number;
   is_active: boolean;
   open_in_new_tab: boolean;
+  // Per-site notification rules (all optional; nulls inherit widget settings).
+  attention_effect?: string | null;
+  badge_enabled?: boolean | null;
+  badge_text?: string | null;
+  auto_open_override?: boolean | null;
+  max_badge_per_day?: number | null;
 }
 
 interface WidgetSettings {
