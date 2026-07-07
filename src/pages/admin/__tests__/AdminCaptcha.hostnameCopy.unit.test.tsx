@@ -44,7 +44,8 @@ describe("InvalidRecaptchaDomainWarning hostname copy button", () => {
       expect(writeText).toHaveBeenCalledTimes(1);
       // Argument must be the exact hostname, with no whitespace, protocol, or extras.
       expect(writeText).toHaveBeenCalledWith(HOSTNAME);
-      const [arg] = writeText.mock.calls[0];
+      const call = writeText.mock.calls[0] as unknown as [string];
+      const arg = call[0];
       expect(arg).toBe(HOSTNAME);
       expect(arg).not.toMatch(/^\s|\s$|https?:|\//);
     });
