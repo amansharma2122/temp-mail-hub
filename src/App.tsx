@@ -124,6 +124,7 @@ const AdminDeploymentHealth = lazyWithRetry(() => import("./pages/admin/AdminDep
 const AdminAlertSettings = lazyWithRetry(() => import("./pages/admin/AdminAlertSettings"));
 const AdminMaintenance = lazyWithRetry(() => import("./pages/admin/AdminMaintenance"));
 const AdminGeoBlocking = lazyWithRetry(() => import("./pages/admin/AdminGeoBlocking"));
+const AdminStatsVerification = lazyWithRetry(() => import("./pages/admin/AdminStatsVerification"));
 
 // Consolidated hub pages (6-group sidebar). Each hub renders the existing
 // admin pages inside tabs so all legacy URLs keep working while sidebar
@@ -365,6 +366,7 @@ const App = () => (
                             <Route path="alerts" element={<AdminAlertSettings />} />
                             <Route path="maintenance" element={<AdminMaintenance />} />
                             <Route path="geo-blocking" element={<AdminGeoBlocking />} />
+                            <Route path="stats-verification" element={<AdminStatsVerification />} />
 
                             {/* Consolidated hub routes (6-group sidebar) */}
                             <Route path="hub/users" element={<UsersHub />} />

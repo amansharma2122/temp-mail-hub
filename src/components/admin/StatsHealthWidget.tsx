@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Activity, CheckCircle2, AlertCircle, HardDrive, RefreshCw } from "lucide-react";
+import { Activity, CheckCircle2, AlertCircle, HardDrive, RefreshCw, ExternalLink, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 interface HealthRow {
   id: string;
@@ -55,6 +56,7 @@ const StatsHealthWidget = () => {
   const [counters, setCounters] = useState<CounterRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [reconciling, setReconciling] = useState(false);
+  const [promoting, setPromoting] = useState<string | null>(null);
 
   const load = async () => {
     const [h, m, c] = await Promise.all([
@@ -102,6 +104,22 @@ const StatsHealthWidget = () => {
     }
   };
 
+  const promote = async (id: string) => {
+    setPromoting(id);
+    try {
+      const { error } = await supabase.rpc("promote_mailbox_as_primary", { p_mailbox_id: id });
+      if (error) throw error;
+      toast.success("Mailbox promoted to primary");
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || "Promotion failed");
+    } finally {
+      setPromoting(null);
+    }
+  };
+
+  const activePrimary = mailboxes.find((m) => m.is_primary);
+
   const latest = health[0];
   const latestOk = latest?.status === "ok";
 
@@ -112,12 +130,30 @@ const StatsHealthWidget = () => {
           <Activity className="w-4 h-4" />
           Public stats & mailbox health
         </CardTitle>
-        <Button size="sm" variant="outline" onClick={reconcile} disabled={reconciling}>
-          <RefreshCw className={`w-3 h-3 mr-1 ${reconciling ? "animate-spin" : ""}`} />
-          Reconcile now
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/admin/stats-verification"
+            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+          >
+            Verification page <ExternalLink className="w-3 h-3" />
+          </Link>
+          <Button size="sm" variant="outline" onClick={reconcile} disabled={reconciling}>
+            <RefreshCw className={`w-3 h-3 mr-1 ${reconciling ? "animate-spin" : ""}`} />
+            Reconcile now
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="text-xs bg-muted/50 rounded px-3 py-2 flex items-center gap-2">
+          <Star className="w-3 h-3 text-primary" />
+          <span>
+            Active polling mailbox:{" "}
+            <span className="font-semibold">{activePrimary?.name || "— none —"}</span>
+            {activePrimary?.is_full && (
+              <Badge variant="destructive" className="ml-2 text-[10px]">full — failover pending</Badge>
+            )}
+          </span>
+        </div>
         <div>
           <div className="text-xs font-medium text-muted-foreground mb-2">get-public-stats — last 10 runs</div>
           {loading ? (
@@ -207,13 +243,30 @@ const StatsHealthWidget = () => {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-medium truncate">{m.name}</span>
-                        {m.is_primary && <Badge variant="outline" className="text-[10px]">primary</Badge>}
+                        {m.is_primary && (
+                          <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30">
+                            active
+                          </Badge>
+                        )}
                         {m.is_full && <Badge variant="destructive" className="text-[10px]">full</Badge>}
                         {!m.is_active && <Badge variant="secondary" className="text-[10px]">inactive</Badge>}
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {fmtBytes(m.storage_bytes_used)} / {fmtBytes(m.storage_bytes_limit)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {fmtBytes(m.storage_bytes_used)} / {fmtBytes(m.storage_bytes_limit)}
+                        </span>
+                        {!m.is_primary && m.is_active && !m.is_full && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[10px]"
+                            disabled={promoting === m.id}
+                            onClick={() => promote(m.id)}
+                          >
+                            Set active
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <Progress value={pct} className="h-1.5" />
                   </li>

@@ -221,7 +221,7 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     banners.forEach((banner) => trackView(banner.id));
   }, [banners]);
 
-  // Don't render anything if no banners (even while loading, to avoid layout shift)
+  // Don't render anything if no banners — avoids layout shift.
   if (banners.length === 0) return null;
 
   const positionStyles: Record<string, string> = {
@@ -240,6 +240,16 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
         >
           <RadioTower className="w-3 h-3" />
           Live updates paused — polling
+        </div>
+      )}
+      {!isAdmin && realtimeMode === "polling" && (
+        <div
+          className="absolute top-1 right-1 z-10 text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50 flex items-center gap-1 pointer-events-none opacity-70"
+          title="Temporarily syncing — content refreshes every 30 seconds"
+          aria-live="polite"
+        >
+          <RadioTower className="w-3 h-3 animate-pulse" />
+          Temporarily syncing…
         </div>
       )}
       {banners.map((banner, index) => (
