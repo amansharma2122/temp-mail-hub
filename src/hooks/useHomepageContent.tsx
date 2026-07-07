@@ -155,7 +155,7 @@ export function useHomepageContent() {
   // Subscribe to real-time updates
   useEffect(() => {
     const channel = supabase
-      .channel("homepage-sections-changes")
+      .channel(`homepage-sections-changes-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         {
@@ -171,7 +171,7 @@ export function useHomepageContent() {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [queryClient]);
 

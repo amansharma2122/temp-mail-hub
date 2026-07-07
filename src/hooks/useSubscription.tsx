@@ -136,7 +136,7 @@ export const useSubscription = () => {
         user_id: user.id,
         date: today,
         [field]: usage[field] + 1,
-      }, {
+      } as any, {
         onConflict: 'user_id,date',
       });
     

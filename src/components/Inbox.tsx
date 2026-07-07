@@ -56,8 +56,8 @@ const Inbox = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   
   // 4. All useRef hooks together
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
-  const refreshRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Notification sounds - auto-unlocks on user interaction
   const { playSound } = useNotificationSounds();
