@@ -338,17 +338,17 @@ const FriendlyWebsitesWidget = ({
   const colorClasses = COLOR_CLASSES;
   const buttonColorClasses = BUTTON_COLOR_CLASSES;
 
-  // Only the slide/bounce variants depend on `position`, so memoize keyed by it.
-  const animationVariants = useMemo(() => {
-    const offset = settings.position === 'right' ? 300 : -300;
-    return {
-      slide:  { hidden: { x: offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
-      fade:   { hidden: { opacity: 0, scale: 0.8 }, visible: { opacity: 1, scale: 1 } },
-      bounce: { hidden: { x: offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
-      flip:   { hidden: { rotateY: 90, opacity: 0 }, visible: { rotateY: 0, opacity: 1 } },
-      zoom:   { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1 } },
-    } as const;
-  }, [settings.position]);
+  // NOTE: this literal lives after an early-return branch, so it can't be a
+  // hook. It's still cheaper than before because the class-name maps above
+  // are now module-scoped and no longer rebuilt every render.
+  const _offset = settings.position === 'right' ? 300 : -300;
+  const animationVariants = {
+    slide:  { hidden: { x: _offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
+    fade:   { hidden: { opacity: 0, scale: 0.8 }, visible: { opacity: 1, scale: 1 } },
+    bounce: { hidden: { x: _offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
+    flip:   { hidden: { rotateY: 90, opacity: 0 }, visible: { rotateY: 0, opacity: 1 } },
+    zoom:   { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1 } },
+  } as const;
 
   const positionClasses = settings.position === 'right' 
     ? 'right-0 rounded-l-xl' 
