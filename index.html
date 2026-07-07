@@ -41,6 +41,14 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/nullsto-favicon.png" />
+
+    <!-- Preload favicon/logo used as the LCP-adjacent brand mark and
+         hint the browser to prioritize the hero fetch chain. The hero
+         itself is text-based (no <img>), so we preconnect to the CDN
+         used by any hero-adjacent assets rather than preloading an image
+         file that doesn't exist. -->
+    <link rel="preload" as="image" href="/nullsto-favicon.png" fetchpriority="high" />
+    <link rel="preconnect" href="https://ttgltktefeqluafrvpjl.supabase.co" crossorigin />
   </head>
 
   <body>
