@@ -697,8 +697,111 @@ const AdminFriendlyWebsites = () => {
                       <SelectItem value="slide">Slide</SelectItem>
                       <SelectItem value="fade">Fade</SelectItem>
                       <SelectItem value="bounce">Bounce</SelectItem>
+                      <SelectItem value="flip">Flip</SelectItem>
+                      <SelectItem value="zoom">Zoom</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* Attention & branding */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Attention Effect
+                  </Label>
+                  <Select
+                    value={settings.attentionEffect}
+                    onValueChange={(v: WidgetSettings['attentionEffect']) =>
+                      setSettings({ ...settings, attentionEffect: v })
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="pulse">Pulse</SelectItem>
+                      <SelectItem value="glow">Glow</SelectItem>
+                      <SelectItem value="wiggle">Wiggle</SelectItem>
+                      <SelectItem value="bounce">Bounce</SelectItem>
+                      <SelectItem value="ring">Ring</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Makes the widget more noticeable while closed.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Wand2 className="w-4 h-4" /> Trigger Icon
+                  </Label>
+                  <LucideIconPicker
+                    value={settings.triggerIcon}
+                    onChange={(name) => setSettings({ ...settings, triggerIcon: name })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Button Label</Label>
+                  <Input
+                    value={settings.buttonLabel}
+                    onChange={(e) => setSettings({ ...settings, buttonLabel: e.target.value })}
+                    placeholder="Partner Sites"
+                    maxLength={40}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tooltip Text</Label>
+                  <Input
+                    value={settings.tooltipText}
+                    onChange={(e) => setSettings({ ...settings, tooltipText: e.target.value })}
+                    placeholder="Explore our partner sites"
+                    maxLength={80}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Badge Text (blank = count)</Label>
+                  <Input
+                    value={settings.badgeText}
+                    onChange={(e) => setSettings({ ...settings, badgeText: e.target.value })}
+                    placeholder="New"
+                    maxLength={6}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Auto-open Delay (ms, 0 = off)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={settings.autoOpenDelayMs}
+                    onChange={(e) => setSettings({ ...settings, autoOpenDelayMs: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                  <p className="text-xs text-muted-foreground">Opens once per session after the delay.</p>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label>Show Notification Badge</Label>
+                    <p className="text-xs text-muted-foreground">Small badge on the trigger button</p>
+                  </div>
+                  <Switch
+                    checked={settings.showBadge}
+                    onCheckedChange={(v) => setSettings({ ...settings, showBadge: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label>Show Label on Trigger</Label>
+                    <p className="text-xs text-muted-foreground">Vertical label next to the icon</p>
+                  </div>
+                  <Switch
+                    checked={settings.showLabelOnTrigger}
+                    onCheckedChange={(v) => setSettings({ ...settings, showLabelOnTrigger: v })}
+                  />
                 </div>
               </div>
 
