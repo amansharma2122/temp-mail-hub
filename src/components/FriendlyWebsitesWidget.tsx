@@ -434,13 +434,7 @@ const FriendlyWebsitesWidget = ({
         className="sr-only"
         data-testid="friendly-widget-live-region"
       >
-        {hasSyncError
-          ? "Widget sync failed. Retry available."
-          : isOpen
-            ? `${label} panel opened`
-            : burstAt
-              ? `${label} activated`
-              : ""}
+        {liveMessage}
       </div>
 
       {/* Toggle Button */}
