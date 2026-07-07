@@ -8,6 +8,7 @@ import {
   getNewEmailSoundAdminEnabled,
   getNewEmailSoundAdminEnabledSync,
 } from "@/lib/newEmailNotificationStyle";
+import { reportRealtimeLatency, type RumSurface } from "@/lib/realtimeEmailRum";
 
 // ---------------------------------------------------------------------------
 // Module-level subscription registry.
@@ -91,10 +92,19 @@ interface UseRealtimeEmailsOptions {
   showToast?: boolean;
   playSoundCallback?: () => void; // Accept sound callback from parent
   enablePushNotifications?: boolean;
+  /** RUM surface tag — defaults to "inbox". Admin dashboards pass "admin". */
+  rumSurface?: RumSurface;
 }
 
 export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
-  const { tempEmailId, onNewEmail, showToast = true, playSoundCallback, enablePushNotifications = true } = options;
+  const {
+    tempEmailId,
+    onNewEmail,
+    showToast = true,
+    playSoundCallback,
+    enablePushNotifications = true,
+    rumSurface = "inbox",
+  } = options;
   const [newEmailCount, setNewEmailCount] = useState(0);
   const [lastEmail, setLastEmail] = useState<ReceivedEmail | null>(null);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
@@ -203,6 +213,8 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
     }
     const unsubscribe = subscribe(tempEmailId, (payload) => {
       const newEmail = payload.new as ReceivedEmail;
+      // RUM: end-to-end realtime latency from server received_at to client.
+      reportRealtimeLatency(rumSurface, tempEmailId, newEmail.received_at);
       setNewEmailCount((prev) => prev + 1);
       setLastEmail(newEmail);
 
