@@ -1718,6 +1718,10 @@ export type Database = {
         }
         Returns: string
       }
+      promote_mailbox_as_primary: {
+        Args: { p_mailbox_id: string }
+        Returns: Json
+      }
       prune_stats_health_log: { Args: never; Returns: undefined }
       reconcile_email_stats: { Args: never; Returns: Json }
       reconcile_mailbox_storage: { Args: never; Returns: Json }
