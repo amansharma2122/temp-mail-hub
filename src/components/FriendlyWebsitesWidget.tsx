@@ -68,6 +68,12 @@ interface WidgetSettings {
   celebrationEffect?:
     | 'sparkle' | 'confetti' | 'bomb' | 'fireworks'
     | 'hearts' | 'stars' | 'rainbow-burst';
+  /** Celebration animation tuning — persisted, editable in admin. */
+  celebrationIntensity?: 'subtle' | 'normal' | 'lively';
+  celebrationDurationMs?: number;   // 800..8000, overrides OVERLAY_MS
+  celebrationParticleCount?: number; // 0 = use preset default
+  /** Play a short chime when the celebrate button is clicked. */
+  celebrationSoundEnabled?: boolean;
 }
 
 const defaultSettings: WidgetSettings = {
@@ -96,6 +102,10 @@ const defaultSettings: WidgetSettings = {
   celebrationEnabled: true,
   celebrationLabel: 'Click Me 🎉',
   celebrationEffect: 'confetti',
+  celebrationIntensity: 'normal',
+  celebrationDurationMs: 4200,
+  celebrationParticleCount: 0,
+  celebrationSoundEnabled: false,
 };
 
 // -------- Module-scoped constants (do NOT depend on component state) -------
