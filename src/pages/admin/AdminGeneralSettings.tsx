@@ -399,6 +399,9 @@ const AdminGeneralSettings = () => {
         </Card>
 
         {/* Site Status settings are in Registration Control page */}
+
+        {/* Stats + Quick Tips section background */}
+        <StatsSectionBgPreview />
       </div>
     </div>
   );
