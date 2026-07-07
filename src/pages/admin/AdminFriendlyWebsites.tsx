@@ -20,6 +20,7 @@ import {
 import * as LucideIcons from "lucide-react";
 import LucideIconPicker from "@/components/admin/LucideIconPicker";
 import FriendlyWidgetAnalytics from "@/components/admin/FriendlyWidgetAnalytics";
+import FriendlyWidgetRateLimitSettings from "@/components/admin/FriendlyWidgetRateLimitSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -945,6 +946,7 @@ const AdminFriendlyWebsites = () => {
 
         <TabsContent value="analytics" className="space-y-4 mt-4">
           <FriendlyWidgetAnalytics days={30} />
+          <FriendlyWidgetRateLimitSettings />
         </TabsContent>
       </Tabs>
 
