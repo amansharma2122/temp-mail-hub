@@ -9,6 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import LucideIconPicker from "@/components/admin/LucideIconPicker";
 import FriendlyWebsitesWidget from "@/components/FriendlyWebsitesWidget";
+import { useState as useReactState } from "react";
+import { Moon, Sun, Languages } from "lucide-react";
 
 /**
  * Live preview of the Friendly Websites widget for admins.
@@ -96,6 +98,12 @@ export default function AdminFriendlyWidgetPreview() {
 
   const update = <K extends keyof typeof settings>(k: K, v: typeof settings[K]) =>
     setSettings((s) => ({ ...s, [k]: v }));
+
+  // Preview-only toggles: LTR/RTL direction and light/dark theme applied
+  // scoped to the preview canvas so admins can validate rendering without
+  // affecting the surrounding admin app.
+  const [previewDir, setPreviewDir] = useReactState<"ltr" | "rtl">("ltr");
+  const [previewTheme, setPreviewTheme] = useReactState<"light" | "dark">("light");
 
   return (
     <div className="container max-w-5xl py-8 space-y-6">
@@ -216,10 +224,44 @@ export default function AdminFriendlyWidgetPreview() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Preview canvas</CardTitle>
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+            <span>Preview canvas</span>
+            <div className="flex items-center gap-2 text-sm font-normal">
+              <Button
+                type="button"
+                variant={previewDir === "rtl" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPreviewDir(previewDir === "ltr" ? "rtl" : "ltr")}
+                aria-pressed={previewDir === "rtl"}
+                data-testid="preview-dir-toggle"
+              >
+                <Languages className="w-4 h-4 mr-1" /> {previewDir.toUpperCase()}
+              </Button>
+              <Button
+                type="button"
+                variant={previewTheme === "dark" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPreviewTheme(previewTheme === "light" ? "dark" : "light")}
+                aria-pressed={previewTheme === "dark"}
+                data-testid="preview-theme-toggle"
+              >
+                {previewTheme === "dark" ? (
+                  <Moon className="w-4 h-4 mr-1" />
+                ) : (
+                  <Sun className="w-4 h-4 mr-1" />
+                )}
+                {previewTheme}
+              </Button>
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="relative h-96 border rounded-lg bg-gradient-to-br from-muted/40 to-background overflow-hidden">
+          <div
+            dir={previewDir}
+            data-testid="preview-canvas"
+            data-theme={previewTheme}
+            className={`relative h-96 border rounded-lg overflow-hidden ${previewTheme === "dark" ? "dark bg-slate-950 text-slate-50" : "bg-gradient-to-br from-muted/40 to-background"}`}
+          >
             <p className="absolute top-3 left-3 text-xs text-muted-foreground">
               The widget renders anchored to the viewport — resize your window to see position.
             </p>
