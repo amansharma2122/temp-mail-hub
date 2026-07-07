@@ -32,7 +32,7 @@ const defaultSettings: PaymentSettings = {
   currency: 'usd',
   upiEnabled: true,
   upiId: '',
-  keepEmailPrice: 2,
+  keepEmailPrice: 10,
 };
 
 export function usePaymentSettings() {
@@ -119,7 +119,7 @@ export function usePaymentSettings() {
     hasPaidPaymentMethod: currentSettings.stripeEnabled || currentSettings.paypalEnabled,
     upiEnabled: !!currentSettings.upiEnabled && !!currentSettings.upiId,
     upiId: currentSettings.upiId || '',
-    keepEmailPrice: currentSettings.keepEmailPrice ?? 2,
+    keepEmailPrice: currentSettings.keepEmailPrice ?? 10,
     currency: currentSettings.currency || 'usd',
   };
 }

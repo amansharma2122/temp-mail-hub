@@ -38,6 +38,13 @@ import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { getAppSettingsRowId } from "@/lib/appSettingsKeyRoutes";
 import {
+  getCelebrationSpeedLabels,
+  normalizeCelebrationSpeed,
+  CELEBRATION_SPEEDS,
+  DEFAULT_CELEBRATION_SPEED,
+} from "@/lib/celebrationSpeedLabels";
+import { useLanguage } from "@/contexts/LanguageContext";
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -54,6 +61,63 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+/**
+ * Localized Speed <select> with inline validation and a "Reset to defaults"
+ * action. Kept inline (not extracted) so it stays close to the settings
+ * object it edits.
+ */
+function CelebrationSpeedField({
+  value,
+  disabled,
+  onChange,
+  onReset,
+}: {
+  value: 'slower' | 'normal' | 'faster' | undefined;
+  disabled: boolean;
+  onChange: (v: 'slower' | 'normal' | 'faster') => void;
+  onReset: () => void;
+}) {
+  const { language } = useLanguage();
+  const L = getCelebrationSpeedLabels(language);
+  const safe = normalizeCelebrationSpeed(value);
+  const invalid = value !== undefined && !CELEBRATION_SPEEDS.includes(value as never);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs" htmlFor="celebration-speed">{L.label}</Label>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={disabled}
+          className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+          data-testid="celebration-speed-reset"
+        >
+          {L.reset}
+        </button>
+      </div>
+      <Select
+        value={safe}
+        onValueChange={(v: string) => onChange(normalizeCelebrationSpeed(v))}
+        disabled={disabled}
+      >
+        <SelectTrigger id="celebration-speed" data-testid="celebration-speed-select" aria-invalid={invalid || undefined}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="slower">{L.slower}</SelectItem>
+          <SelectItem value="normal">{L.normal}</SelectItem>
+          <SelectItem value="faster">{L.faster}</SelectItem>
+        </SelectContent>
+      </Select>
+      {invalid && (
+        <p className="text-[10px] text-destructive" data-testid="celebration-speed-error">
+          Invalid value — was reset to “{L.normal}”.
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface FriendlyWebsite {
   id: string;
@@ -915,22 +979,18 @@ const AdminFriendlyWebsites = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Speed</Label>
-                      <Select
-                        value={settings.celebrationSpeed ?? 'normal'}
-                        onValueChange={(v: 'slower'|'normal'|'faster') =>
-                          setSettings({ ...settings, celebrationSpeed: v })}
-                        disabled={!(settings.celebrationEnabled ?? true)}
-                      >
-                        <SelectTrigger data-testid="celebration-speed-select"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="slower">Slower</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                          <SelectItem value="faster">Faster</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                     <CelebrationSpeedField
+                       value={settings.celebrationSpeed}
+                       disabled={!(settings.celebrationEnabled ?? true)}
+                       onChange={(v) => setSettings({ ...settings, celebrationSpeed: v })}
+                       onReset={() => setSettings({
+                         ...settings,
+                         celebrationSpeed: DEFAULT_CELEBRATION_SPEED,
+                         celebrationIntensity: 'normal',
+                         celebrationDurationMs: 4200,
+                         celebrationParticleCount: 0,
+                       })}
+                     />
                     <div className="space-y-1">
                       <Label className="text-xs">Duration (ms)</Label>
                       <Input

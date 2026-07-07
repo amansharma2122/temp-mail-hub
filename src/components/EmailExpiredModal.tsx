@@ -132,13 +132,18 @@ const EmailExpiredModal = ({ isOpen, address, onClose, onGenerateNew }: EmailExp
               </div>
 
               <div className="mt-4 flex items-center justify-between rounded-xl border border-primary/30 bg-background/70 px-3 py-2">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  <span>Keep this exact email</span>
+                <div className="min-w-0 pr-2">
+                  <div className="flex items-center gap-2 text-xs text-foreground">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span className="font-medium">Keep this exact email</span>
+                  </div>
+                  <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                    Includes <span className="font-semibold text-foreground">10 GB</span> mailbox storage · send &amp; receive emails
+                  </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <div className="text-base font-bold text-foreground leading-none">{priceLabel}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">one-time</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">per year</div>
                 </div>
               </div>
             </div>
