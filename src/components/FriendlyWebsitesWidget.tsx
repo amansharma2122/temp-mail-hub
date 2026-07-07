@@ -411,7 +411,7 @@ const FriendlyWebsitesWidget = ({
 
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
       <AnimatePresence>
-        {burstAt && !reducedMotion && (
+        {burstAt && !effectiveReducedMotion && (
           <motion.div
             key={burstAt}
             className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
