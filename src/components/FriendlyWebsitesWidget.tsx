@@ -334,7 +334,13 @@ const FriendlyWebsitesWidget = ({
   // discoverable without any looping animation.
   const rawAttention = settings.attentionEffect ?? 'pulse';
   const disableOnRM = settings.disableEffectsOnReducedMotion !== false;
-  const attention = reducedMotion && disableOnRM
+  // Effective reduced-motion combines admin policy and OS preference.
+  const rmMode = settings.reducedMotionMode ?? 'respect_user';
+  const effectiveReducedMotion =
+    rmMode === 'always_on' ? true
+    : rmMode === 'never' ? false
+    : (reducedMotion && disableOnRM);
+  const attention = effectiveReducedMotion
     && ['pulse','wiggle','bounce','sparkle','confetti','ripple','rainbow','magnet'].includes(rawAttention)
     ? 'ring'
     : rawAttention;
