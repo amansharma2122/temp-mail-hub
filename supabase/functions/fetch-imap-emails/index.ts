@@ -767,6 +767,10 @@ serve(async (req: Request): Promise<Response> => {
               continue;
             }
 
+            const bodyBytes = new TextEncoder().encode(finalTextBody || "").length;
+            const htmlBytes = new TextEncoder().encode(finalHtmlBody || "").length;
+            const rawSize = bodyBytes + htmlBytes;
+
             const { error: insertError } = await supabase.from("received_emails").insert({
               temp_email_id: matchedTempEmailId,
               from_address: fromAddress,
@@ -775,6 +779,8 @@ serve(async (req: Request): Promise<Response> => {
               html_body: finalHtmlBody ? finalHtmlBody.substring(0, 50000) : null,
               is_read: false,
               received_at: receivedAtIso,
+              mailbox_id: candidate.mailboxId ?? null,
+              raw_size_bytes: rawSize,
             });
 
             if (insertError) {
@@ -785,6 +791,15 @@ serve(async (req: Request): Promise<Response> => {
               }
             } else {
               storedCount.success++;
+              // Increment cached usage; mark full if we've crossed the manual cap.
+              if (candidate.mailboxId) {
+                currentUsed += rawSize;
+                try {
+                  const patch: Record<string, unknown> = { storage_bytes_used: currentUsed };
+                  if (currentUsed >= effectiveLimit) patch.is_full = true;
+                  await supabase.from("mailboxes").update(patch).eq("id", candidate.mailboxId);
+                } catch { /* ignore */ }
+              }
             }
 
             await sendCommand(`STORE ${msgId} +FLAGS (\\Seen)`, tagNum++);
