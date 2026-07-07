@@ -971,6 +971,9 @@ const AdminFriendlyWebsites = () => {
                     <ClickBurst
                       key={previewBurstAt}
                       variant={settings.celebrationEffect ?? 'confetti'}
+                      intensity={settings.celebrationIntensity ?? 'normal'}
+                      durationMs={settings.celebrationDurationMs ?? 4200}
+                      countScale={settings.celebrationParticleCount ?? 0}
                       onDone={() => setPreviewBurstAt(null)}
                     />
                   )}
