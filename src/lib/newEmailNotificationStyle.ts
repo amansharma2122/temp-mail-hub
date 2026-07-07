@@ -2,9 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 import type { NewEmailToastStyle } from "@/components/NewEmailToast";
 
 const STORAGE_KEY = "new_email_notification_style";
+const SOUND_KEY = "new_email_sound_admin_enabled";
 const DEFAULT_STYLE: NewEmailToastStyle = "bounce_confetti";
 let cached: NewEmailToastStyle | null = null;
 let inflight: Promise<NewEmailToastStyle> | null = null;
+let cachedSound: boolean | null = null;
+let inflightSound: Promise<boolean> | null = null;
 
 function readCache(): NewEmailToastStyle {
   if (cached) return cached;
@@ -54,4 +57,54 @@ export async function getNewEmailNotificationStyle(): Promise<NewEmailToastStyle
 export function setNewEmailNotificationStyleCache(style: NewEmailToastStyle) {
   cached = style;
   try { localStorage.setItem(STORAGE_KEY, style); } catch { /* noop */ }
+}
+
+// --- Admin-controlled sound gate ---------------------------------------------
+// Distinct from the per-user "enable notification sounds" toggle: this is a
+// site-wide switch admins can flip to silence realtime new-email sound
+// notifications for everyone (e.g. if a bug causes flooding).
+
+function readSoundCache(): boolean {
+  if (cachedSound !== null) return cachedSound;
+  try {
+    const v = localStorage.getItem(SOUND_KEY);
+    if (v === "true") return true;
+    if (v === "false") return false;
+  } catch { /* noop */ }
+  return true; // default on
+}
+
+export function getNewEmailSoundAdminEnabledSync(): boolean {
+  return cachedSound ?? readSoundCache();
+}
+
+export async function getNewEmailSoundAdminEnabled(): Promise<boolean> {
+  if (cachedSound !== null) return cachedSound;
+  if (inflightSound) return inflightSound;
+  inflightSound = (async () => {
+    try {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", SOUND_KEY)
+        .maybeSingle();
+      const raw = (data as any)?.value;
+      const val = raw === false || raw === "false" || raw?.enabled === false ? false : true;
+      cachedSound = val;
+      try { localStorage.setItem(SOUND_KEY, val ? "true" : "false"); } catch { /* noop */ }
+      return val;
+    } catch {
+      const fallback = readSoundCache();
+      cachedSound = fallback;
+      return fallback;
+    } finally {
+      inflightSound = null;
+    }
+  })();
+  return inflightSound;
+}
+
+export function setNewEmailSoundAdminEnabledCache(enabled: boolean) {
+  cachedSound = enabled;
+  try { localStorage.setItem(SOUND_KEY, enabled ? "true" : "false"); } catch { /* noop */ }
 }

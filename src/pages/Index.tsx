@@ -10,7 +10,11 @@ import SEOHead from "@/components/SEOHead";
 import JsonLd from "@/components/JsonLd";
 import BannerDisplay from "@/components/BannerDisplay";
 import LiveStatsWidget from "@/components/LiveStatsWidget";
-import FriendlyWebsitesWidget from "@/components/FriendlyWebsitesWidget";
+import { lazy, Suspense } from "react";
+// FriendlyWebsitesWidget is heavy (framer-motion + full lucide-react set) and
+// only paints in a corner overlay — defer it out of the initial bundle so the
+// public site's LCP isn't blocked by widget code.
+const FriendlyWebsitesWidget = lazy(() => import("@/components/FriendlyWebsitesWidget"));
 import BackendHealthBanner from "@/components/BackendHealthBanner";
 import { motion } from "framer-motion";
 import { useHomepageContent } from "@/hooks/useHomepageContent";
@@ -159,7 +163,9 @@ const Index = () => {
       <Footer />
       
       {/* Friendly Websites Sidebar Widget */}
-      <FriendlyWebsitesWidget />
+      <Suspense fallback={null}>
+        <FriendlyWebsitesWidget />
+      </Suspense>
     </div>
   );
 };

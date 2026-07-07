@@ -5,6 +5,8 @@ import { NewEmailToast } from "@/components/NewEmailToast";
 import {
   getNewEmailNotificationStyle,
   getNewEmailNotificationStyleSync,
+  getNewEmailSoundAdminEnabled,
+  getNewEmailSoundAdminEnabledSync,
 } from "@/lib/newEmailNotificationStyle";
 
 interface ReceivedEmail {
@@ -169,10 +171,14 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
             void getNewEmailNotificationStyle();
           }
 
-          // Play sound using the callback from parent
-          if (playSoundCallback) {
+          // Play sound using the callback from parent, gated by the
+          // site-wide admin toggle (defaults on). Users can additionally
+          // silence sounds via NotificationSoundSettings.
+          if (playSoundCallback && getNewEmailSoundAdminEnabledSync()) {
             playSoundCallback();
           }
+          // Refresh admin-side sound flag in the background.
+          void getNewEmailSoundAdminEnabled();
 
           // Show push notification if page is hidden
           if (document.hidden) {

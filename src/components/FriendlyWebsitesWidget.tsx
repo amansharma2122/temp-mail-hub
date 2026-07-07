@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
@@ -80,6 +80,29 @@ const defaultSettings: WidgetSettings = {
   disableEffectsOnReducedMotion: true,
   reducedMotionMode: 'respect_user',
 };
+
+// -------- Module-scoped constants (do NOT depend on component state) -------
+// Hoisted out of the render body so React doesn't rebuild these object
+// literals on every state change (countdown ticks, isOpen toggles, etc).
+const SIZE_CLASSES = {
+  small: 'w-48',
+  medium: 'w-64',
+  large: 'w-80',
+} as const;
+
+const COLOR_CLASSES = {
+  primary: 'bg-primary/10 border-primary/30 hover:bg-primary/20',
+  accent: 'bg-accent/10 border-accent/30 hover:bg-accent/20',
+  gradient: 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30',
+  glass: 'bg-card/80 backdrop-blur-xl border-border/50',
+} as const;
+
+const BUTTON_COLOR_CLASSES = {
+  primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+  accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
+  gradient: 'bg-gradient-to-r from-primary to-accent text-primary-foreground',
+  glass: 'bg-card/90 backdrop-blur-xl text-foreground border border-border/50 hover:bg-card',
+} as const;
 
 const renderLucide = (name: string | null | undefined, className = "w-5 h-5") => {
   if (!name) return null;
@@ -311,47 +334,20 @@ const FriendlyWebsitesWidget = ({
   }
   if (overrideWebsites && !settings.enabled) return null;
 
-  const sizeClasses = {
-    small: 'w-48',
-    medium: 'w-64',
-    large: 'w-80',
-  };
+  const sizeClasses = SIZE_CLASSES;
+  const colorClasses = COLOR_CLASSES;
+  const buttonColorClasses = BUTTON_COLOR_CLASSES;
 
-  const colorClasses = {
-    primary: 'bg-primary/10 border-primary/30 hover:bg-primary/20',
-    accent: 'bg-accent/10 border-accent/30 hover:bg-accent/20',
-    gradient: 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30',
-    glass: 'bg-card/80 backdrop-blur-xl border-border/50',
-  };
-
-  const buttonColorClasses = {
-    primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
-    gradient: 'bg-gradient-to-r from-primary to-accent text-primary-foreground',
-    glass: 'bg-card/90 backdrop-blur-xl text-foreground border border-border/50 hover:bg-card',
-  };
-
+  // NOTE: this literal lives after an early-return branch, so it can't be a
+  // hook. It's still cheaper than before because the class-name maps above
+  // are now module-scoped and no longer rebuilt every render.
+  const _offset = settings.position === 'right' ? 300 : -300;
   const animationVariants = {
-    slide: {
-      hidden: { x: settings.position === 'right' ? 300 : -300, opacity: 0 },
-      visible: { x: 0, opacity: 1 },
-    },
-    fade: {
-      hidden: { opacity: 0, scale: 0.8 },
-      visible: { opacity: 1, scale: 1 },
-    },
-    bounce: {
-      hidden: { x: settings.position === 'right' ? 300 : -300, opacity: 0 },
-      visible: { x: 0, opacity: 1 },
-    },
-    flip: {
-      hidden: { rotateY: 90, opacity: 0 },
-      visible: { rotateY: 0, opacity: 1 },
-    },
-    zoom: {
-      hidden: { scale: 0, opacity: 0 },
-      visible: { scale: 1, opacity: 1 },
-    },
+    slide:  { hidden: { x: _offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
+    fade:   { hidden: { opacity: 0, scale: 0.8 }, visible: { opacity: 1, scale: 1 } },
+    bounce: { hidden: { x: _offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
+    flip:   { hidden: { rotateY: 90, opacity: 0 }, visible: { rotateY: 0, opacity: 1 } },
+    zoom:   { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1 } },
   } as const;
 
   const positionClasses = settings.position === 'right' 
@@ -635,7 +631,10 @@ const FriendlyWebsitesWidget = ({
   );
 };
 
-export default FriendlyWebsitesWidget;
+// Memoize to skip re-renders when parents (e.g. Index) re-render but props
+// (overrideSettings/overrideWebsites) are unchanged. React Query caches keep
+// internal state stable, so parent renders shouldn't propagate down here.
+export default memo(FriendlyWebsitesWidget);
 
 // -------------------- Sync-error pill w/ backoff + Retry now ---------------
 
