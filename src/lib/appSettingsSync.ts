@@ -25,6 +25,25 @@ export interface AppSettingsChange {
 type Listener = (change: AppSettingsChange) => void;
 const listeners = new Set<Listener>();
 
+// Track versions this tab has just persisted so remote-vs-local can be
+// distinguished by consumers (e.g. the admin "updated in another tab"
+// toast). Entries expire after LOCAL_WRITE_TTL_MS.
+const LOCAL_WRITE_TTL_MS = 4_000;
+const localWrites = new Map<string, number>(); // `${key}:${version}` -> ts
+function markLocalWrite(key: string, version: number | null) {
+  if (version == null) return;
+  localWrites.set(`${key}:${version}`, Date.now());
+  // GC old markers.
+  const cutoff = Date.now() - LOCAL_WRITE_TTL_MS;
+  for (const [k, t] of localWrites) if (t < cutoff) localWrites.delete(k);
+}
+export function isLocalAppSettingsWrite(key: string, version: number | null): boolean {
+  if (version == null) return false;
+  const t = localWrites.get(`${key}:${version}`);
+  if (!t) return false;
+  return Date.now() - t < LOCAL_WRITE_TTL_MS;
+}
+
 // Last-observed change per key — powers the admin debug/audit view.
 const lastObserved = new Map<string, AppSettingsChange & { updated_by: string | null; merged: boolean | null }>();
 export function getLastObservedAppSettings() {
@@ -174,6 +193,7 @@ export async function applyAppSettingsPatch(
     updated_by: lastObserved.get(key)?.updated_by ?? null,
     merged,
   });
+  markLocalWrite(key, version);
   broadcastAppSettingsChange(key, version);
   return {
     value: (row?.value ?? {}) as Record<string, unknown>,
