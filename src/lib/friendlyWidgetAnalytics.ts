@@ -7,7 +7,10 @@ export type FriendlyWidgetEvent =
   | "manual_open"
   | "auto_open"
   | "click"
-  | "badge_shown";
+  | "badge_shown"
+  | "anim_start"
+  | "anim_complete"
+  | "render_latency";
 
 const SESSION_KEY = "nullsto:friendly-session-id";
 
@@ -26,7 +29,11 @@ function getSessionId(): string {
 
 export async function recordFriendlyWidgetEvent(
   event_type: FriendlyWidgetEvent,
-  opts: { website_id?: string | null; attention_effect?: string | null } = {},
+  opts: {
+    website_id?: string | null;
+    attention_effect?: string | null;
+    sample_ms?: number | null;
+  } = {},
 ): Promise<void> {
   try {
     const { data: authData } = await supabase.auth.getUser();
@@ -35,6 +42,7 @@ export async function recordFriendlyWidgetEvent(
       event_type,
       website_id: opts.website_id ?? null,
       attention_effect: opts.attention_effect ?? null,
+      sample_ms: opts.sample_ms ?? null,
       session_id: getSessionId(),
       user_id,
     } as any);
