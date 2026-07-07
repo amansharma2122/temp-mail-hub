@@ -86,6 +86,8 @@ interface WidgetSettings {
   triggerIcon: string;
   autoOpenDelayMs: number;
   showLabelOnTrigger: boolean;
+  animationIntensity: 'subtle' | 'normal' | 'lively';
+  disableEffectsOnReducedMotion: boolean;
 }
 
 const defaultSettings: WidgetSettings = {
@@ -105,6 +107,8 @@ const defaultSettings: WidgetSettings = {
   triggerIcon: 'Sparkles',
   autoOpenDelayMs: 0,
   showLabelOnTrigger: true,
+  animationIntensity: 'normal',
+  disableEffectsOnReducedMotion: true,
 };
 
 const emptyForm = {
@@ -883,6 +887,51 @@ const AdminFriendlyWebsites = () => {
                   checked={settings.showOnMobile}
                   onCheckedChange={(checked) => setSettings({ ...settings, showOnMobile: checked })}
                 />
+              </div>
+
+              {/* Animation intensity + reduced-motion safeguard */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2 p-4 border rounded-lg">
+                  <Label>Animation Intensity</Label>
+                  <Select
+                    value={settings.animationIntensity}
+                    onValueChange={(v: 'subtle' | 'normal' | 'lively') =>
+                      setSettings({ ...settings, animationIntensity: v })
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="subtle">Subtle (slower, minimal)</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="lively">Lively (faster, springier)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Tunes panel + trigger motion speed.</p>
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label>Auto-disable Effects on Reduced Motion</Label>
+                    <p className="text-xs text-muted-foreground">
+                      When the OS reports "reduce motion", suppress sparkle/wiggle/etc. Recommended.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.disableEffectsOnReducedMotion}
+                    onCheckedChange={(v) =>
+                      setSettings({ ...settings, disableEffectsOnReducedMotion: v })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 border rounded-lg bg-muted/30 text-sm flex items-center justify-between">
+                <span>Preview widget exactly as end users see it (with your unsaved changes).</span>
+                <a
+                  href="/admin/friendly-widget-preview"
+                  className="text-primary hover:underline"
+                >
+                  Open Preview →
+                </a>
               </div>
 
               {/* Save Button */}

@@ -77,6 +77,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         keywords: ["cron", "alerts", "maintenance", "status"] },
       { title: "Stats Verification", url: "/admin/stats-verification", icon: Activity,
         keywords: ["counters", "ist", "reset", "reconcile", "health"] },
+      { title: "Friendly Widget Preview", url: "/admin/friendly-widget-preview", icon: Palette,
+        keywords: ["widget", "preview", "friendly", "sites"] },
       { title: "Logs", url: "/admin/hub/logs", icon: FileWarning,
         keywords: ["audit", "errors"] },
     ],
