@@ -81,6 +81,29 @@ const defaultSettings: WidgetSettings = {
   reducedMotionMode: 'respect_user',
 };
 
+// -------- Module-scoped constants (do NOT depend on component state) -------
+// Hoisted out of the render body so React doesn't rebuild these object
+// literals on every state change (countdown ticks, isOpen toggles, etc).
+const SIZE_CLASSES = {
+  small: 'w-48',
+  medium: 'w-64',
+  large: 'w-80',
+} as const;
+
+const COLOR_CLASSES = {
+  primary: 'bg-primary/10 border-primary/30 hover:bg-primary/20',
+  accent: 'bg-accent/10 border-accent/30 hover:bg-accent/20',
+  gradient: 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30',
+  glass: 'bg-card/80 backdrop-blur-xl border-border/50',
+} as const;
+
+const BUTTON_COLOR_CLASSES = {
+  primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+  accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
+  gradient: 'bg-gradient-to-r from-primary to-accent text-primary-foreground',
+  glass: 'bg-card/90 backdrop-blur-xl text-foreground border border-border/50 hover:bg-card',
+} as const;
+
 const renderLucide = (name: string | null | undefined, className = "w-5 h-5") => {
   if (!name) return null;
   const Icon = (LucideIcons as any)[name];
