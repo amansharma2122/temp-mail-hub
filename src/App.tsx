@@ -365,6 +365,21 @@ const App = () => (
                             <Route path="alerts" element={<AdminAlertSettings />} />
                             <Route path="maintenance" element={<AdminMaintenance />} />
                             <Route path="geo-blocking" element={<AdminGeoBlocking />} />
+
+                            {/* Consolidated hub routes (6-group sidebar) */}
+                            <Route path="hub/users" element={<UsersHub />} />
+                            <Route path="hub/subscriptions" element={<SubscriptionsHub />} />
+                            <Route path="hub/security" element={<SecurityHub />} />
+                            <Route path="hub/emails" element={<EmailsHub />} />
+                            <Route path="hub/mail-servers" element={<MailServersHub />} />
+                            <Route path="hub/email-rules" element={<EmailRulesHub />} />
+                            <Route path="hub/domains" element={<DomainsHub />} />
+                            <Route path="hub/content" element={<ContentHub />} />
+                            <Route path="hub/promotions" element={<PromotionsHub />} />
+                            <Route path="hub/settings" element={<SettingsHub />} />
+                            <Route path="hub/appearance" element={<AppearanceHub />} />
+                            <Route path="hub/automation" element={<AutomationHub />} />
+                            <Route path="hub/logs" element={<LogsHub />} />
                           </Route>
 
                           <Route path="*" element={<NotFound />} />
