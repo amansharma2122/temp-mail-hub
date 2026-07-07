@@ -486,6 +486,7 @@ const FriendlyWebsitesWidget = ({
         @keyframes fw-shockwave{0%{transform:translate(-50%,-50%) scale(0);opacity:.55}100%{transform:translate(-50%,-50%) scale(6);opacity:0}}
         @keyframes fw-float-up{0%{transform:translate(-50%,-50%) translateY(0);opacity:1}100%{transform:translate(-50%,-50%) translateY(-160px);opacity:0}}
         @keyframes fw-panel-glow{0%,100%{opacity:.35}50%{opacity:.7}}
+        @keyframes fw-rain{0%{transform:translateY(-12vh) rotate(0deg);opacity:0}8%{opacity:1}92%{opacity:1}100%{transform:translateY(112vh) rotate(var(--rot,360deg));opacity:0}}
       `}</style>
 
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
