@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
 import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
+import { reportRealtimeStatus, clearRealtimeStatus } from "@/lib/realtimeHealth";
 
 interface Banner {
   id: string;
@@ -76,39 +77,72 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
 
   useEffect(() => {
     let cancelled = false;
-    
+    let pollingId: ReturnType<typeof setInterval> | null = null;
+
     const doFetch = async () => {
       if (!cancelled) await fetchBanners();
     };
-    
+
     doFetch();
 
-    // Subscribe to real-time banner changes with a per-mount channel name.
-    // Supabase reuses channels by topic, so stable names can reattach to an
-    // already-subscribed channel during remounts and throw when adding .on().
+    // Attempt realtime subscription; if it throws (e.g. `postgres_changes`
+    // callbacks added after `subscribe()` due to channel reuse), fall back
+    // to interval polling so banners still render and refresh.
+    const healthKey = `BannerDisplay:${position}`;
     const channelName = `banners_realtime_${position}_${Math.random().toString(36).slice(2)}`;
-    const channel = supabase.channel(channelName);
-    
-    channel
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'banners',
-        },
-        (payload) => {
-          if (!cancelled) {
-            console.log('[BannerDisplay] Realtime update received:', payload.eventType);
-            fetchBanners();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const startPolling = () => {
+      if (pollingId) return;
+      pollingId = setInterval(() => {
+        if (!cancelled) fetchBanners();
+      }, 30_000);
+    };
+
+    try {
+      reportRealtimeStatus(healthKey, channelName, "subscribing");
+      channel = supabase.channel(channelName);
+      channel
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "banners" },
+          (payload) => {
+            if (!cancelled) {
+              console.log("[BannerDisplay] Realtime update received:", payload.eventType);
+              fetchBanners();
+            }
+          },
+        )
+        .subscribe((status, err) => {
+          if (status === "SUBSCRIBED") {
+            reportRealtimeStatus(healthKey, channelName, "subscribed");
+          } else if (status === "CHANNEL_ERROR") {
+            reportRealtimeStatus(healthKey, channelName, "error", err);
+            startPolling();
+          } else if (status === "TIMED_OUT") {
+            reportRealtimeStatus(healthKey, channelName, "timed_out", err);
+            startPolling();
+          } else if (status === "CLOSED") {
+            reportRealtimeStatus(healthKey, channelName, "closed");
           }
-        }
-      )
-      .subscribe();
+        });
+    } catch (err) {
+      console.warn("[BannerDisplay] Realtime subscription failed, using polling fallback:", err);
+      reportRealtimeStatus(healthKey, channelName, "error", err);
+      startPolling();
+    }
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      if (pollingId) clearInterval(pollingId);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {
+          // ignore
+        }
+      }
+      clearRealtimeStatus(healthKey);
     };
   }, [position, fetchBanners]);
 
