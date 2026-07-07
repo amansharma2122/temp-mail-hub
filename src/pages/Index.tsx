@@ -83,16 +83,16 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Live Stats + Quick Tips (Quick Tips returned to right side of stats) */}
+        {/* Live Stats + Quick Tips (side-by-side: stats left, tips right) */}
         <section className="py-4 border-y border-border/30">
           <div className="container mx-auto px-4">
-            <div className="flex flex-col xl:flex-row gap-4 xl:gap-6 xl:items-stretch">
+            <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:items-stretch">
               <div className="flex-1 min-w-0">
                 <LiveStatsWidget />
               </div>
               {isSectionEnabled("quick_tips") && (
                 <motion.div
-                  className="w-full xl:w-80 relative overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 sm:p-6 shadow-lg shadow-primary/5 flex flex-col"
+                  className="w-full md:w-64 lg:w-72 xl:w-80 md:flex-shrink-0 relative overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 sm:p-6 shadow-lg shadow-primary/5 flex flex-col"
                   initial={{ opacity: 0, scale: 0.95 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
