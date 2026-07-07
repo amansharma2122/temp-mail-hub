@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Settings, Save, AlertTriangle, Eye } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useLimitModalSettings, defaultLimitModalConfig, LimitModalConfig } from "@/hooks/useLimitModalSettings";
+import { useDirty } from "@/hooks/useDirty";
+import DirtySaveButton from "@/components/admin/DirtySaveButton";
 import {
   Select,
   SelectContent,
@@ -50,6 +52,8 @@ const AdminGeneralSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const { isDirty, markDirty, markClean } = useDirty();
+  const { isDirty: isModalDirty, markDirty: markModalDirty, markClean: markModalClean } = useDirty();
 
   // Limit modal settings
   const {
@@ -130,6 +134,7 @@ const AdminGeneralSettings = () => {
       } else {
         // Immediately refetch global settings so changes apply everywhere
         await refetchGlobalSettings();
+        markClean();
         toast.success("General settings saved successfully!");
       }
     } catch (e) {
@@ -143,6 +148,7 @@ const AdminGeneralSettings = () => {
   const handleSaveLimitModal = async () => {
     const success = await saveModalConfig(limitModalConfig);
     if (success) {
+      markModalClean();
       toast.success("Limit modal settings saved!");
     } else {
       toast.error("Failed to save limit modal settings");
@@ -151,6 +157,7 @@ const AdminGeneralSettings = () => {
 
   const updateSetting = <K extends keyof GeneralSettings>(key: K, value: GeneralSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+    markDirty();
   };
 
   return (
@@ -163,10 +170,7 @@ const AdminGeneralSettings = () => {
           </h1>
           <p className="text-muted-foreground">Configure basic site settings</p>
         </div>
-        <Button onClick={handleSave} disabled={isSaving}>
-          <Save className="w-4 h-4 mr-2" />
-          {isSaving ? 'Saving...' : 'Save Changes'}
-        </Button>
+        <DirtySaveButton onClick={handleSave} isDirty={isDirty} isSaving={isSaving} />
       </div>
 
       <div className="grid gap-6">
@@ -286,10 +290,13 @@ const AdminGeneralSettings = () => {
                 </CardTitle>
                 <CardDescription>Configure the popup shown when users reach their daily email limit</CardDescription>
               </div>
-              <Button onClick={handleSaveLimitModal} disabled={isSavingModal} size="sm">
-                <Save className="w-4 h-4 mr-2" />
-                {isSavingModal ? 'Saving...' : 'Save Modal Settings'}
-              </Button>
+              <DirtySaveButton
+                onClick={handleSaveLimitModal}
+                isDirty={isModalDirty}
+                isSaving={isSavingModal}
+                size="sm"
+                label="Save Modal Settings"
+              />
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
