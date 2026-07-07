@@ -101,6 +101,10 @@ const FriendlyWebsitesWidget = ({
   const [burstAt, setBurstAt] = useState<number | null>(null);
   // Track OS-level reduce-motion. Updates live if the user toggles it.
   const [reducedMotion, setReducedMotion] = useState<boolean>(() => prefersReducedMotion());
+  // Consistent live-region message. We derive it from state transitions in a
+  // dedicated effect so screen readers get one clear announcement per event
+  // (open / close / highlight / sync error) instead of overlapping strings.
+  const [liveMessage, setLiveMessage] = useState<string>("");
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -155,6 +159,34 @@ const FriendlyWebsitesWidget = ({
     // eslint-disable-next-line no-console
     console.warn("[friendly-widget] realtime/polling failed — surfacing sync indicator");
   }, [hasSyncError]);
+
+  // Derive a single consistent live-region announcement. Priority: sync error
+  // beats interactive state (a screen reader user needs to know the widget is
+  // broken). Open/close use symmetric wording so listeners can build a mental
+  // model, and the sparkle burst is announced as "highlighted" only when the
+  // panel is closed (avoiding a duplicate announcement alongside "opened").
+  const _label = (overrideSettings?.buttonLabel ?? fetchedSettings.buttonLabel) || 'Partner Sites';
+  useEffect(() => {
+    if (hasSyncError) {
+      setLiveMessage(`${_label}: sync unavailable — retry available.`);
+      return;
+    }
+    if (isOpen) {
+      setLiveMessage(`${_label} panel opened.`);
+      return;
+    }
+    // Panel just closed (burstAt is only set when opening, so no overlap).
+    if (hasAutoOpened || liveMessage.includes('opened')) {
+      setLiveMessage(`${_label} panel closed.`);
+      return;
+    }
+    if (burstAt) {
+      setLiveMessage(`${_label} highlighted.`);
+      return;
+    }
+    setLiveMessage("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSyncError, isOpen, burstAt, _label]);
 
   // ---- Telemetry: render latency (measure until first paint of the trigger) ----
   const mountRef = useState(() => (typeof performance !== 'undefined' ? performance.now() : Date.now()))[0];
@@ -402,13 +434,7 @@ const FriendlyWebsitesWidget = ({
         className="sr-only"
         data-testid="friendly-widget-live-region"
       >
-        {hasSyncError
-          ? "Widget sync failed. Retry available."
-          : isOpen
-            ? `${label} panel opened`
-            : burstAt
-              ? `${label} activated`
-              : ""}
+        {liveMessage}
       </div>
 
       {/* Toggle Button */}

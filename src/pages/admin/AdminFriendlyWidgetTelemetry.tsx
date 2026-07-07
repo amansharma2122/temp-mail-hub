@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { BarChart3, Loader2, Timer, Activity } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, LineChart, Line, Legend,
@@ -262,14 +263,20 @@ export default function AdminFriendlyWidgetTelemetry() {
               ) : (
                 <ol className="space-y-1 text-sm">
                   {topPerforming.map((e, i) => (
-                    <li key={e.effect} className="flex items-center justify-between border-b border-border/40 py-1">
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 tabular-nums text-muted-foreground">{i + 1}.</span>
-                        <span className="capitalize font-medium">{e.effect}</span>
-                      </span>
-                      <span className="text-muted-foreground tabular-nums">
-                        {e.ratio}% • {e.volume} starts
-                      </span>
+                    <li key={e.effect}>
+                      <Link
+                        to={`/admin/friendly-widget-telemetry/effect?effect=${encodeURIComponent(e.effect)}`}
+                        className="flex items-center justify-between border-b border-border/40 py-1 hover:bg-muted/40 rounded px-1 -mx-1 focus:outline-none focus:ring-2 focus:ring-primary/60"
+                        aria-label={`Drill down into ${e.effect}: ${e.ratio}% completion, ${e.volume} starts`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="w-5 tabular-nums text-muted-foreground">{i + 1}.</span>
+                          <span className="capitalize font-medium">{e.effect}</span>
+                        </span>
+                        <span className="text-muted-foreground tabular-nums">
+                          {e.ratio}% • {e.volume} starts →
+                        </span>
+                      </Link>
                     </li>
                   ))}
                 </ol>
