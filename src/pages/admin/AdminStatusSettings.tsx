@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+import { saveAppSetting } from "@/lib/appSettingsSync";
 interface ServiceOverride {
   enabled: boolean;
   status: "operational" | "degraded" | "down";
@@ -90,36 +91,7 @@ const AdminStatusSettings = () => {
     setSaving(true);
     try {
       // Check if setting exists
-      const { data: existing } = await supabase
-        .from("app_settings")
-        .select("id")
-        .eq("key", "status_overrides")
-        .single();
-
-      if (existing) {
-        // Update
-        const { error } = await supabase
-          .from("app_settings")
-          .update({
-            value: JSON.parse(JSON.stringify(overrides)),
-            updated_at: new Date().toISOString()
-          })
-          .eq("key", "status_overrides");
-
-        if (error) throw error;
-      } else {
-        // Insert
-        const { error } = await supabase
-          .from("app_settings")
-          .insert([{
-            key: "status_overrides",
-            value: JSON.parse(JSON.stringify(overrides)),
-            updated_at: new Date().toISOString()
-          }]);
-
-        if (error) throw error;
-      }
-
+      await saveAppSetting("status_overrides", JSON.parse(JSON.stringify(overrides)));
       toast({
         title: "Settings Saved",
         description: "Status overrides have been updated successfully.",
