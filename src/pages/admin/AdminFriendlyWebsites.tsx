@@ -32,6 +32,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { broadcastAppSettingsChange } from "@/lib/appSettingsSync";
+import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import {
   DndContext,
@@ -382,9 +384,12 @@ const AdminFriendlyWebsites = () => {
       }
 
       toast.success('Settings saved successfully');
-      // Invalidate both the general app_settings and the specific widget query
+      // Invalidate this tab's cache…
       queryClient.invalidateQueries({ queryKey: ['app_settings'] });
       queryClient.invalidateQueries({ queryKey: ['app_settings', 'friendly_sites_widget'] });
+      // …and fan out to every other tab / device so the homepage widget
+      // reflects the change instantly, no reload required.
+      broadcastAppSettingsChange('friendly_sites_widget');
     } catch (error) {
       console.error('Error saving settings:', error);
       toast.error('Failed to save settings');
@@ -894,22 +899,48 @@ const AdminFriendlyWebsites = () => {
 
               {/* Animation intensity + reduced-motion safeguard */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2 p-4 border rounded-lg">
-                  <Label>Animation Intensity</Label>
-                  <Select
-                    value={settings.animationIntensity}
-                    onValueChange={(v: 'subtle' | 'normal' | 'lively') =>
-                      setSettings({ ...settings, animationIntensity: v })
-                    }
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="subtle">Subtle (slower, minimal)</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="lively">Lively (faster, springier)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">Default intensity for all visitors. Persisted site-wide.</p>
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <Label>Animation Intensity</Label>
+                    <span className="text-xs font-medium uppercase tracking-wide text-primary">
+                      {settings.animationIntensity ?? 'normal'}
+                    </span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={2}
+                    step={1}
+                    value={[
+                      settings.animationIntensity === 'subtle' ? 0
+                        : settings.animationIntensity === 'lively' ? 2 : 1,
+                    ]}
+                    onValueChange={([v]) => {
+                      const next = v === 0 ? 'subtle' : v === 2 ? 'lively' : 'normal';
+                      setSettings({ ...settings, animationIntensity: next });
+                    }}
+                    aria-label="Animation intensity"
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['subtle', 'normal', 'lively'] as const).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, animationIntensity: preset })}
+                        className={
+                          "px-2 py-1.5 text-xs rounded-md border transition-colors " +
+                          (settings.animationIntensity === preset
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "border-border hover:bg-muted text-muted-foreground")
+                        }
+                      >
+                        {preset[0].toUpperCase() + preset.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Default intensity applied to every visitor. Persisted site-wide and
+                    synced across tabs in real time.
+                  </p>
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>

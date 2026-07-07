@@ -1,46 +1,72 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Mail, Sparkles } from "lucide-react";
 
 export type NewEmailToastStyle = "slide_glow" | "bounce_confetti" | "both";
+// Extra internal variant used when the user has requested reduced motion.
+// Callers still pass one of the public styles above — we swap in "reduced"
+// automatically. Exposed for tests.
+export type ResolvedNewEmailToastVariant = NewEmailToastStyle | "reduced";
 
 interface NewEmailToastProps {
   from: string;
   subject: string;
   style: NewEmailToastStyle;
   onClose?: () => void;
+  /**
+   * Test hook: force a specific reduced-motion state. When omitted, the
+   * component reads `useReducedMotion()` and OS media query as usual.
+   */
+  forceReducedMotion?: boolean;
 }
 
-// Detect user preference for reduced motion so we degrade gracefully.
-const prefersReducedMotion =
-  typeof window !== "undefined" &&
-  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+/** Resolve the visual variant, downgrading to "reduced" if requested. */
+export function resolveNewEmailToastVariant(
+  style: NewEmailToastStyle,
+  reducedMotion: boolean,
+): ResolvedNewEmailToastVariant {
+  return reducedMotion ? "reduced" : style;
+}
 
 /**
  * NewEmailToast — animated toast for realtime new-email arrivals.
  * The style is admin-configurable via `app_settings.new_email_notification_style`.
+ * When the visitor has `prefers-reduced-motion: reduce` we render a dedicated
+ * static "reduced" variant — no springs, no confetti, no repeated glow.
  */
-export function NewEmailToast({ from, subject, style, onClose }: NewEmailToastProps) {
-  const effectiveStyle: NewEmailToastStyle = prefersReducedMotion ? "slide_glow" : style;
-  const showConfetti = effectiveStyle === "bounce_confetti" || effectiveStyle === "both";
-  const useBounce = effectiveStyle === "bounce_confetti" || effectiveStyle === "both";
+export function NewEmailToast({ from, subject, style, onClose, forceReducedMotion }: NewEmailToastProps) {
+  const rm = useReducedMotion();
+  const reduced = forceReducedMotion ?? Boolean(rm);
+  const variant = resolveNewEmailToastVariant(style, reduced);
+  const isReduced = variant === "reduced";
+  const showConfetti = variant === "bounce_confetti" || variant === "both";
+  const useBounce = variant === "bounce_confetti" || variant === "both";
 
   return (
     <motion.div
-      initial={useBounce ? { y: -40, opacity: 0, scale: 0.85 } : { x: 40, opacity: 0 }}
-      animate={useBounce
-        ? { y: 0, opacity: 1, scale: 1 }
-        : { x: 0, opacity: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={useBounce
-        ? { type: "spring", stiffness: 380, damping: 18 }
-        : { duration: 0.35, ease: "easeOut" }}
+      data-variant={variant}
+      initial={isReduced
+        ? { opacity: 0 }
+        : useBounce
+          ? { y: -40, opacity: 0, scale: 0.85 }
+          : { x: 40, opacity: 0 }}
+      animate={isReduced
+        ? { opacity: 1 }
+        : useBounce
+          ? { y: 0, opacity: 1, scale: 1 }
+          : { x: 0, opacity: 1 }}
+      exit={isReduced ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
+      transition={isReduced
+        ? { duration: 0.15, ease: "linear" }
+        : useBounce
+          ? { type: "spring", stiffness: 380, damping: 18 }
+          : { duration: 0.35, ease: "easeOut" }}
       className="relative flex items-start gap-3 min-w-[280px] max-w-sm bg-card border border-primary/30 rounded-xl shadow-lg pl-3 pr-4 py-3 overflow-visible"
       role="status"
       aria-live="polite"
     >
       <div className="relative shrink-0">
         <motion.div
-          animate={effectiveStyle === "slide_glow" || effectiveStyle === "both"
+          animate={!isReduced && (variant === "slide_glow" || variant === "both")
             ? { boxShadow: [
                 "0 0 0px hsl(var(--primary) / 0.0)",
                 "0 0 18px hsl(var(--primary) / 0.55)",
@@ -52,7 +78,7 @@ export function NewEmailToast({ from, subject, style, onClose }: NewEmailToastPr
         >
           <Mail className="w-5 h-5" aria-hidden />
         </motion.div>
-        {showConfetti && !prefersReducedMotion && (
+        {showConfetti && !isReduced && (
           <div aria-hidden className="pointer-events-none absolute inset-0">
             {Array.from({ length: 8 }).map((_, i) => {
               const angle = (i / 8) * Math.PI * 2;
