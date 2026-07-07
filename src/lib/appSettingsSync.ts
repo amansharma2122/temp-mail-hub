@@ -193,6 +193,7 @@ export async function applyAppSettingsPatch(
     updated_by: lastObserved.get(key)?.updated_by ?? null,
     merged,
   });
+  markLocalWrite(key, version);
   broadcastAppSettingsChange(key, version);
   return {
     value: (row?.value ?? {}) as Record<string, unknown>,
