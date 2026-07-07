@@ -234,7 +234,7 @@ const LiveStatsWidget = () => {
   ];
 
   return (
-    <div className="grid h-full grid-cols-2 gap-4 md:grid-cols-4">
+    <div className="grid h-full grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
       {statItems.map((item, index) => (
         <Tooltip key={item.label}>
           <TooltipTrigger asChild>
@@ -244,28 +244,30 @@ const LiveStatsWidget = () => {
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="group relative h-full cursor-help"
             >
-              <div className="relative h-full overflow-hidden rounded-xl border border-border/50 bg-card/50 p-4 backdrop-blur-sm transition-all duration-300 hover:border-primary/30">
+              <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl border border-border/50 bg-card/50 p-2.5 backdrop-blur-sm transition-all duration-300 hover:border-primary/30 sm:p-3">
                 {/* Pulse effect */}
-                <div className="absolute top-2 right-2">
-                  <span className="relative flex h-2 w-2">
+                <div className="absolute top-1.5 right-1.5">
+                  <span className="relative flex h-1.5 w-1.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
                   </span>
                 </div>
 
-                <div className={`inline-flex p-2 rounded-lg ${item.bgColor} mb-3`}>
-                  <item.icon className={`w-5 h-5 ${item.color}`} />
+                <div className="flex items-center gap-2">
+                  <div className={`inline-flex p-1.5 rounded-md ${item.bgColor}`}>
+                    <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
+                  </div>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{item.label}</p>
                 </div>
 
-                <div className="space-y-1">
-                  <p className="text-2xl md:text-3xl font-bold text-foreground">
+                <div className="mt-1.5">
+                  <p className="text-lg sm:text-xl font-bold leading-none text-foreground">
                     {isLoading ? (
-                      <span className="inline-block w-12 h-8 bg-secondary animate-pulse rounded" />
+                      <span className="inline-block w-10 h-5 bg-secondary animate-pulse rounded" />
                     ) : (
                       <AnimatedCounter value={item.value} isAnimating={animatingIndex === index} />
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
                 </div>
 
                 {/* Hover gradient */}
