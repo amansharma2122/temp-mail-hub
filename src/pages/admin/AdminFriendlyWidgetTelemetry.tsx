@@ -122,14 +122,16 @@ export default function AdminFriendlyWidgetTelemetry() {
   }, [filtered]);
 
   const totals = useMemo(() => {
-    const t = { anim_start: 0, anim_complete: 0, render_latency: 0, samples: 0 };
+    const t: Record<string, number> = { anim_start: 0, anim_complete: 0, render_latency: 0 };
     const latencySamples: number[] = [];
     for (const r of filtered) {
-      if (r.event_type in t) (t as any)[r.event_type] += 1;
+      if (r.event_type in t) t[r.event_type] += 1;
       if (r.event_type === "render_latency" && r.sample_ms != null) latencySamples.push(r.sample_ms);
     }
     return {
-      ...t,
+      anim_start: t.anim_start,
+      anim_complete: t.anim_complete,
+      render_latency: t.render_latency,
       p50: p(latencySamples, 0.5),
       p95: p(latencySamples, 0.95),
     };
