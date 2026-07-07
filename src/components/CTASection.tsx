@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import DOMPurify from "dompurify";
@@ -73,4 +74,4 @@ const CTASection = () => {
   );
 };
 
-export default CTASection;
+export default memo(CTASection);
