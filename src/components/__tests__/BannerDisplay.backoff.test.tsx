@@ -130,7 +130,11 @@ describe("BannerDisplay realtime exponential backoff", () => {
     await advance(1);
     expect(channelInstances.length).toBe(beforeThird + 1);
 
-    // Syncing indicator must still be visible through all failures.
+    // The retry we just fired flipped the widget to "connecting" while a new
+    // channel is being negotiated — drive that attempt to failure too so we
+    // land back in polling mode with the syncing indicator visible.
+    await act(async () => { subscribeCb!("CHANNEL_ERROR"); });
+    await flush();
     expect(screen.getByText(/Temporarily syncing/i)).toBeInTheDocument();
 
     // Finally re-subscribe successfully → syncing indicator disappears.
