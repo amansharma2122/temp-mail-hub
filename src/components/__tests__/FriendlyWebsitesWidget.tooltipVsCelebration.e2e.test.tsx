@@ -111,6 +111,6 @@ describe("Tooltip open + outside click does not interfere with celebration overl
     // Burst overlay must still be present in the DOM immediately after.
     expect(document.querySelector('[data-testid="friendly-widget-click-burst"]')).not.toBeNull();
     // Overlay is decorative and must not swallow pointer events.
-    expect(getComputedStyle(burst).pointerEvents).toBe("none");
+    expect(burst.className).toMatch(/pointer-events-none/);
   });
 });
