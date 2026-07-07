@@ -87,12 +87,12 @@ const Index = () => {
         <section className="py-4 border-y border-border/30">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:items-stretch">
-              <div className="min-w-0 max-h-40">
+              <div className="min-w-0">
                 <LiveStatsWidget />
               </div>
               {isSectionEnabled("quick_tips") && (
                 <motion.div
-                  className="relative flex h-full max-h-40 flex-col overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-3 shadow-lg shadow-primary/5"
+                  className="relative flex h-full flex-col overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-3 shadow-lg shadow-primary/5"
                   initial={{ opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
@@ -101,10 +101,10 @@ const Index = () => {
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary via-accent to-primary opacity-20 blur-sm animate-pulse" />
                   <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full animate-ping opacity-75" />
                   <div className="absolute bottom-4 left-4 w-1.5 h-1.5 bg-accent rounded-full animate-ping opacity-50" style={{ animationDelay: '0.5s' }} />
-                  <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-                    <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground lg:text-base">
+                  <div className="relative z-10 flex flex-1 flex-col">
+                    <h3 className="mb-1.5 flex items-center gap-2 text-xs font-bold text-foreground sm:text-sm">
                       <motion.span
-                        className="w-3 h-3 rounded-full bg-gradient-to-r from-primary to-accent"
+                        className="w-2 h-2 rounded-full bg-gradient-to-r from-primary to-accent"
                         animate={{ scale: [1, 1.2, 1] }}
                         transition={{ duration: 2, repeat: Infinity }}
                       />
@@ -112,23 +112,20 @@ const Index = () => {
                         {quickTips.title}
                       </span>
                     </h3>
-                    <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+                    <ul className="flex-1 space-y-1 text-xs">
                       {quickTips.tips.map((tip, index) => (
                         <motion.li
                           key={index}
-                          className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/50 p-2 transition-colors hover:border-primary/30"
+                          className="flex items-start gap-1.5 rounded-md border border-border/50 bg-background/50 px-1.5 py-1 transition-colors hover:border-primary/30"
                           whileHover={{ x: 4 }}
                         >
-                          <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+                          <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
                             {index + 1}
                           </span>
-                          <span className="text-xs leading-snug text-foreground">{tip}</span>
+                          <span className="text-[11px] leading-snug text-foreground">{tip}</span>
                         </motion.li>
                       ))}
                     </ul>
-                  </div>
-                  <div className="mt-3">
-                    <BannerDisplay position="sidebar" />
                   </div>
                 </motion.div>
               )}
