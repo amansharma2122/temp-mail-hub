@@ -128,7 +128,7 @@ describe("Admin dashboard: quota alerts + reconcile/promote flow", () => {
     expect(
       screen.getByText(/Rotate now or promote another active mailbox/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/rotate by/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/rotate by/i).length).toBeGreaterThan(0);
   });
 
   it("Reconcile now triggers both reconciler RPCs without errors", async () => {
