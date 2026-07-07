@@ -62,6 +62,12 @@ interface WidgetSettings {
   //  'always_on':    force reduced motion for every visitor.
   //  'never':        ignore OS preference (use with caution).
   reducedMotionMode?: 'respect_user' | 'always_on' | 'never';
+  /** Celebration button rendered inside the open panel. */
+  celebrationEnabled?: boolean;
+  celebrationLabel?: string;
+  celebrationEffect?:
+    | 'sparkle' | 'confetti' | 'bomb' | 'fireworks'
+    | 'hearts' | 'stars' | 'rainbow-burst';
 }
 
 const defaultSettings: WidgetSettings = {
@@ -87,6 +93,9 @@ const defaultSettings: WidgetSettings = {
   disableEffectsOnReducedMotion: true,
   reducedMotionMode: 'respect_user',
   clickEffect: 'sparkle',
+  celebrationEnabled: true,
+  celebrationLabel: 'Click Me 🎉',
+  celebrationEffect: 'confetti',
 };
 
 // -------- Module-scoped constants (do NOT depend on component state) -------
@@ -137,6 +146,7 @@ const FriendlyWebsitesWidget = ({
   // Burst effect triggered when the user clicks the trigger — a lightweight
   // site-wide sparkle overlay that respects reduced-motion.
   const [burstAt, setBurstAt] = useState<number | null>(null);
+  const [burstVariant, setBurstVariant] = useState<NonNullable<WidgetSettings['clickEffect']> | NonNullable<WidgetSettings['celebrationEffect']>>('sparkle');
   // Track OS-level reduce-motion. Updates live if the user toggles it.
   const [reducedMotion, setReducedMotion] = useState<boolean>(() => prefersReducedMotion());
   // Consistent live-region message. We derive it from state transitions in a
@@ -425,7 +435,10 @@ const FriendlyWebsitesWidget = ({
     setIsOpen(next);
     if (next) {
       const rmBlocks = effectiveReducedMotion;
-      if (!rmBlocks) setBurstAt(Date.now());
+      if (!rmBlocks) {
+        setBurstVariant(settings.clickEffect ?? 'sparkle');
+        setBurstAt(Date.now());
+      }
       recordFriendlyWidgetEvent('manual_open', {
         attention_effect: settings.attentionEffect ?? null,
       });
@@ -436,6 +449,17 @@ const FriendlyWebsitesWidget = ({
     recordFriendlyWidgetEvent('click', {
       website_id: site.id,
       attention_effect: site.attention_effect || settings.attentionEffect || null,
+    });
+  };
+
+  const handleCelebrate = () => {
+    const rmBlocks = effectiveReducedMotion;
+    if (!rmBlocks) {
+      setBurstVariant(settings.celebrationEffect ?? 'confetti');
+      setBurstAt(Date.now());
+    }
+    recordFriendlyWidgetEvent('celebrate_click', {
+      attention_effect: settings.celebrationEffect ?? null,
     });
   };
 
@@ -469,7 +493,7 @@ const FriendlyWebsitesWidget = ({
         {burstAt && !effectiveReducedMotion && (
           <ClickBurst
             key={burstAt}
-            variant={settings.clickEffect ?? 'sparkle'}
+            variant={burstVariant as NonNullable<WidgetSettings['clickEffect']>}
             onDone={() => setBurstAt(null)}
           />
         )}
@@ -655,6 +679,19 @@ const FriendlyWebsitesWidget = ({
             {/* Decorative orbs */}
             <div aria-hidden className="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
             <div aria-hidden className="pointer-events-none absolute -top-6 -left-6 h-20 w-20 rounded-full bg-accent/20 blur-2xl" />
+
+            {(settings.celebrationEnabled ?? true) && (
+              <button
+                type="button"
+                onClick={handleCelebrate}
+                data-testid="friendly-widget-celebrate"
+                aria-label={settings.celebrationLabel || 'Celebrate'}
+                className="mt-3 relative w-full inline-flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-gradient-to-r from-primary/90 via-accent/90 to-primary/90 px-3 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              >
+                <Sparkles className="w-4 h-4" aria-hidden />
+                <span>{settings.celebrationLabel || 'Click Me 🎉'}</span>
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

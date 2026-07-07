@@ -10,7 +10,8 @@ export type FriendlyWidgetEvent =
   | "badge_shown"
   | "anim_start"
   | "anim_complete"
-  | "render_latency";
+  | "render_latency"
+  | "celebrate_click";
 
 const SESSION_KEY = "nullsto:friendly-session-id";
 

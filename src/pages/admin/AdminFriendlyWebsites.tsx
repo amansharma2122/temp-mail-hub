@@ -84,6 +84,9 @@ interface WidgetSettings {
   animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
   attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring' | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
   clickEffect?: 'none' | 'sparkle' | 'confetti' | 'bomb' | 'fireworks' | 'hearts' | 'stars' | 'rainbow-burst';
+  celebrationEnabled?: boolean;
+  celebrationLabel?: string;
+  celebrationEffect?: 'sparkle' | 'confetti' | 'bomb' | 'fireworks' | 'hearts' | 'stars' | 'rainbow-burst';
   buttonLabel: string;
   tooltipText: string;
   showBadge: boolean;
@@ -107,6 +110,9 @@ const defaultSettings: WidgetSettings = {
   animationType: 'slide',
   attentionEffect: 'pulse',
   clickEffect: 'sparkle',
+  celebrationEnabled: true,
+  celebrationLabel: 'Click Me 🎉',
+  celebrationEffect: 'confetti',
   buttonLabel: 'Partner Sites',
   tooltipText: 'Explore our partner sites',
   showBadge: true,
@@ -830,6 +836,54 @@ const AdminFriendlyWebsites = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">Plays once when a visitor opens the widget. Respects reduced-motion.</p>
+                </div>
+
+                <div className="space-y-2 md:col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" /> Celebration Button (inside panel)
+                    </Label>
+                    <Switch
+                      checked={settings.celebrationEnabled ?? true}
+                      onCheckedChange={(v) => setSettings({ ...settings, celebrationEnabled: v })}
+                    />
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Button label</Label>
+                      <Input
+                        value={settings.celebrationLabel ?? ''}
+                        onChange={(e) => setSettings({ ...settings, celebrationLabel: e.target.value })}
+                        placeholder="Click Me 🎉"
+                        maxLength={40}
+                        disabled={!(settings.celebrationEnabled ?? true)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Effect</Label>
+                      <Select
+                        value={settings.celebrationEffect ?? 'confetti'}
+                        onValueChange={(v: NonNullable<WidgetSettings['celebrationEffect']>) =>
+                          setSettings({ ...settings, celebrationEffect: v })
+                        }
+                        disabled={!(settings.celebrationEnabled ?? true)}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sparkle">Sparkle ✨</SelectItem>
+                          <SelectItem value="confetti">Confetti 🎉</SelectItem>
+                          <SelectItem value="bomb">Bomb 💥</SelectItem>
+                          <SelectItem value="fireworks">Fireworks 🎆</SelectItem>
+                          <SelectItem value="hearts">Hearts ❤️</SelectItem>
+                          <SelectItem value="stars">Stars ⭐</SelectItem>
+                          <SelectItem value="rainbow-burst">Rainbow Burst 🌈</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Shown at the bottom of the open panel. Fires the selected full-screen effect on click. Respects reduced-motion.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
