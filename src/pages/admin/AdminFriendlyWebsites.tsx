@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import LucideIconPicker from "@/components/admin/LucideIconPicker";
+import FriendlyWidgetAnalytics from "@/components/admin/FriendlyWidgetAnalytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +62,11 @@ interface FriendlyWebsite {
   open_in_new_tab: boolean;
   created_at: string;
   updated_at: string;
+  attention_effect?: string | null;
+  badge_enabled?: boolean | null;
+  badge_text?: string | null;
+  auto_open_override?: boolean | null;
+  max_badge_per_day?: number | null;
 }
 
 interface WidgetSettings {
@@ -257,6 +263,11 @@ const AdminFriendlyWebsites = () => {
     icon_name: '',
     description: '',
     open_in_new_tab: true,
+    attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring',
+    badge_enabled: true,
+    badge_text: '',
+    auto_open_override: 'inherit' as 'inherit' | 'force_on' | 'force_off',
+    max_badge_per_day: 0,
   });
 
   // DnD sensors
