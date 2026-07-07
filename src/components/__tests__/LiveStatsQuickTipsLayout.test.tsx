@@ -11,12 +11,12 @@ function LayoutFixture() {
       data-testid="stats-tips-grid"
       className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:items-stretch"
     >
-      <div data-testid="stats-cell" className="min-w-0 max-h-40">
+      <div data-testid="stats-cell" className="min-w-0">
         <div className="h-full rounded-xl border" />
       </div>
       <div
         data-testid="tips-cell"
-        className="relative flex h-full max-h-40 flex-col overflow-hidden rounded-xl border-2"
+        className="relative flex h-full flex-col overflow-hidden rounded-xl border-2"
       />
     </div>
   );
@@ -34,9 +34,8 @@ describe("LiveStats + Quick Tips compact layout", () => {
     expect(grid.className).toMatch(/sm:grid-cols-\[minmax\(0,3fr\)_minmax\(0,2fr\)\]/);
     expect(grid.className).toMatch(/sm:items-stretch/);
 
-    // Both cards share the same max-h-40 height cap so they always match.
-    expect(stats.className).toMatch(/max-h-40/);
-    expect(tips.className).toMatch(/max-h-40/);
+    // Tips cell stretches to match the stats row height via items-stretch + h-full.
+    expect(stats.className).toMatch(/min-w-0/);
     expect(tips.className).toMatch(/\bh-full\b/);
 
     // Snapshot the compact layout so accidental regressions are visible.
