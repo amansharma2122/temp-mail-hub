@@ -101,6 +101,10 @@ const FriendlyWebsitesWidget = ({
   const [burstAt, setBurstAt] = useState<number | null>(null);
   // Track OS-level reduce-motion. Updates live if the user toggles it.
   const [reducedMotion, setReducedMotion] = useState<boolean>(() => prefersReducedMotion());
+  // Consistent live-region message. We derive it from state transitions in a
+  // dedicated effect so screen readers get one clear announcement per event
+  // (open / close / highlight / sync error) instead of overlapping strings.
+  const [liveMessage, setLiveMessage] = useState<string>("");
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
