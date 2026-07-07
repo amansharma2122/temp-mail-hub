@@ -28,6 +28,20 @@ interface MailboxRow {
   last_quota_check_at: string | null;
 }
 
+interface CounterRow {
+  stat_key: string;
+  stat_value: number;
+  stat_date: string | null;
+  updated_at: string | null;
+}
+
+const COUNTER_LABELS: Record<string, string> = {
+  emails_today_ist: "Emails today (IST)",
+  total_emails_received: "Total emails received",
+  total_inboxes_created: "Total inboxes created",
+  total_emails_generated: "Total emails generated",
+};
+
 const fmtBytes = (n: number) => {
   if (!n) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -38,11 +52,12 @@ const fmtBytes = (n: number) => {
 const StatsHealthWidget = () => {
   const [health, setHealth] = useState<HealthRow[]>([]);
   const [mailboxes, setMailboxes] = useState<MailboxRow[]>([]);
+  const [counters, setCounters] = useState<CounterRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [reconciling, setReconciling] = useState(false);
 
   const load = async () => {
-    const [h, m] = await Promise.all([
+    const [h, m, c] = await Promise.all([
       supabase
         .from("stats_health_log")
         .select("*")
@@ -53,9 +68,14 @@ const StatsHealthWidget = () => {
         .select("id,name,is_active,is_full,storage_bytes_used,storage_bytes_limit,is_primary,last_quota_check_at")
         .order("is_primary", { ascending: false })
         .order("name", { ascending: true }),
+      supabase
+        .from("email_stats")
+        .select("stat_key, stat_value, stat_date, updated_at")
+        .in("stat_key", Object.keys(COUNTER_LABELS)),
     ]);
     setHealth((h.data as HealthRow[]) || []);
     setMailboxes((m.data as MailboxRow[]) || []);
+    setCounters((c.data as CounterRow[]) || []);
     setLoading(false);
   };
 
