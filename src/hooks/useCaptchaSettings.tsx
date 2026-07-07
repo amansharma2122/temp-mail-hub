@@ -49,7 +49,7 @@ export const useCaptchaSettings = () => {
         return { ...defaultSettings, ...(data.value as unknown as CaptchaSettings) };
       }
 
-      const { data: publicSettings, error: publicError } = await supabase.rpc('get_public_captcha_settings');
+      const { data: publicSettings, error: publicError } = await (supabase.rpc as any)('get_public_captcha_settings');
       if (publicError) {
         console.error('Error fetching public captcha settings:', publicError);
         return defaultSettings;
