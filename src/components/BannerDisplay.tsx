@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
-import { ExternalLink, RadioTower } from "lucide-react";
+import { ExternalLink, RadioTower, RefreshCw } from "lucide-react";
 import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { reportRealtimeStatus, clearRealtimeStatus } from "@/lib/realtimeHealth";
@@ -27,20 +27,44 @@ interface BannerDisplayProps {
 
 const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
   const cacheKey = `nullsto:banner-cache:${position}`;
+  const ttlKey = "nullsto:banner-cache-ttl-min";
+  const getTtlMs = () => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(ttlKey) : null;
+      const min = raw ? Number(raw) : NaN;
+      return (Number.isFinite(min) && min > 0 ? min : 24 * 60) * 60_000;
+    } catch { return 24 * 60 * 60_000; }
+  };
   const readCache = (): Banner[] => {
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem(cacheKey) : null;
       if (!raw) return [];
       const parsed = JSON.parse(raw) as { at: number; data: Banner[] };
-      // Discard cache older than 24h to avoid stale ads lingering forever.
-      if (!parsed?.data || Date.now() - (parsed.at || 0) > 24 * 60 * 60_000) return [];
+      // Discard cache older than the admin-configured TTL.
+      if (!parsed?.data || Date.now() - (parsed.at || 0) > getTtlMs()) return [];
       return parsed.data;
     } catch { return []; }
   };
   const [banners, setBanners] = useState<Banner[]>(() => readCache());
   const [isLoading, setIsLoading] = useState(true);
   const [realtimeMode, setRealtimeMode] = useState<"live" | "polling" | "connecting">("connecting");
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const { isAdmin } = useAdminRole();
+
+  // Fetch admin-configured TTL once and cache in localStorage.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("app_settings")
+          .select("value")
+          .eq("key", "banner_cache_ttl_minutes")
+          .maybeSingle();
+        const m = (data?.value as { minutes?: number } | null)?.minutes;
+        if (typeof m === "number" && m > 0) localStorage.setItem(ttlKey, String(m));
+      } catch { /* ignore — falls back to default */ }
+    })();
+  }, []);
 
   const fetchBanners = useCallback(async (attempt = 0) => {
     const maxRetries = 3;
