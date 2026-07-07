@@ -573,6 +573,10 @@ const AdminFriendlyWebsites = () => {
             <Settings className="w-4 h-4 mr-2" />
             Widget Settings
           </TabsTrigger>
+          <TabsTrigger value="analytics">
+            <Sparkles className="w-4 h-4 mr-2" />
+            Analytics
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="websites" className="space-y-4 mt-4">
