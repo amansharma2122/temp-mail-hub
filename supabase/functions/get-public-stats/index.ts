@@ -38,58 +38,51 @@ serve(async (req) => {
     const istMidnight = getMidnightIST();
     console.log('[get-public-stats] IST midnight (UTC):', istMidnight);
 
-    // Fetch stats in parallel
+    // Compute today IST date string (YYYY-MM-DD) for daily counter freshness check
+    const istNow = new Date(Date.now() + IST_OFFSET_MS);
+    const istTodayStr = istNow.toISOString().slice(0, 10);
+
+    // Fetch all monotonic counters from email_stats plus live counts for active/domains
     const [
-      emailsTodayISTResult,
-      totalEmailsReceivedResult,
+      statsRowsResult,
       activeAddressesResult,
-      totalInboxesCreatedResult,
       totalDomainsResult,
-      emailStatsDataResult
     ] = await Promise.all([
-      // Emails received since midnight IST (not rolling 24h)
       supabase
-        .from('received_emails')
-        .select('*', { count: 'exact', head: true })
-        .gte('received_at', istMidnight),
-      
-      // Total emails received all time (monotonic)
-      supabase
-        .from('received_emails')
-        .select('*', { count: 'exact', head: true }),
-      
-      // Currently active temp addresses
+        .from('email_stats')
+        .select('stat_key, stat_value, stat_date')
+        .in('stat_key', [
+          'total_emails_generated',
+          'total_inboxes_created',
+          'total_emails_received',
+          'emails_today_ist',
+        ]),
       supabase
         .from('temp_emails')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true),
-      
-      // Total inboxes ever created (monotonic) - all temp_emails regardless of status
-      supabase
-        .from('temp_emails')
-        .select('*', { count: 'exact', head: true }),
-      
-      // Total active domains
       supabase
         .from('domains')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true),
-      
-      // Get permanent email generation count from email_stats table
-      supabase
-        .from('email_stats')
-        .select('stat_value')
-        .eq('stat_key', 'total_emails_generated')
-        .maybeSingle(),
     ]);
 
-    // Use ?? to preserve 0 values (|| would treat 0 as falsy)
-    const emailsToday = emailsTodayISTResult.count ?? 0;
-    const totalEmailsReceived = totalEmailsReceivedResult.count ?? 0;
+    const statMap = new Map<string, { value: number; date: string | null }>();
+    for (const row of statsRowsResult.data ?? []) {
+      statMap.set(row.stat_key, {
+        value: Number(row.stat_value ?? 0),
+        date: (row as { stat_date?: string | null }).stat_date ?? null,
+      });
+    }
+
+    const todayRow = statMap.get('emails_today_ist');
+    // Auto-reset display if stored date is stale (trigger will reset on next insert)
+    const emailsToday = todayRow && todayRow.date === istTodayStr ? todayRow.value : 0;
+    const totalEmailsReceived = statMap.get('total_emails_received')?.value ?? 0;
+    const totalInboxesCreated = statMap.get('total_inboxes_created')?.value ?? 0;
+    const totalEmailsGenerated = statMap.get('total_emails_generated')?.value ?? 0;
     const activeAddresses = activeAddressesResult.count ?? 0;
-    const totalInboxesCreated = totalInboxesCreatedResult.count ?? 0;
     const activeDomains = totalDomainsResult.count ?? 0;
-    const totalEmailsGenerated = emailStatsDataResult.data?.stat_value ?? 0;
 
     const stats = {
       // Emails since midnight IST - resets at IST midnight
