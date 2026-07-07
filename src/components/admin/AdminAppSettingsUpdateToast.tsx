@@ -50,10 +50,10 @@ const AdminAppSettingsUpdateToast = () => {
       toast(t("adminSettingsUpdatedTitle"), {
         description,
         duration: 4000,
-        // sonner respects the document-level `dir` attribute, but we set
-        // it explicitly here so screen readers announce direction even if
-        // the toast root is portalled outside the localized subtree.
-        dir: isRTL ? "rtl" : "ltr",
+        // The document-level `dir` attribute (set by LanguageProvider) is
+        // what actually flips the toast layout — including here as a data
+        // attribute so tests can assert per-toast direction.
+        className: isRTL ? "rtl" : "ltr",
       });
 
       reportAppSettingsToastEvent({
