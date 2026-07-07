@@ -569,18 +569,21 @@ export type Database = {
       email_stats: {
         Row: {
           id: string
+          stat_date: string | null
           stat_key: string
           stat_value: number
           updated_at: string
         }
         Insert: {
           id?: string
+          stat_date?: string | null
           stat_key: string
           stat_value?: number
           updated_at?: string
         }
         Update: {
           id?: string
+          stat_date?: string | null
           stat_key?: string
           stat_value?: number
           updated_at?: string
