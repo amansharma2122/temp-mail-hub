@@ -725,7 +725,7 @@ export function ClickBurst({ variant, onDone }: { variant: BurstVariant; onDone:
   const p = presets[variant];
   // Total overlay duration: give the shower time to reach the bottom on
   // large screens without keeping the veil around too long.
-  const OVERLAY_MS = 3500;
+  const OVERLAY_MS = 4200;
   return (
     <motion.div
       className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
