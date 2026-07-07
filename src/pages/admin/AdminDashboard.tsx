@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import SubscriptionStatsWidget from "@/components/admin/SubscriptionStatsWidget";
 import PaymentStatsWidget from "@/components/admin/PaymentStatsWidget";
+import RealtimeHealthWidget from "@/components/admin/RealtimeHealthWidget";
 
 interface Stats {
   totalUsers: number;
@@ -368,6 +369,9 @@ const AdminDashboard = () => {
 
       {/* Subscription Stats Widget */}
       <SubscriptionStatsWidget />
+
+      {/* Realtime Subscription Health */}
+      <RealtimeHealthWidget />
 
       {/* Recent Activity */}
       <motion.div
