@@ -32,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { broadcastAppSettingsChange, applyAppSettingsPatch } from "@/lib/appSettingsSync";
+import { applyAppSettingsPatch } from "@/lib/appSettingsSync";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { getAppSettingsRowId } from "@/lib/appSettingsKeyRoutes";
@@ -384,8 +384,6 @@ const AdminFriendlyWebsites = () => {
       }
       queryClient.invalidateQueries({ queryKey: ['app_settings'] });
       queryClient.invalidateQueries({ queryKey: ['app_settings', 'friendly_sites_widget'] });
-      // applyAppSettingsPatch already broadcasts; retained for clarity.
-      broadcastAppSettingsChange('friendly_sites_widget');
     } catch (error) {
       console.error('Error saving settings:', error);
       toast.error('Failed to save settings');

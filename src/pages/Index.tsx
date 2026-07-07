@@ -86,13 +86,13 @@ const Index = () => {
         {/* Live Stats + Quick Tips (side-by-side: stats left, tips right) */}
         <section className="py-4 border-y border-border/30">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,4fr)_minmax(10rem,1fr)] md:grid-cols-5 md:items-stretch">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,4fr)_minmax(0,1fr)] md:grid-cols-5 md:items-stretch">
               <div className="min-w-0 md:col-span-4">
                 <LiveStatsWidget />
               </div>
               {isSectionEnabled("quick_tips") && (
                 <motion.div
-                  className="relative flex h-full max-h-none flex-col overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 shadow-lg shadow-primary/5 sm:max-h-[168px] md:col-span-1"
+                  className="relative flex h-full flex-col overflow-hidden rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 shadow-lg shadow-primary/5 md:col-span-1"
                   initial={{ opacity: 0, scale: 0.95 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
