@@ -91,6 +91,7 @@ interface WidgetSettings {
   celebrationIntensity?: 'subtle' | 'normal' | 'lively';
   celebrationDurationMs?: number;
   celebrationParticleCount?: number;
+  celebrationSpeed?: 'slower' | 'normal' | 'faster';
   celebrationSoundEnabled?: boolean;
   buttonLabel: string;
   tooltipText: string;
@@ -121,6 +122,7 @@ const defaultSettings: WidgetSettings = {
   celebrationIntensity: 'normal',
   celebrationDurationMs: 4200,
   celebrationParticleCount: 0,
+  celebrationSpeed: 'normal',
   celebrationSoundEnabled: false,
   buttonLabel: 'Partner Sites',
   tooltipText: 'Explore our partner sites',
