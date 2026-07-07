@@ -109,7 +109,7 @@ export const useSEOSettings = () => {
 
     // Subscribe to real-time updates on app_settings for SEO changes
     const channel = supabase
-      .channel('seo-settings-realtime')
+      .channel(`seo-settings-realtime-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -129,7 +129,7 @@ export const useSEOSettings = () => {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [fetchSettings]);
 
