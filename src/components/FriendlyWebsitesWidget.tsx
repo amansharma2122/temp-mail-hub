@@ -429,11 +429,6 @@ const FriendlyWebsitesWidget = ({
   const intensity = settings.animationIntensity ?? 'normal';
   const intensityMul = intensity === 'subtle' ? 0.6 : intensity === 'lively' ? 1.35 : 1;
 
-  // Memoize the manualRetry closure so the SyncErrorPill doesn't rebind on
-  // every render (which was causing the countdown text update to briefly
-  // re-render the whole widget tree).
-  const memoManualRetry = useCallback(manualRetry, [manualRetry]);
-
   return (
     <>
       {/* Local keyframes for the wiggle effect — kept scoped so we don't touch tailwind config. */}
