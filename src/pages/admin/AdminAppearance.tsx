@@ -9,6 +9,7 @@ import { storage } from "@/lib/storage";
 import { Paintbrush, Save, Upload, Image, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSettings } from "@/contexts/SettingsContext";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 const APPEARANCE_SETTINGS_KEY = 'trashmails_appearance_settings';
 
 interface AppearanceSettings {
@@ -75,43 +76,17 @@ const AdminAppearance = () => {
     try {
       // Save to localStorage for immediate access
       storage.set(APPEARANCE_SETTINGS_KEY, settings);
-      
-      // Also save to Supabase app_settings for persistence
-      // First check if the key exists
-      const { data: existingData } = await api.db.query('app_settings', {
-        filter: { key: 'appearance' },
-        select: 'id',
-        limit: 1
-      });
-      const existing = existingData?.[0];
 
-      // Cast settings to Json-compatible format
-      const settingsJson = JSON.parse(JSON.stringify(settings));
-
-      let error;
-      if (existing) {
-        // Update existing
-        const result = await api.db.update('app_settings', 
-          { value: settingsJson, updated_at: new Date().toISOString() },
-          { key: 'appearance' }
-        );
-        error = result.error;
-      } else {
-        // Insert new
-        const result = await api.db.insert('app_settings', {
-          key: 'appearance',
-          value: settingsJson,
-        });
-        error = result.error;
-      }
-
-      if (error) {
-        console.error('Error saving to database:', error);
-        toast.error('Settings saved locally but failed to sync to database');
-      } else {
-        // Immediately refetch global settings so changes apply everywhere
+      // Persist via deterministic deep-merge RPC — broadcasts instantly to
+      // every tab/device.
+      try {
+        const settingsJson = JSON.parse(JSON.stringify(settings));
+        await saveAppSetting('appearance', settingsJson);
         await refetchGlobalSettings();
         toast.success("Appearance settings saved!");
+      } catch (error) {
+        console.error('Error saving to database:', error);
+        toast.error('Settings saved locally but failed to sync to database');
       }
     } catch (e) {
       console.error('Error saving settings:', e);
