@@ -168,7 +168,7 @@ export const useSecureEmailService = () => {
   // Load domains from API with retry logic and local cache fallback
   useEffect(() => {
     let cancelled = false;
-    let retryTimeout: NodeJS.Timeout | null = null;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const loadDomains = async (attempt = 0) => {
       if (cancelled) return;

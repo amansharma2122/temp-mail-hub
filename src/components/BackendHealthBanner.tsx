@@ -27,7 +27,7 @@ const BackendHealthBanner = () => {
   });
   const [isRecovering, setIsRecovering] = useState(false);
   const [circuitOpen, setCircuitOpen] = useState(false);
-  const cooldownRef = useRef<NodeJS.Timeout | null>(null);
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const checkHealth = useCallback(async (isManual = false) => {
     // Circuit breaker: skip auto-checks if circuit is open
