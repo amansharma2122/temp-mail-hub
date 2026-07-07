@@ -888,6 +888,29 @@ const AdminFriendlyWebsites = () => {
                   <p className="text-xs text-muted-foreground">
                     Shown at the bottom of the open panel. Fires the selected full-screen effect on click. Respects reduced-motion.
                   </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPreviewBurstAt(Date.now())}
+                      disabled={!(settings.celebrationEnabled ?? true)}
+                      data-testid="celebration-preview-btn"
+                    >
+                      <Sparkles className="w-4 h-4 mr-1" />
+                      Preview effect
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground">
+                      Plays a full-screen preview of “{settings.celebrationEffect ?? 'confetti'}”.
+                    </span>
+                  </div>
+                  {previewBurstAt && (
+                    <ClickBurst
+                      key={previewBurstAt}
+                      variant={settings.celebrationEffect ?? 'confetti'}
+                      onDone={() => setPreviewBurstAt(null)}
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">
