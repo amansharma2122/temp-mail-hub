@@ -28,6 +28,15 @@ type ImapCandidate = {
   storageBytesUsed?: number;
 };
 
+type ImapFailureKind = "auth" | "connection" | "configuration" | "mailbox_full" | "unknown";
+
+type SafeFailure = {
+  kind: ImapFailureKind;
+  status: number;
+  code: string;
+  message: string;
+};
+
 const EMAIL_REGEX = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
 // Decode quoted-printable encoding
@@ -186,6 +195,54 @@ function toShortError(err: unknown): string {
   return msg.length > 800 ? msg.slice(0, 800) + "…" : msg;
 }
 
+function classifyImapFailure(err: unknown): SafeFailure {
+  const raw = err instanceof Error ? err.message : String(err || "");
+  const msg = raw.toLowerCase();
+
+  if (msg.includes("mailbox_full")) {
+    return {
+      kind: "mailbox_full",
+      status: 200,
+      code: "IMAP_MAILBOX_FULL",
+      message: "The configured mailbox is full. Please free space or switch to another active mailbox.",
+    };
+  }
+
+  if (msg.includes("login failed") || msg.includes("authentication") || msg.includes("invalid credentials")) {
+    return {
+      kind: "auth",
+      status: 200,
+      code: "IMAP_AUTH_FAILED",
+      message: "IMAP authentication failed. Please update the mailbox username and password in admin settings.",
+    };
+  }
+
+  if (msg.includes("connection refused") || msg.includes("timeout") || msg.includes("network") || msg.includes("no such host")) {
+    return {
+      kind: "connection",
+      status: 200,
+      code: "IMAP_CONNECTION_FAILED",
+      message: "Could not connect to the IMAP server. Please check the host, port, and TLS settings.",
+    };
+  }
+
+  if (msg.includes("not configured") || msg.includes("missing") || msg.includes("requires host")) {
+    return {
+      kind: "configuration",
+      status: 200,
+      code: "IMAP_NOT_CONFIGURED",
+      message: "IMAP is not fully configured. Please add a host, username, and password for an active mailbox.",
+    };
+  }
+
+  return {
+    kind: "unknown",
+    status: 500,
+    code: "IMAP_FETCH_FAILED",
+    message: "Unable to fetch emails right now. Please try again later or check the mailbox settings.",
+  };
+}
+
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -217,7 +274,36 @@ serve(async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_ANON_KEY_LEGACY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authHeader = req.headers.get("Authorization") || "";
+    let isAdminRequest = false;
+    if (authHeader && supabaseAnonKey) {
+      try {
+        const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user } } = await userClient.auth.getUser();
+        if (user?.id) {
+          const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: user.id });
+          isAdminRequest = isAdmin === true;
+        }
+      } catch {
+        isAdminRequest = false;
+      }
+    }
+
+    if ((testOnly || requestedMailboxId) && !isAdminRequest) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          code: "ADMIN_REQUIRED",
+          error: "Admin access is required to test or poll a specific mailbox.",
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const updateMailboxError = async (mailboxId: string, err: unknown) => {
       const msg = toShortError(err);
@@ -260,7 +346,7 @@ serve(async (req: Request): Promise<Response> => {
         const password = String(requestBody?.password || "");
 
         if (!host || !username || !password) {
-          return [];
+          throw new Error("IMAP test requires host, username, and password.");
         }
 
         return [
@@ -367,6 +453,7 @@ serve(async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           success: false,
+          code: "IMAP_TEST_CONFIG_REQUIRED",
           error: "IMAP test requires host, port, username, and password.",
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -377,11 +464,12 @@ serve(async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({
           success: false,
+          code: "IMAP_NOT_CONFIGURED",
           error:
-            "No IMAP mailbox is configured (or passwords are missing). Please configure IMAP on at least one mailbox and set it as Primary.",
+            "IMAP is not fully configured. Please add a host, username, and password for at least one active mailbox.",
           configured: false,
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -400,7 +488,7 @@ serve(async (req: Request): Promise<Response> => {
       .map((name) => (name.startsWith("@") ? name.slice(1) : name))
       .filter(Boolean);
 
-    console.log(`[IMAP] Allowed domains: ${allowedDomainSuffixes.join(", ")}`);
+    console.log(`[IMAP] Loaded ${allowedDomainSuffixes.length} active domain suffixes`);
 
     // Helper to lookup temp_email by address (with caching within this request)
     const tempEmailCache = new Map<string, string | null>();
@@ -466,7 +554,7 @@ serve(async (req: Request): Promise<Response> => {
         const tag = `A${tagNum.toString().padStart(4, "0")}`;
         const fullCommand = `${tag} ${command}\r\n`;
 
-        const logCmd = command.startsWith("LOGIN") ? `LOGIN "${username}" ****` : command;
+        const logCmd = command.startsWith("LOGIN") ? "LOGIN ****" : command;
         console.log(`[IMAP] > ${tag} ${logCmd}`);
 
         await secureConn.write(encoder.encode(fullCommand));
@@ -850,12 +938,14 @@ serve(async (req: Request): Promise<Response> => {
         return new Response(
           JSON.stringify({
             ...result,
-            mailbox_used: {
-              source: candidate.source,
-              mailbox_id: candidate.mailboxId || null,
-              mailbox_name: candidate.mailboxName || null,
-              host: candidate.host,
-            },
+            ...(isAdminRequest ? {
+              mailbox_used: {
+                source: candidate.source,
+                mailbox_id: candidate.mailboxId || null,
+                mailbox_name: candidate.mailboxName || null,
+                host: candidate.host,
+              },
+            } : {}),
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -871,41 +961,34 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const rawMessage = lastErr instanceof Error ? lastErr.message : String(lastErr || "Failed to fetch emails");
-    let errorMessage = rawMessage || "Failed to fetch emails";
-
-    if (errorMessage.includes("Connection refused")) {
-      errorMessage = "Could not connect to IMAP server. Please check the host and port.";
-    } else if (errorMessage.toLowerCase().includes("login failed") || errorMessage.toLowerCase().includes("authentication")) {
-      errorMessage = "IMAP authentication failed. Please check your username and password.";
-    }
+    const failure = classifyImapFailure(lastErr);
+    const safeTried = tried.map((item) => ({
+      mailboxId: item.mailboxId,
+      mailboxName: item.mailboxName,
+      host: item.host,
+      error: classifyImapFailure(item.error).message,
+    }));
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: errorMessage,
-        details: rawMessage,
-        tried,
+        code: failure.code,
+        error: failure.message,
+        ...(isAdminRequest ? { details: rawMessage, tried: safeTried } : {}),
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: failure.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("[IMAP] Fetch error:", error);
-
-    let errorMessage = error?.message || "Failed to fetch emails";
-
-    if (errorMessage.includes("Connection refused")) {
-      errorMessage = "Could not connect to IMAP server. Please check the host and port.";
-    } else if (errorMessage.toLowerCase().includes("login failed") || errorMessage.toLowerCase().includes("authentication")) {
-      errorMessage = "IMAP authentication failed. Please check your username and password.";
-    }
+    const failure = classifyImapFailure(error);
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: errorMessage,
-        details: error?.message,
+        code: failure.code,
+        error: failure.message,
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: failure.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

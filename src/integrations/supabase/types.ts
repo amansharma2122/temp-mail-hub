@@ -1742,6 +1742,7 @@ export type Database = {
           suggested_rotate_at: string
         }[]
       }
+      get_public_captcha_settings: { Args: never; Returns: Json }
       get_registration_ip: { Args: never; Returns: string }
       get_suspended_users: {
         Args: never

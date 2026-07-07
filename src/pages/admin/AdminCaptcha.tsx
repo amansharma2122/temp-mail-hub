@@ -15,14 +15,108 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
+
+export const InvalidRecaptchaDomainWarning = ({
+  hostname,
+  loadError,
+}: {
+  hostname: string;
+  loadError: string;
+}) => {
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [hostnameCopied, setHostnameCopied] = useState(false);
+  const checklistId = "recaptcha-domain-checklist";
+
+  const copyHostname = async () => {
+    if (!hostname) return;
+    try {
+      await navigator.clipboard.writeText(hostname);
+      setHostnameCopied(true);
+      toast.success("Hostname copied");
+      window.setTimeout(() => setHostnameCopied(false), 1500);
+    } catch {
+      toast.error("Could not copy hostname");
+    }
+  };
+
+  return (
+    <Alert
+      role="alert"
+      data-testid="recaptcha-invalid-domain-alert"
+      className="border-destructive/60 bg-destructive/10"
+    >
+      <AlertDescription className="space-y-2 text-destructive-foreground">
+        <p className="font-semibold">
+          reCAPTCHA site key is not authorized for this domain.
+        </p>
+        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
+          <span>Current hostname:</span>
+          <code className="min-w-0 break-all rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
+            {hostname || "(unknown)"}
+          </code>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={copyHostname}
+            disabled={!hostname}
+            aria-label="Copy current hostname"
+            className="w-fit"
+          >
+            {hostnameCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+            {hostnameCopied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+        <div className="text-sm">
+          <button
+            type="button"
+            onClick={() => setChecklistOpen((open) => !open)}
+            className="inline-flex h-9 items-center px-0 text-sm font-medium text-destructive-foreground hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-expanded={checklistOpen}
+            aria-controls={checklistId}
+            data-testid="recaptcha-domain-checklist-toggle"
+          >
+            <ChevronDown className={`mr-2 h-4 w-4 transition-transform ${checklistOpen ? "rotate-180" : ""}`} />
+            {checklistOpen ? "Hide fix checklist" : "Show fix checklist"}
+          </button>
+          {checklistOpen && (
+            <div id={checklistId} data-testid="recaptcha-domain-checklist">
+              <ol className="list-decimal space-y-1 pl-5 pt-1">
+                <li>
+                  Open the{" "}
+                  <a
+                    href="https://www.google.com/recaptcha/admin"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    Google reCAPTCHA admin console
+                  </a>
+                  .
+                </li>
+                <li>Select the site key currently configured above.</li>
+                <li>
+                  Under <strong>Domains</strong>, add{" "}
+                  <code className="rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
+                    {hostname || "your-domain.com"}
+                  </code>{" "}
+                  (and any preview / www / staging variants you use).
+                </li>
+                <li>Save and reload this page — the warning will clear automatically.</li>
+              </ol>
+            </div>
+          )}
+        </div>
+        <p className="text-xs opacity-80">Raw error: {loadError}</p>
+      </AlertDescription>
+    </Alert>
+  );
+};
 
 const AdminCaptcha = () => {
   const { settings, isLoading, updateSettings, isSaving } = useCaptchaSettings();
   const [localSettings, setLocalSettings] = useState<CaptchaSettings>(settings);
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const [hostnameCopied, setHostnameCopied] = useState(false);
   const { loadError } = useRecaptcha();
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
   const isDomainError =
@@ -38,18 +132,6 @@ const AdminCaptcha = () => {
 
   const updateSetting = <K extends keyof CaptchaSettings>(key: K, value: CaptchaSettings[K]) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
-  };
-
-  const copyHostname = async () => {
-    if (!hostname) return;
-    try {
-      await navigator.clipboard.writeText(hostname);
-      setHostnameCopied(true);
-      toast.success("Hostname copied");
-      window.setTimeout(() => setHostnameCopied(false), 1500);
-    } catch {
-      toast.error("Could not copy hostname");
-    }
   };
 
   if (isLoading) {
@@ -84,71 +166,7 @@ const AdminCaptcha = () => {
         </Alert>
       )}
 
-      {isDomainError && (
-        <Alert
-          role="alert"
-          data-testid="recaptcha-invalid-domain-alert"
-          className="border-destructive/60 bg-destructive/10"
-        >
-          <AlertDescription className="space-y-2 text-destructive-foreground">
-            <p className="font-semibold">
-              reCAPTCHA site key is not authorized for this domain.
-            </p>
-            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
-              <span>Current hostname:</span>
-              <code className="min-w-0 break-all rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
-                {hostname || "(unknown)"}
-              </code>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={copyHostname}
-                disabled={!hostname}
-                aria-label="Copy current hostname"
-                className="w-fit"
-              >
-                {hostnameCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-                {hostnameCopied ? "Copied" : "Copy"}
-              </Button>
-            </div>
-            <Collapsible open={checklistOpen} onOpenChange={setChecklistOpen} className="text-sm">
-              <CollapsibleTrigger asChild>
-                <Button type="button" variant="ghost" size="sm" className="px-0 text-destructive-foreground hover:bg-transparent">
-                  <ChevronDown className={`mr-2 h-4 w-4 transition-transform ${checklistOpen ? "rotate-180" : ""}`} />
-                  {checklistOpen ? "Hide fix checklist" : "Show fix checklist"}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <ol className="list-decimal space-y-1 pl-5 pt-1">
-                  <li>
-                    Open the{" "}
-                    <a
-                      href="https://www.google.com/recaptcha/admin"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline"
-                    >
-                      Google reCAPTCHA admin console
-                    </a>
-                    .
-                  </li>
-                  <li>Select the site key currently configured above.</li>
-                  <li>
-                    Under <strong>Domains</strong>, add{" "}
-                    <code className="rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
-                      {hostname || "your-domain.com"}
-                    </code>{" "}
-                    (and any preview / www / staging variants you use).
-                  </li>
-                  <li>Save and reload this page — the warning will clear automatically.</li>
-                </ol>
-              </CollapsibleContent>
-            </Collapsible>
-            <p className="text-xs opacity-80">Raw error: {loadError}</p>
-          </AlertDescription>
-        </Alert>
-      )}
+      {isDomainError && <InvalidRecaptchaDomainWarning hostname={hostname} loadError={loadError} />}
 
       <div className="grid gap-6">
         <Card>

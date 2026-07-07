@@ -131,7 +131,7 @@ const AdminSMTPSettings = () => {
       host: mailbox.smtp_host || '',
       port: mailbox.smtp_port || 587,
       username: mailbox.smtp_user || '',
-      password: mailbox.smtp_password || '',
+      password: '',
       encryption: mailbox.smtp_port === 465 ? 'ssl' : 'tls',
       fromEmail: mailbox.smtp_from || mailbox.smtp_user || '',
       fromName: mailbox.name || 'Nullsto',
@@ -173,11 +173,11 @@ const AdminSMTPSettings = () => {
         smtp_host: settings.host,
         smtp_port: settings.port,
         smtp_user: settings.username,
-        smtp_password: settings.password,
         smtp_from: settings.fromEmail || settings.username,
         is_active: settings.enabled,
       };
 
+      let savedMailboxId = selectedMailboxId;
       if (selectedMailboxId) {
         mailboxData.id = selectedMailboxId;
         const { error } = await api.admin.saveMailbox(mailboxData);
@@ -186,8 +186,21 @@ const AdminSMTPSettings = () => {
       } else {
         const { data, error } = await api.admin.saveMailbox(mailboxData);
         if (error) throw new Error(error.message);
-        if (data?.id) setSelectedMailboxId(data.id);
+        const inserted = Array.isArray(data) ? data[0] : data;
+        if (inserted?.id) {
+          savedMailboxId = inserted.id;
+          setSelectedMailboxId(inserted.id);
+        }
         toast.success("New mailbox created in database!");
+      }
+
+      if (settings.password && savedMailboxId) {
+        const { data, error: pwError } = await api.db.rpc<boolean>('set_mailbox_smtp_password', {
+          p_mailbox_id: savedMailboxId,
+          p_password: settings.password,
+        });
+        if (pwError) throw new Error(pwError.message);
+        if (data === false) throw new Error('Failed to store SMTP password');
       }
       
       setSyncSource('database');

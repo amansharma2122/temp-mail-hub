@@ -1243,14 +1243,18 @@ export const admin = {
 
   // Mailboxes management
   async getMailboxes(): Promise<ApiResponse<any>> {
-    return db.query('mailboxes', { order: { column: 'priority', ascending: false } });
+    return db.query('mailboxes', {
+      select: 'id,name,smtp_host,smtp_port,smtp_user,smtp_from,imap_host,imap_port,imap_user,receiving_email,hourly_limit,daily_limit,emails_sent_this_hour,emails_sent_today,auto_delete_after_store,storage_used_bytes,storage_limit_bytes,storage_bytes_used,storage_bytes_limit,is_full,is_primary,is_active,priority,last_error,last_error_at,last_polled_at,last_sent_at,created_at,updated_at',
+      order: { column: 'priority', ascending: false }
+    });
   },
 
   async saveMailbox(mailbox: Record<string, any>): Promise<ApiResponse<any>> {
+    const { smtp_password: _smtpPassword, imap_password: _imapPassword, ...safeMailbox } = mailbox;
     if (mailbox.id) {
-      return db.update('mailboxes', mailbox, { id: mailbox.id });
+      return db.update('mailboxes', safeMailbox, { id: mailbox.id }, { select: 'id' });
     }
-    return db.insert('mailboxes', mailbox);
+    return db.insert('mailboxes', safeMailbox, { select: 'id' });
   },
 
   async deleteMailbox(id: string): Promise<ApiResponse<any>> {

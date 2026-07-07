@@ -104,6 +104,7 @@ export const useAdminMailboxes = () => {
     queryKey: adminQueryKeys.mailboxes(),
     queryFn: async () => {
       const { data, error } = await api.db.query("mailboxes", {
+        select: "id,name,smtp_host,smtp_port,smtp_user,smtp_from,imap_host,imap_port,imap_user,receiving_email,hourly_limit,daily_limit,emails_sent_this_hour,emails_sent_today,auto_delete_after_store,storage_used_bytes,storage_limit_bytes,storage_bytes_used,storage_bytes_limit,is_full,is_primary,is_active,priority,last_error,last_error_at,last_polled_at,last_sent_at,created_at,updated_at",
         order: { column: "priority", ascending: true }
       });
 

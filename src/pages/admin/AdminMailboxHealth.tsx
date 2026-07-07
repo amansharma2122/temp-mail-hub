@@ -112,7 +112,9 @@ const AdminMailboxHealth = () => {
 
       // Supabase backend - fetch mailboxes and logs
       const [mailboxResult, logResult] = await Promise.all([
-        supabase.from('mailboxes').select('*'),
+        supabase
+          .from('mailboxes')
+          .select('id,name,smtp_host,smtp_port,smtp_user,smtp_from,imap_host,imap_port,imap_user,receiving_email,hourly_limit,daily_limit,emails_sent_this_hour,emails_sent_today,auto_delete_after_store,storage_used_bytes,storage_limit_bytes,storage_bytes_used,storage_bytes_limit,is_full,is_primary,is_active,priority,last_error,last_error_at,last_polled_at,last_sent_at,created_at,updated_at'),
         supabase.from('email_logs').select('*').gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       ]);
       
