@@ -809,6 +809,31 @@ const AdminFriendlyWebsites = () => {
 
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Click Effect
+                  </Label>
+                  <Select
+                    value={settings.clickEffect ?? 'sparkle'}
+                    onValueChange={(v: NonNullable<WidgetSettings['clickEffect']>) =>
+                      setSettings({ ...settings, clickEffect: v })
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="sparkle">Sparkle ✨</SelectItem>
+                      <SelectItem value="confetti">Confetti 🎉</SelectItem>
+                      <SelectItem value="bomb">Bomb 💥</SelectItem>
+                      <SelectItem value="fireworks">Fireworks 🎆</SelectItem>
+                      <SelectItem value="hearts">Hearts ❤️</SelectItem>
+                      <SelectItem value="stars">Stars ⭐</SelectItem>
+                      <SelectItem value="rainbow-burst">Rainbow Burst 🌈</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Plays once when a visitor opens the widget. Respects reduced-motion.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
                     <Wand2 className="w-4 h-4" /> Trigger Icon
                   </Label>
                   <LucideIconPicker
