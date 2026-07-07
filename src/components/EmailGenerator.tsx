@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { tooltips } from "@/lib/tooltips";
 import EmailLimitBanner from "@/components/EmailLimitBanner";
 import EmailLimitModal from "@/components/EmailLimitModal";
+import EmailExpiredModal from "@/components/EmailExpiredModal";
 import { usePremiumFeatures } from "@/hooks/usePremiumFeatures";
 
 interface RateLimitSettings {
@@ -73,6 +74,8 @@ const EmailGenerator = () => {
   const [selectedCustomDomain, setSelectedCustomDomain] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showExpiredModal, setShowExpiredModal] = useState(false);
+  const [expiredAddress, setExpiredAddress] = useState<string | undefined>(undefined);
   const [rateLimitSettings, setRateLimitSettings] = useState<RateLimitSettings>({
     max_requests: 30,
     window_minutes: 60,
@@ -545,6 +548,17 @@ const EmailGenerator = () => {
           limit={emailUsage.limit}
         />
 
+        {/* Email Expired Modal — offers new email or upgrade to keep it */}
+        <EmailExpiredModal
+          isOpen={showExpiredModal}
+          address={expiredAddress}
+          onClose={() => setShowExpiredModal(false)}
+          onGenerateNew={() => {
+            const domainId = domains[0]?.id;
+            if (domainId) void generateEmail(domainId);
+          }}
+        />
+
         {/* Decorative Elements */}
         <div className="absolute -top-4 -left-4 w-24 h-24 bg-primary/10 rounded-full blur-2xl" />
         <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-accent/10 rounded-full blur-2xl" />
@@ -605,7 +619,8 @@ const EmailGenerator = () => {
                       <EmailExpiryTimer 
                         expiresAt={currentEmail.expires_at} 
                         onExpired={() => {
-                          toast.info("Email expired. Generate a new one!");
+                          setExpiredAddress(currentEmail.address);
+                          setShowExpiredModal(true);
                         }}
                       />
                     </motion.div>
