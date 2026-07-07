@@ -463,28 +463,11 @@ const FriendlyWebsitesWidget = ({
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
       <AnimatePresence>
         {burstAt && !effectiveReducedMotion && (
-          <motion.div
+          <ClickBurst
             key={burstAt}
-            className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 0 }}
-            transition={{ duration: 1.4, ease: 'easeOut' }}
-            onAnimationComplete={() => setBurstAt(null)}
-            aria-hidden
-          >
-            {Array.from({ length: 14 }).map((_, i) => (
-              <span
-                key={i}
-                className="absolute w-2 h-2 rounded-full bg-primary/70"
-                style={{
-                  top: `${50 + (Math.sin(i) * 30)}%`,
-                  left: `${50 + (Math.cos(i) * 30)}%`,
-                  animation: `fw-burst 1.2s ease-out forwards`,
-                  animationDelay: `${(i % 5) * 60}ms`,
-                }}
-              />
-            ))}
-          </motion.div>
+            variant={settings.clickEffect ?? 'sparkle'}
+            onDone={() => setBurstAt(null)}
+          />
         )}
       </AnimatePresence>
 
