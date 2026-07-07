@@ -14,6 +14,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useLimitModalSettings, defaultLimitModalConfig, LimitModalConfig } from "@/hooks/useLimitModalSettings";
 import { useDirty } from "@/hooks/useDirty";
 import DirtySaveButton from "@/components/admin/DirtySaveButton";
+import StatsSectionBgPreview from "@/components/admin/StatsSectionBgPreview";
 import {
   Select,
   SelectContent,
@@ -398,6 +399,9 @@ const AdminGeneralSettings = () => {
         </Card>
 
         {/* Site Status settings are in Registration Control page */}
+
+        {/* Stats + Quick Tips section background */}
+        <StatsSectionBgPreview />
       </div>
     </div>
   );
