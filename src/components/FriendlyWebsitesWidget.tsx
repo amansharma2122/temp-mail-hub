@@ -166,6 +166,43 @@ const FriendlyWebsitesWidget = ({
     console.warn("[friendly-widget] realtime/polling failed — surfacing sync indicator");
   }, [hasSyncError]);
 
+  // Sync-error exponential backoff. Retries the two failing queries with
+  // jittered exponential delay (2s, 4s, 8s, 16s, 32s, 60s max). A manual
+  // "Retry now" click resets the attempt counter.
+  const [syncAttempt, setSyncAttempt] = useState(0);
+  const [nextRetryIn, setNextRetryIn] = useState<number>(0);
+  const runRetry = () => {
+    refetchSettings();
+    refetchSites();
+  };
+  useEffect(() => {
+    if (!hasSyncError) {
+      if (syncAttempt !== 0) setSyncAttempt(0);
+      if (nextRetryIn !== 0) setNextRetryIn(0);
+      return;
+    }
+    const base = Math.min(60_000, 2_000 * Math.pow(2, syncAttempt));
+    const jitter = Math.floor(base * 0.25 * Math.random());
+    const delay = base + jitter;
+    setNextRetryIn(delay);
+    const tick = setInterval(() => {
+      setNextRetryIn((ms) => Math.max(0, ms - 1000));
+    }, 1000);
+    const timer = setTimeout(() => {
+      setSyncAttempt((n) => n + 1);
+      runRetry();
+    }, delay);
+    return () => { clearTimeout(timer); clearInterval(tick); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSyncError, syncAttempt]);
+
+  const manualRetry = () => {
+    setSyncAttempt(0);
+    setNextRetryIn(0);
+    runRetry();
+  };
+  const nextRetrySec = Math.max(0, Math.ceil(nextRetryIn / 1000));
+
   // Derive a single consistent live-region announcement. Priority: sync error
   // beats interactive state (a screen reader user needs to know the widget is
   // broken). Open/close use symmetric wording so listeners can build a mental
