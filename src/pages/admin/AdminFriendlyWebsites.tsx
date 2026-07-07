@@ -955,6 +955,59 @@ const AdminFriendlyWebsites = () => {
                 onCheckedChange={(checked) => setFormData({ ...formData, open_in_new_tab: checked })}
               />
             </div>
+
+            <div className="pt-2 border-t space-y-3">
+              <p className="text-sm font-medium">Per-site notification rules</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Attention effect</Label>
+                  <Select
+                    value={formData.attention_effect || 'inherit'}
+                    onValueChange={(v) => setFormData({ ...formData, attention_effect: (v === 'inherit' ? '' : v) as typeof formData.attention_effect })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit">Inherit widget</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="pulse">Pulse</SelectItem>
+                      <SelectItem value="glow">Glow</SelectItem>
+                      <SelectItem value="wiggle">Wiggle</SelectItem>
+                      <SelectItem value="bounce">Bounce</SelectItem>
+                      <SelectItem value="ring">Ring</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Auto-open</Label>
+                  <Select
+                    value={formData.auto_open_override}
+                    onValueChange={(v) => setFormData({ ...formData, auto_open_override: v as typeof formData.auto_open_override })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit">Inherit widget</SelectItem>
+                      <SelectItem value="force_on">Always auto-open</SelectItem>
+                      <SelectItem value="force_off">Never auto-open</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Badge text (blank = widget default)</Label>
+                  <Input maxLength={12} value={formData.badge_text}
+                    onChange={(e) => setFormData({ ...formData, badge_text: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max badge displays / day (0 = ∞)</Label>
+                  <Input type="number" min={0} max={100} value={formData.max_badge_per_day}
+                    onChange={(e) => setFormData({ ...formData, max_badge_per_day: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Show badge for this site</Label>
+                <Switch checked={formData.badge_enabled}
+                  onCheckedChange={(v) => setFormData({ ...formData, badge_enabled: v })} />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
