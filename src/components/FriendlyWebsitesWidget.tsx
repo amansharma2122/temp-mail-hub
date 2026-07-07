@@ -334,48 +334,21 @@ const FriendlyWebsitesWidget = ({
   }
   if (overrideWebsites && !settings.enabled) return null;
 
-  const sizeClasses = {
-    small: 'w-48',
-    medium: 'w-64',
-    large: 'w-80',
-  };
+  const sizeClasses = SIZE_CLASSES;
+  const colorClasses = COLOR_CLASSES;
+  const buttonColorClasses = BUTTON_COLOR_CLASSES;
 
-  const colorClasses = {
-    primary: 'bg-primary/10 border-primary/30 hover:bg-primary/20',
-    accent: 'bg-accent/10 border-accent/30 hover:bg-accent/20',
-    gradient: 'bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30',
-    glass: 'bg-card/80 backdrop-blur-xl border-border/50',
-  };
-
-  const buttonColorClasses = {
-    primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-    accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
-    gradient: 'bg-gradient-to-r from-primary to-accent text-primary-foreground',
-    glass: 'bg-card/90 backdrop-blur-xl text-foreground border border-border/50 hover:bg-card',
-  };
-
-  const animationVariants = {
-    slide: {
-      hidden: { x: settings.position === 'right' ? 300 : -300, opacity: 0 },
-      visible: { x: 0, opacity: 1 },
-    },
-    fade: {
-      hidden: { opacity: 0, scale: 0.8 },
-      visible: { opacity: 1, scale: 1 },
-    },
-    bounce: {
-      hidden: { x: settings.position === 'right' ? 300 : -300, opacity: 0 },
-      visible: { x: 0, opacity: 1 },
-    },
-    flip: {
-      hidden: { rotateY: 90, opacity: 0 },
-      visible: { rotateY: 0, opacity: 1 },
-    },
-    zoom: {
-      hidden: { scale: 0, opacity: 0 },
-      visible: { scale: 1, opacity: 1 },
-    },
-  } as const;
+  // Only the slide/bounce variants depend on `position`, so memoize keyed by it.
+  const animationVariants = useMemo(() => {
+    const offset = settings.position === 'right' ? 300 : -300;
+    return {
+      slide:  { hidden: { x: offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
+      fade:   { hidden: { opacity: 0, scale: 0.8 }, visible: { opacity: 1, scale: 1 } },
+      bounce: { hidden: { x: offset, opacity: 0 }, visible: { x: 0, opacity: 1 } },
+      flip:   { hidden: { rotateY: 90, opacity: 0 }, visible: { rotateY: 0, opacity: 1 } },
+      zoom:   { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1 } },
+    } as const;
+  }, [settings.position]);
 
   const positionClasses = settings.position === 'right' 
     ? 'right-0 rounded-l-xl' 
