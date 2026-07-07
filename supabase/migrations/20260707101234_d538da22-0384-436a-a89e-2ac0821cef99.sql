@@ -1,0 +1,1 @@
+UPDATE public.app_settings SET value = jsonb_set(value, '{enabled}', 'true'::jsonb, true), updated_at = now() WHERE key = 'friendly_sites_widget';
