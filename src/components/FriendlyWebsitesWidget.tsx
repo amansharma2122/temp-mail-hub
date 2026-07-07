@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useSupabaseAuth";
