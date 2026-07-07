@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { subscribeAppSettings } from "@/lib/appSettingsSync";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import * as LucideIcons from "lucide-react";
@@ -123,6 +124,7 @@ const FriendlyWebsitesWidget = ({
   overrideWebsites,
 }: FriendlyWebsitesWidgetProps = {}) => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   // Burst effect triggered when the user clicks the trigger — a lightweight
@@ -143,6 +145,19 @@ const FriendlyWebsitesWidget = ({
       try { mq.removeEventListener("change", onChange); } catch { mq.removeListener(onChange); }
     };
   }, []);
+
+  // Cross-tab / cross-device sync: when the admin toggles the widget on/off
+  // or changes any setting, invalidate our cached query so the change is
+  // reflected immediately — no page reload, no focus event required.
+  useEffect(() => {
+    return subscribeAppSettings(
+      ["friendly_sites_widget", "friendly_widget_per_effect_quotas"],
+      () => {
+        queryClient.invalidateQueries({ queryKey: ["app_settings", "friendly_sites_widget"] });
+        queryClient.invalidateQueries({ queryKey: ["friendly_websites"] });
+      },
+    );
+  }, [queryClient]);
 
   // Fetch settings with React Query for caching and real-time updates
   const { data: fetchedSettings = defaultSettings, isError: settingsError, refetch: refetchSettings } = useQuery({
