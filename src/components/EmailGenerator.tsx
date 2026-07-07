@@ -548,6 +548,17 @@ const EmailGenerator = () => {
           limit={emailUsage.limit}
         />
 
+        {/* Email Expired Modal — offers new email or upgrade to keep it */}
+        <EmailExpiredModal
+          isOpen={showExpiredModal}
+          address={expiredAddress}
+          onClose={() => setShowExpiredModal(false)}
+          onGenerateNew={() => {
+            const currentDomainId = currentEmail?.domain?.id || domains[0]?.id;
+            if (currentDomainId) void generateEmail(currentDomainId);
+          }}
+        />
+
         {/* Decorative Elements */}
         <div className="absolute -top-4 -left-4 w-24 h-24 bg-primary/10 rounded-full blur-2xl" />
         <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-accent/10 rounded-full blur-2xl" />
