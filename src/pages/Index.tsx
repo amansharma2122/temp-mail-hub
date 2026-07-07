@@ -12,9 +12,18 @@ import BannerDisplay from "@/components/BannerDisplay";
 import LiveStatsWidget from "@/components/LiveStatsWidget";
 import { lazy, Suspense } from "react";
 // FriendlyWebsitesWidget is heavy (framer-motion + full lucide-react set) and
-// only paints in a corner overlay — defer it out of the initial bundle so the
-// public site's LCP isn't blocked by widget code.
-const FriendlyWebsitesWidget = lazy(() => import("@/components/FriendlyWebsitesWidget"));
+// only paints in a corner overlay — kept as a lazy chunk so it doesn't block
+// LCP, but we *warm* the chunk on idle right after mount so the widget
+// becomes visible far sooner than plain lazy() (no click / interaction wait).
+const importFriendlyWidget = () => import("@/components/FriendlyWebsitesWidget");
+const FriendlyWebsitesWidget = lazy(importFriendlyWidget);
+if (typeof window !== "undefined") {
+  const warm = () => { void importFriendlyWidget(); };
+  const ric = (window as any).requestIdleCallback as
+    | ((cb: () => void, opts?: { timeout?: number }) => number) | undefined;
+  if (ric) ric(warm, { timeout: 800 });
+  else setTimeout(warm, 120);
+}
 import BackendHealthBanner from "@/components/BackendHealthBanner";
 import { motion } from "framer-motion";
 import { useHomepageContent } from "@/hooks/useHomepageContent";

@@ -88,6 +88,10 @@ interface WidgetSettings {
   celebrationEnabled?: boolean;
   celebrationLabel?: string;
   celebrationEffect?: 'sparkle' | 'confetti' | 'bomb' | 'fireworks' | 'hearts' | 'stars' | 'rainbow-burst';
+  celebrationIntensity?: 'subtle' | 'normal' | 'lively';
+  celebrationDurationMs?: number;
+  celebrationParticleCount?: number;
+  celebrationSoundEnabled?: boolean;
   buttonLabel: string;
   tooltipText: string;
   showBadge: boolean;
@@ -114,6 +118,10 @@ const defaultSettings: WidgetSettings = {
   celebrationEnabled: true,
   celebrationLabel: 'Click Me 🎉',
   celebrationEffect: 'confetti',
+  celebrationIntensity: 'normal',
+  celebrationDurationMs: 4200,
+  celebrationParticleCount: 0,
+  celebrationSoundEnabled: false,
   buttonLabel: 'Partner Sites',
   tooltipText: 'Explore our partner sites',
   showBadge: true,
@@ -888,6 +896,61 @@ const AdminFriendlyWebsites = () => {
                   <p className="text-xs text-muted-foreground">
                     Shown at the bottom of the open panel. Fires the selected full-screen effect on click. Respects reduced-motion.
                   </p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3 pt-3 border-t border-primary/15">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Intensity</Label>
+                      <Select
+                        value={settings.celebrationIntensity ?? 'normal'}
+                        onValueChange={(v: 'subtle'|'normal'|'lively') =>
+                          setSettings({ ...settings, celebrationIntensity: v })}
+                        disabled={!(settings.celebrationEnabled ?? true)}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="subtle">Subtle</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="lively">Lively</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Duration (ms)</Label>
+                      <Input
+                        type="number" min={800} max={8000} step={100}
+                        value={settings.celebrationDurationMs ?? 4200}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          celebrationDurationMs: Math.max(800, Math.min(8000, Number(e.target.value) || 4200)),
+                        })}
+                        disabled={!(settings.celebrationEnabled ?? true)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Particle count (0 = preset)</Label>
+                      <Input
+                        type="number" min={0} max={220} step={5}
+                        value={settings.celebrationParticleCount ?? 0}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          celebrationParticleCount: Math.max(0, Math.min(220, Number(e.target.value) || 0)),
+                        })}
+                        disabled={!(settings.celebrationEnabled ?? true)}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between p-3 border rounded-lg bg-background/60">
+                    <div>
+                      <Label className="text-sm">Play chime on celebrate</Label>
+                      <p className="text-[11px] text-muted-foreground">
+                        Short WebAudio blip when a visitor clicks. Auto-muted for reduced-motion users.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.celebrationSoundEnabled ?? false}
+                      onCheckedChange={(v) => setSettings({ ...settings, celebrationSoundEnabled: v })}
+                      disabled={!(settings.celebrationEnabled ?? true)}
+                    />
+                  </div>
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -908,6 +971,9 @@ const AdminFriendlyWebsites = () => {
                     <ClickBurst
                       key={previewBurstAt}
                       variant={settings.celebrationEffect ?? 'confetti'}
+                      intensity={settings.celebrationIntensity ?? 'normal'}
+                      durationMs={settings.celebrationDurationMs ?? 4200}
+                      countScale={settings.celebrationParticleCount ?? 0}
                       onDone={() => setPreviewBurstAt(null)}
                     />
                   )}
