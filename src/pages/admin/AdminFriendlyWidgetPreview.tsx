@@ -17,16 +17,37 @@ import FriendlyWebsitesWidget from "@/components/FriendlyWebsitesWidget";
  * DB state.
  */
 export default function AdminFriendlyWidgetPreview() {
-  const [settings, setSettings] = useState({
+  type PreviewSettings = {
+    enabled: boolean;
+    visibleToPublic: boolean;
+    visibleToLoggedIn: boolean;
+    colorScheme: 'primary' | 'accent' | 'gradient' | 'glass';
+    size: 'small' | 'medium' | 'large';
+    position: 'left' | 'right';
+    showOnMobile: boolean;
+    animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
+    attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring'
+      | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
+    buttonLabel: string;
+    tooltipText: string;
+    showBadge: boolean;
+    badgeText: string;
+    triggerIcon: string;
+    autoOpenDelayMs: number;
+    showLabelOnTrigger: boolean;
+    animationIntensity: 'subtle' | 'normal' | 'lively';
+    disableEffectsOnReducedMotion: boolean;
+  };
+  const [settings, setSettings] = useState<PreviewSettings>({
     enabled: true,
     visibleToPublic: true,
     visibleToLoggedIn: true,
-    colorScheme: 'primary' as const,
-    size: 'medium' as const,
-    position: 'right' as const,
+    colorScheme: 'primary',
+    size: 'medium',
+    position: 'right',
     showOnMobile: true,
-    animationType: 'slide' as const,
-    attentionEffect: 'sparkle' as const,
+    animationType: 'slide',
+    attentionEffect: 'sparkle',
     buttonLabel: 'Partner Sites',
     tooltipText: 'Explore our partner sites',
     showBadge: true,
@@ -34,7 +55,7 @@ export default function AdminFriendlyWidgetPreview() {
     triggerIcon: 'Sparkles',
     autoOpenDelayMs: 0,
     showLabelOnTrigger: true,
-    animationIntensity: 'normal' as const,
+    animationIntensity: 'normal',
     disableEffectsOnReducedMotion: true,
   });
 
