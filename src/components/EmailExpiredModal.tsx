@@ -41,12 +41,12 @@ const EmailExpiredModal = ({ isOpen, address, onClose, onGenerateNew }: EmailExp
     currencyLabel === "INR" ? `₹${keepEmailPrice}` :
     `${keepEmailPrice} ${currencyLabel}`;
 
-  const methods: { id: Method; label: string; icon: typeof CreditCard; visible: boolean; hint?: string }[] = [
+  const methods: Array<{ id: Method; label: string; icon: typeof CreditCard; visible: boolean; hint?: string }> = ([
     { id: "stripe",   label: "Card (Stripe)", icon: CreditCard, visible: stripeEnabled },
     { id: "paypal",   label: "PayPal",        icon: Wallet,     visible: paypalEnabled },
     { id: "upi",      label: "UPI",           icon: Smartphone, visible: upiEnabled, hint: upiId },
     { id: "telegram", label: "Telegram",      icon: MessageCircle, visible: telegramEnabled, hint: "Contact for manual purchase" },
-  ].filter(m => m.visible);
+  ] as const).filter(m => m.visible).map(m => ({ ...m }));
 
   const handleContinue = async () => {
     if (!selected) return;
