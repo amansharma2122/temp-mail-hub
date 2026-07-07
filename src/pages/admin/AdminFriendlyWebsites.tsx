@@ -13,8 +13,12 @@ import {
   Palette,
   Maximize2,
   ArrowLeftRight,
-  Smartphone
+  Smartphone,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import LucideIconPicker from "@/components/admin/LucideIconPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +54,7 @@ interface FriendlyWebsite {
   name: string;
   url: string;
   icon_url: string | null;
+  icon_name?: string | null;
   description: string | null;
   display_order: number;
   is_active: boolean;
@@ -66,7 +71,15 @@ interface WidgetSettings {
   size: 'small' | 'medium' | 'large';
   position: 'left' | 'right';
   showOnMobile: boolean;
-  animationType: 'slide' | 'fade' | 'bounce';
+  animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
+  attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring';
+  buttonLabel: string;
+  tooltipText: string;
+  showBadge: boolean;
+  badgeText: string;
+  triggerIcon: string;
+  autoOpenDelayMs: number;
+  showLabelOnTrigger: boolean;
 }
 
 const defaultSettings: WidgetSettings = {
@@ -78,6 +91,14 @@ const defaultSettings: WidgetSettings = {
   position: 'right',
   showOnMobile: true,
   animationType: 'slide',
+  attentionEffect: 'pulse',
+  buttonLabel: 'Partner Sites',
+  tooltipText: 'Explore our partner sites',
+  showBadge: true,
+  badgeText: '',
+  triggerIcon: 'Sparkles',
+  autoOpenDelayMs: 0,
+  showLabelOnTrigger: true,
 };
 
 // Sortable Website Card Component
@@ -130,7 +151,16 @@ const SortableWebsiteCard = ({
             </TooltipContent>
           </Tooltip>
 
-          {website.icon_url ? (
+          {website.icon_name && (LucideIcons as any)[website.icon_name] ? (
+            (() => {
+              const Icon = (LucideIcons as any)[website.icon_name!];
+              return (
+                <div className="w-10 h-10 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+                  <Icon className="w-5 h-5" />
+                </div>
+              );
+            })()
+          ) : website.icon_url ? (
             <img 
               src={website.icon_url} 
               alt={website.name}
@@ -224,6 +254,7 @@ const AdminFriendlyWebsites = () => {
     name: '',
     url: '',
     icon_url: '',
+    icon_name: '',
     description: '',
     open_in_new_tab: true,
   });
@@ -338,16 +369,17 @@ const AdminFriendlyWebsites = () => {
           name: formData.name,
           url: formData.url,
           icon_url: formData.icon_url || null,
+          icon_name: formData.icon_name || null,
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
           display_order: maxOrder + 1,
-        });
+        } as any);
 
       if (error) throw error;
 
       toast.success('Website added successfully');
       setAddDialogOpen(false);
-      setFormData({ name: '', url: '', icon_url: '', description: '', open_in_new_tab: true });
+      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
       fetchData();
     } catch (error) {
       console.error('Error adding website:', error);
@@ -365,16 +397,17 @@ const AdminFriendlyWebsites = () => {
           name: formData.name,
           url: formData.url,
           icon_url: formData.icon_url || null,
+          icon_name: formData.icon_name || null,
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
-        })
+        } as any)
         .eq('id', editingWebsite.id);
 
       if (error) throw error;
 
       toast.success('Website updated successfully');
       setEditingWebsite(null);
-      setFormData({ name: '', url: '', icon_url: '', description: '', open_in_new_tab: true });
+      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
       fetchData();
     } catch (error) {
       console.error('Error updating website:', error);
@@ -457,6 +490,7 @@ const AdminFriendlyWebsites = () => {
       name: website.name,
       url: website.url,
       icon_url: website.icon_url || '',
+      icon_name: website.icon_name || '',
       description: website.description || '',
       open_in_new_tab: website.open_in_new_tab,
     });
@@ -672,8 +706,111 @@ const AdminFriendlyWebsites = () => {
                       <SelectItem value="slide">Slide</SelectItem>
                       <SelectItem value="fade">Fade</SelectItem>
                       <SelectItem value="bounce">Bounce</SelectItem>
+                      <SelectItem value="flip">Flip</SelectItem>
+                      <SelectItem value="zoom">Zoom</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* Attention & branding */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Attention Effect
+                  </Label>
+                  <Select
+                    value={settings.attentionEffect}
+                    onValueChange={(v: WidgetSettings['attentionEffect']) =>
+                      setSettings({ ...settings, attentionEffect: v })
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="pulse">Pulse</SelectItem>
+                      <SelectItem value="glow">Glow</SelectItem>
+                      <SelectItem value="wiggle">Wiggle</SelectItem>
+                      <SelectItem value="bounce">Bounce</SelectItem>
+                      <SelectItem value="ring">Ring</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Makes the widget more noticeable while closed.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Wand2 className="w-4 h-4" /> Trigger Icon
+                  </Label>
+                  <LucideIconPicker
+                    value={settings.triggerIcon}
+                    onChange={(name) => setSettings({ ...settings, triggerIcon: name })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Button Label</Label>
+                  <Input
+                    value={settings.buttonLabel}
+                    onChange={(e) => setSettings({ ...settings, buttonLabel: e.target.value })}
+                    placeholder="Partner Sites"
+                    maxLength={40}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tooltip Text</Label>
+                  <Input
+                    value={settings.tooltipText}
+                    onChange={(e) => setSettings({ ...settings, tooltipText: e.target.value })}
+                    placeholder="Explore our partner sites"
+                    maxLength={80}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Badge Text (blank = count)</Label>
+                  <Input
+                    value={settings.badgeText}
+                    onChange={(e) => setSettings({ ...settings, badgeText: e.target.value })}
+                    placeholder="New"
+                    maxLength={6}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Auto-open Delay (ms, 0 = off)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={settings.autoOpenDelayMs}
+                    onChange={(e) => setSettings({ ...settings, autoOpenDelayMs: Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                  <p className="text-xs text-muted-foreground">Opens once per session after the delay.</p>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label>Show Notification Badge</Label>
+                    <p className="text-xs text-muted-foreground">Small badge on the trigger button</p>
+                  </div>
+                  <Switch
+                    checked={settings.showBadge}
+                    onCheckedChange={(v) => setSettings({ ...settings, showBadge: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label>Show Label on Trigger</Label>
+                    <p className="text-xs text-muted-foreground">Vertical label next to the icon</p>
+                  </div>
+                  <Switch
+                    checked={settings.showLabelOnTrigger}
+                    onCheckedChange={(v) => setSettings({ ...settings, showLabelOnTrigger: v })}
+                  />
                 </div>
               </div>
 
@@ -737,6 +874,22 @@ const AdminFriendlyWebsites = () => {
               />
             </div>
             <div className="space-y-2">
+              <Label>Icon (from library, overrides URL)</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <LucideIconPicker
+                    value={formData.icon_name}
+                    onChange={(name) => setFormData({ ...formData, icon_name: name })}
+                  />
+                </div>
+                {formData.icon_name && (
+                  <Button variant="ghost" size="sm" onClick={() => setFormData({ ...formData, icon_name: '' })}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label>Description (optional)</Label>
               <Textarea
                 placeholder="Brief description of the website"
@@ -792,6 +945,22 @@ const AdminFriendlyWebsites = () => {
                 value={formData.icon_url}
                 onChange={(e) => setFormData({ ...formData, icon_url: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Icon (from library, overrides URL)</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <LucideIconPicker
+                    value={formData.icon_name}
+                    onChange={(name) => setFormData({ ...formData, icon_name: name })}
+                  />
+                </div>
+                {formData.icon_name && (
+                  <Button variant="ghost" size="sm" onClick={() => setFormData({ ...formData, icon_name: '' })}>
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Description (optional)</Label>

@@ -1,0 +1,2 @@
+ALTER TABLE public.friendly_websites ADD COLUMN IF NOT EXISTS icon_name text;
+COMMENT ON COLUMN public.friendly_websites.icon_name IS 'Optional lucide-react icon name (e.g. "Globe"). Falls back to icon_url or first letter of name.';
