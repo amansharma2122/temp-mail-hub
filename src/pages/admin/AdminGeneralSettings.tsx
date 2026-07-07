@@ -55,8 +55,8 @@ const AdminGeneralSettings = () => {
   const { isDirty, markDirty, markClean } = useDirty();
   const { isDirty: isModalDirty, markDirty: markModalDirty, markClean: markModalClean } = useDirty();
 
-  const updateModal: typeof updateModalConfigConfig = (k, v) => {
-    updateModal(k, v);
+  const updateModal: typeof updateModalConfig = (k, v) => {
+    updateModalConfig(k, v);
     markModalDirty();
   };
 
