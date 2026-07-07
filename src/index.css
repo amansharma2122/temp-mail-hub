@@ -10,6 +10,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * reCAPTCHA "ERROR for site owner: Invalid domain for site key" is a
+ * banner painted by Google's script directly into the reCAPTCHA badge
+ * iframe wrapper. Our fail-safe in useRecaptcha already lets sign-in
+ * proceed when the site-key domain allowlist is misconfigured, so the
+ * visible banner is pure noise for end users. Hide it — the admin is
+ * warned in the console with the actual hostname to add in the reCAPTCHA
+ * console.
+ */
+.grecaptcha-badge[data-error="true"],
+.grecaptcha-badge iframe[src*="bframe"] + div,
+.grecaptcha-error {
+  display: none !important;
+}
+
 /* Performance-optimized CSS animations */
 @keyframes pulse-slow {
   0%, 100% { opacity: 0.3; transform: scale(1); }
