@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { broadcastAppSettingsChange, applyAppSettingsPatch } from "@/lib/appSettingsSync";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { getAppSettingsRowId } from "@/lib/appSettingsKeyRoutes";
 import {
   DndContext,
   closestCenter,
@@ -279,9 +280,15 @@ const SortableWebsiteCard = ({
 };
 
 const AdminFriendlyWebsites = () => {
+  const widgetSettingsRowId = getAppSettingsRowId('friendly_sites_widget');
   const queryClient = useQueryClient();
   const [websites, setWebsites] = useState<FriendlyWebsite[]>([]);
   const [settings, setSettings] = useState<WidgetSettings>(defaultSettings);
+  const [activeTab, setActiveTab] = useState(() =>
+    typeof window !== 'undefined' && window.location.hash === `#${widgetSettingsRowId}`
+      ? 'settings'
+      : 'websites',
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -345,6 +352,21 @@ const AdminFriendlyWebsites = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const revealSettingsRow = () => {
+      if (window.location.hash !== `#${widgetSettingsRowId}`) return;
+      setActiveTab('settings');
+      window.setTimeout(() => {
+        const row = document.getElementById(widgetSettingsRowId);
+        row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row?.focus({ preventScroll: true });
+      }, 50);
+    };
+    revealSettingsRow();
+    window.addEventListener('hashchange', revealSettingsRow);
+    return () => window.removeEventListener('hashchange', revealSettingsRow);
+  }, [widgetSettingsRowId]);
 
   const saveSettings = async () => {
     setIsSaving(true);
@@ -549,7 +571,7 @@ const AdminFriendlyWebsites = () => {
         </Tooltip>
       </div>
 
-      <Tabs defaultValue="websites">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="websites">
             <Globe className="w-4 h-4 mr-2" />
@@ -611,7 +633,12 @@ const AdminFriendlyWebsites = () => {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4 mt-4">
-          <Card>
+          <Card
+            id={widgetSettingsRowId}
+            tabIndex={-1}
+            data-app-settings-key="friendly_sites_widget"
+            className="scroll-mt-28 focus:outline-none focus:ring-2 focus:ring-primary/60"
+          >
             <CardHeader>
               <CardTitle>Widget Settings</CardTitle>
               <CardDescription>Configure how the friendly websites sidebar appears</CardDescription>

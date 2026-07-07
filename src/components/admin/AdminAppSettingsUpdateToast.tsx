@@ -6,7 +6,7 @@ import {
 } from "@/lib/appSettingsSync";
 import { reportAppSettingsToastEvent } from "@/lib/appSettingsRum";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { getAppSettingsRoute } from "@/lib/appSettingsKeyRoutes";
+import { getAppSettingsKeyLabel, getAppSettingsRoute } from "@/lib/appSettingsKeyRoutes";
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -20,6 +20,21 @@ const AdminAppSettingsUpdateToast = () => {
   const lastShown = useRef<Map<string, number>>(new Map());
   const { t, isRTL } = useLanguage();
   const navigate = useNavigate();
+
+  const openSettingRoute = (route: string) => {
+    navigate(route);
+    const hash = route.split("#")[1];
+    if (!hash) return;
+    window.setTimeout(() => {
+      const el = document.getElementById(hash);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el instanceof HTMLElement) {
+        if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+        el.focus({ preventScroll: true });
+      }
+    }, 50);
+  };
 
   useEffect(() => {
     const off = subscribeAllAppSettings((key, change) => {
@@ -46,8 +61,10 @@ const AdminAppSettingsUpdateToast = () => {
         change.version != null
           ? `v${change.version}`
           : t("adminSettingsUpdatedVersionFallback");
+      const keyLabel = getAppSettingsKeyLabel(key);
       const description = t("adminSettingsUpdatedDescription")
         .replace("{key}", key)
+        .replace("{keyLabel}", keyLabel)
         .replace("{version}", versionLabel);
 
       const route = getAppSettingsRoute(key);
@@ -59,10 +76,14 @@ const AdminAppSettingsUpdateToast = () => {
         // what actually flips the toast layout — including here as a data
         // attribute so tests can assert per-toast direction.
         className: `app-settings-update-toast max-w-full break-words ${isRTL ? "rtl" : "ltr"}`,
+        ariaProps: {
+          role: "status",
+          "aria-live": "polite",
+        },
         action: route
           ? {
               label: t("adminSettingsUpdatedOpen"),
-              onClick: () => navigate(route),
+              onClick: () => openSettingRoute(route),
             }
           : undefined,
       });

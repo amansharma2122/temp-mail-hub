@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ShieldCheck, Save, Loader2 } from "lucide-react";
+import { Check, ChevronDown, Copy, ShieldCheck, Save, Loader2 } from "lucide-react";
 import { useCaptchaSettings, CaptchaSettings } from "@/hooks/useCaptchaSettings";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import {
@@ -15,10 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { toast } from "sonner";
 
 const AdminCaptcha = () => {
   const { settings, isLoading, updateSettings, isSaving } = useCaptchaSettings();
   const [localSettings, setLocalSettings] = useState<CaptchaSettings>(settings);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [hostnameCopied, setHostnameCopied] = useState(false);
   const { loadError } = useRecaptcha();
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
   const isDomainError =
@@ -34,6 +38,18 @@ const AdminCaptcha = () => {
 
   const updateSetting = <K extends keyof CaptchaSettings>(key: K, value: CaptchaSettings[K]) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const copyHostname = async () => {
+    if (!hostname) return;
+    try {
+      await navigator.clipboard.writeText(hostname);
+      setHostnameCopied(true);
+      toast.success("Hostname copied");
+      window.setTimeout(() => setHostnameCopied(false), 1500);
+    } catch {
+      toast.error("Could not copy hostname");
+    }
   };
 
   if (isLoading) {
@@ -78,38 +94,57 @@ const AdminCaptcha = () => {
             <p className="font-semibold">
               reCAPTCHA site key is not authorized for this domain.
             </p>
-            <p className="text-sm">
-              Current hostname:{" "}
-              <code className="rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
+            <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center">
+              <span>Current hostname:</span>
+              <code className="min-w-0 break-all rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
                 {hostname || "(unknown)"}
               </code>
-            </p>
-            <div className="text-sm">
-              <p className="mb-1">Fix checklist:</p>
-              <ol className="list-decimal space-y-1 pl-5">
-                <li>
-                  Open the{" "}
-                  <a
-                    href="https://www.google.com/recaptcha/admin"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
-                  >
-                    Google reCAPTCHA admin console
-                  </a>
-                  .
-                </li>
-                <li>Select the site key currently configured above.</li>
-                <li>
-                  Under <strong>Domains</strong>, add{" "}
-                  <code className="rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
-                    {hostname || "your-domain.com"}
-                  </code>{" "}
-                  (and any preview / www / staging variants you use).
-                </li>
-                <li>Save and reload this page — the warning will clear automatically.</li>
-              </ol>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={copyHostname}
+                disabled={!hostname}
+                aria-label="Copy current hostname"
+                className="w-fit"
+              >
+                {hostnameCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                {hostnameCopied ? "Copied" : "Copy"}
+              </Button>
             </div>
+            <Collapsible open={checklistOpen} onOpenChange={setChecklistOpen} className="text-sm">
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="ghost" size="sm" className="px-0 text-destructive-foreground hover:bg-transparent">
+                  <ChevronDown className={`mr-2 h-4 w-4 transition-transform ${checklistOpen ? "rotate-180" : ""}`} />
+                  {checklistOpen ? "Hide fix checklist" : "Show fix checklist"}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ol className="list-decimal space-y-1 pl-5 pt-1">
+                  <li>
+                    Open the{" "}
+                    <a
+                      href="https://www.google.com/recaptcha/admin"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      Google reCAPTCHA admin console
+                    </a>
+                    .
+                  </li>
+                  <li>Select the site key currently configured above.</li>
+                  <li>
+                    Under <strong>Domains</strong>, add{" "}
+                    <code className="rounded bg-background/40 px-1.5 py-0.5 font-mono text-xs">
+                      {hostname || "your-domain.com"}
+                    </code>{" "}
+                    (and any preview / www / staging variants you use).
+                  </li>
+                  <li>Save and reload this page — the warning will clear automatically.</li>
+                </ol>
+              </CollapsibleContent>
+            </Collapsible>
             <p className="text-xs opacity-80">Raw error: {loadError}</p>
           </AlertDescription>
         </Alert>

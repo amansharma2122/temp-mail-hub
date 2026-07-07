@@ -234,7 +234,7 @@ const LiveStatsWidget = () => {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid h-full grid-cols-2 gap-4 md:grid-cols-4">
       {statItems.map((item, index) => (
         <Tooltip key={item.label}>
           <TooltipTrigger asChild>
@@ -242,9 +242,9 @@ const LiveStatsWidget = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="relative group cursor-help"
+              className="group relative h-full cursor-help"
             >
-              <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 hover:border-primary/30 transition-all duration-300">
+              <div className="relative h-full overflow-hidden rounded-xl border border-border/50 bg-card/50 p-4 backdrop-blur-sm transition-all duration-300 hover:border-primary/30">
                 {/* Pulse effect */}
                 <div className="absolute top-2 right-2">
                   <span className="relative flex h-2 w-2">
