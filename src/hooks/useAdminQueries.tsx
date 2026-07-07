@@ -3,6 +3,27 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryClient";
 import { toast } from "sonner";
 
+/**
+ * Wrap an async mutation fn with loading -> success/error toast transitions.
+ * Returns a new async function with the same signature.
+ */
+export function withToast<T extends (...args: any[]) => Promise<any>>(
+  fn: T,
+  messages: { loading: string; success: string; error?: string },
+): T {
+  return (async (...args: Parameters<T>) => {
+    const toastId = toast.loading(messages.loading);
+    try {
+      const result = await fn(...args);
+      toast.success(messages.success, { id: toastId });
+      return result;
+    } catch (err: any) {
+      toast.error(messages.error || err?.message || "Something went wrong", { id: toastId });
+      throw err;
+    }
+  }) as T;
+}
+
 // Extended query keys for admin
 const adminQueryKeys = {
   ...queryKeys.admin,
