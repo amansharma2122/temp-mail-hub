@@ -183,7 +183,7 @@ export const usePremiumFeatures = () => {
     if (!user) return;
 
     const channel = supabase
-      .channel(`user_subscription_${user.id}`)
+      .channel(`premium_user_subscription_${user.id}_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -202,14 +202,14 @@ export const usePremiumFeatures = () => {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [user, fetchSubscription]);
 
   // Real-time subscription to subscription_tiers changes (for admin edits)
   useEffect(() => {
     const channel = supabase
-      .channel('subscription_tiers_changes')
+      .channel(`premium_subscription_tiers_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -227,7 +227,7 @@ export const usePremiumFeatures = () => {
       .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [fetchSubscription]);
 
