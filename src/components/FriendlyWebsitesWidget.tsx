@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ExternalLink, X, Sparkles } from "lucide-react";
@@ -67,6 +67,7 @@ const renderLucide = (name: string | null | undefined, className = "w-5 h-5") =>
 const FriendlyWebsitesWidget = () => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
 
   // Fetch settings with React Query for caching and real-time updates
   const { data: settings = defaultSettings } = useQuery({
