@@ -244,7 +244,7 @@ const LiveStatsWidget = () => {
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="group relative h-full cursor-help"
             >
-              <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl border border-border/50 bg-card/50 p-2.5 backdrop-blur-sm transition-all duration-300 hover:border-primary/30 sm:p-3">
+              <div className="relative flex h-full flex-col overflow-hidden rounded-xl border border-border/50 bg-card/50 p-2 backdrop-blur-sm transition-all duration-300 hover:border-primary/30 sm:p-2.5">
                 {/* Pulse effect */}
                 <div className="absolute top-1.5 right-1.5">
                   <span className="relative flex h-1.5 w-1.5">
@@ -253,14 +253,14 @@ const LiveStatsWidget = () => {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <div className={`inline-flex p-1.5 rounded-md ${item.bgColor}`}>
                     <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
                   </div>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{item.label}</p>
                 </div>
 
-                <div className="mt-1.5">
+                <div className="mt-0.5">
                   <p className="text-lg sm:text-xl font-bold leading-none text-foreground">
                     {isLoading ? (
                       <span className="inline-block w-10 h-5 bg-secondary animate-pulse rounded" />
