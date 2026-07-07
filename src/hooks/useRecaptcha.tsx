@@ -114,6 +114,7 @@ export const useRecaptcha = () => {
 
     return () => {
       clearTimeout(timeout);
+      window.removeEventListener("error", onWindowError);
     };
   }, [settings.enabled, settings.provider, settings.siteKey, isLoading, isEnabled, isReady, loadError]);
 
