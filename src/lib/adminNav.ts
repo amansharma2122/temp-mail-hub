@@ -79,6 +79,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         keywords: ["counters", "ist", "reset", "reconcile", "health"] },
       { title: "Friendly Widget Preview", url: "/admin/friendly-widget-preview", icon: Palette,
         keywords: ["widget", "preview", "friendly", "sites"] },
+      { title: "Friendly Widget Telemetry", url: "/admin/friendly-widget-telemetry", icon: Activity,
+        keywords: ["widget", "telemetry", "analytics", "latency", "friendly"] },
       { title: "Logs", url: "/admin/hub/logs", icon: FileWarning,
         keywords: ["audit", "errors"] },
     ],

@@ -370,6 +370,7 @@ const App = () => (
                             <Route path="geo-blocking" element={<AdminGeoBlocking />} />
                             <Route path="stats-verification" element={<AdminStatsVerification />} />
                             <Route path="friendly-widget-preview" element={<AdminFriendlyWidgetPreview />} />
+                            <Route path="friendly-widget-telemetry" element={<AdminFriendlyWidgetTelemetry />} />
 
                             {/* Consolidated hub routes (6-group sidebar) */}
                             <Route path="hub/users" element={<UsersHub />} />
