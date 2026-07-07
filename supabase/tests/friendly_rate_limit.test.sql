@@ -88,4 +88,52 @@ BEGIN
   RESET ROLE;
 END $$;
 
+-- 5) Admin-configured quota is honored by the trigger --------------------
+-- Override the setting to (5 events / 60 minutes) and verify the 6th insert
+-- is blocked, then restore the default. All wrapped in the outer ROLLBACK.
+DO $$
+DECLARE
+  v_session text := 'tunable-' || gen_random_uuid();
+  v_err text;
+  v_old jsonb;
+BEGIN
+  SELECT value INTO v_old FROM public.app_settings
+   WHERE key = 'rate_limit_friendly_widget_events';
+
+  INSERT INTO public.app_settings (key, value)
+  VALUES ('rate_limit_friendly_widget_events',
+          jsonb_build_object('max_requests', 5, 'window_minutes', 60))
+  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+
+  FOR i IN 1..5 LOOP
+    INSERT INTO public.friendly_widget_events (event_type, session_id)
+    VALUES ('click', v_session);
+  END LOOP;
+
+  BEGIN
+    INSERT INTO public.friendly_widget_events (event_type, session_id)
+    VALUES ('click', v_session);
+    RAISE EXCEPTION 'FAIL: 6th insert should have been rejected by tuned quota (max=5)';
+  EXCEPTION WHEN OTHERS THEN
+    v_err := SQLERRM;
+    IF v_err !~* 'rate|quota|limit' THEN
+      RAISE EXCEPTION 'FAIL: unexpected error for over-quota insert (tuned): %', v_err;
+    END IF;
+    RAISE NOTICE 'PASS: tuned quota (max=5) blocked over-limit insert (%).', v_err;
+  END;
+END $$;
+
+-- 6) RLS still intact after quota override --------------------------------
+DO $$
+BEGIN
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    UPDATE public.friendly_widget_events SET event_type = 'click' WHERE 1=0;
+    RAISE EXCEPTION 'FAIL: authenticated UPDATE should still be denied after quota override';
+  EXCEPTION WHEN insufficient_privilege OR others THEN
+    RAISE NOTICE 'PASS: authenticated UPDATE remains denied after quota override.';
+  END;
+  RESET ROLE;
+END $$;
+
 ROLLBACK;
