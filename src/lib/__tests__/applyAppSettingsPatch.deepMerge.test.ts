@@ -64,15 +64,15 @@ describe("applyAppSettingsPatch deep-merge semantics", () => {
     currentValue = {}; currentVersion = 0;
     await applyAppSettingsPatch("k", { a: { x: 1 } });
     await applyAppSettingsPatch("k", { b: { y: 2 } });
-    const first = JSON.stringify(currentValue);
+    const first = { ...currentValue };
 
     // Reset and run in reverse order B→A
     currentValue = {}; currentVersion = 0;
     await applyAppSettingsPatch("k", { b: { y: 2 } });
     await applyAppSettingsPatch("k", { a: { x: 1 } });
-    const second = JSON.stringify(currentValue);
+    const second = { ...currentValue };
 
-    expect(first).toBe(second);
+    expect(first).toEqual(second);
     expect(currentValue).toEqual({ a: { x: 1 }, b: { y: 2 } });
   });
 
