@@ -159,11 +159,42 @@ describe("FriendlyWebsitesWidget — accessibility", () => {
     const live = await screen.findByTestId("friendly-widget-live-region");
     expect(live).toHaveAttribute("aria-live", "polite");
     await waitFor(() => {
-      expect(live.textContent || "").toMatch(/panel opened|activated/i);
+      expect(live.textContent || "").toMatch(/panel opened/i);
     });
 
     // Any burst overlay markup must be aria-hidden.
     const overlays = container.querySelectorAll('[aria-hidden="true"]');
     expect(overlays.length).toBeGreaterThan(0);
+  });
+
+  it("uses symmetric 'opened' → 'closed' announcements without redundancy", async () => {
+    renderWidget();
+    const trigger = await screen.findByTestId("friendly-widget-trigger");
+    const live = await screen.findByTestId("friendly-widget-live-region");
+
+    fireEvent.click(trigger); // open
+    await waitFor(() => {
+      expect(live.textContent || "").toMatch(/Partner Sites panel opened\.$/);
+    });
+    // Must NOT combine "opened" + "highlighted" — one clear message only.
+    expect(live.textContent).not.toMatch(/highlighted/i);
+
+    fireEvent.click(trigger); // close
+    await waitFor(() => {
+      expect(live.textContent || "").toMatch(/Partner Sites panel closed\.$/);
+    });
+  });
+
+  it("announces sync errors with the widget label, not a generic 'widget failed'", async () => {
+    sitesOk = false;
+    settingsOk = false;
+    renderWidget();
+    const pill = await screen.findByTestId(
+      "friendly-widget-sync-error",
+      {},
+      { timeout: 3000 },
+    );
+    // The pill remains the interactive retry surface with a clear label.
+    expect(pill.getAttribute("aria-label") || "").toMatch(/sync/i);
   });
 });
