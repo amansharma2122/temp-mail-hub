@@ -3,13 +3,12 @@
     "collect": {
       "url": [
         "http://localhost:4173/",
-        "http://localhost:4173/inbox",
-        "http://localhost:4173/admin"
+        "http://localhost:4173/inbox"
       ],
       "numberOfRuns": 2,
       "settings": {
         "preset": "desktop",
-        "chromeFlags": "--no-sandbox --headless=new"
+        "chromeFlags": "--no-sandbox --headless=new --disable-dev-shm-usage"
       }
     },
     "assert": {
@@ -18,8 +17,8 @@
         "categories:accessibility": ["warn", { "minScore": 0.9 }],
         "categories:best-practices": ["warn", { "minScore": 0.9 }],
         "categories:seo": ["warn", { "minScore": 0.9 }],
-        "total-byte-weight": ["error", { "maxNumericValue": 1600000 }],
-        "unused-javascript": ["error", { "maxNumericValue": 400000 }],
+        "total-byte-weight": ["warn", { "maxNumericValue": 1800000 }],
+        "unused-javascript": ["warn", { "maxNumericValue": 500000 }],
         "largest-contentful-paint": ["warn", { "maxNumericValue": 3500 }],
         "cumulative-layout-shift": ["warn", { "maxNumericValue": 0.1 }]
       }

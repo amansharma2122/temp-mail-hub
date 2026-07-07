@@ -11,20 +11,38 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import type { QueryClient } from "@tanstack/react-query";
+import { reportAppSettingsLatency } from "@/lib/appSettingsRum";
 
 const CHANNEL_NAME = "nullsto:app-settings";
 const STORAGE_KEY = "nullsto:app-settings:ping";
 
-type Listener = (key: string) => void;
+export interface AppSettingsChange {
+  key: string;
+  version: number | null;
+  emittedAt: number;
+}
+
+type Listener = (change: AppSettingsChange) => void;
 const listeners = new Set<Listener>();
+
+// Last-observed change per key — powers the admin debug/audit view.
+const lastObserved = new Map<string, AppSettingsChange & { updated_by: string | null; merged: boolean | null }>();
+export function getLastObservedAppSettings() {
+  return Array.from(lastObserved.values()).sort((a, b) => b.emittedAt - a.emittedAt);
+}
 
 let bc: BroadcastChannel | null = null;
 let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 let storageBound = false;
 
-function fanout(key: string) {
+function fanout(change: AppSettingsChange, meta?: { updated_by?: string | null; merged?: boolean | null }) {
+  lastObserved.set(change.key, {
+    ...change,
+    updated_by: meta?.updated_by ?? lastObserved.get(change.key)?.updated_by ?? null,
+    merged: meta?.merged ?? lastObserved.get(change.key)?.merged ?? null,
+  });
   listeners.forEach((fn) => {
-    try { fn(key); } catch (e) { console.warn("[appSettingsSync] listener error", e); }
+    try { fn(change); } catch (e) { console.warn("[appSettingsSync] listener error", e); }
   });
 }
 
@@ -34,8 +52,8 @@ function ensureTransport() {
   if (!bc && "BroadcastChannel" in window) {
     bc = new BroadcastChannel(CHANNEL_NAME);
     bc.onmessage = (e) => {
-      const key = typeof e.data === "string" ? e.data : e.data?.key;
-      if (key) fanout(key);
+      const data = typeof e.data === "string" ? { key: e.data } : e.data || {};
+      if (data.key) fanout({ key: data.key, version: data.version ?? null, emittedAt: data.emittedAt ?? Date.now() });
     };
   }
 
@@ -43,8 +61,8 @@ function ensureTransport() {
     window.addEventListener("storage", (e) => {
       if (e.key !== STORAGE_KEY || !e.newValue) return;
       try {
-        const parsed = JSON.parse(e.newValue) as { key?: string };
-        if (parsed?.key) fanout(parsed.key);
+        const parsed = JSON.parse(e.newValue) as { key?: string; version?: number; t?: number };
+        if (parsed?.key) fanout({ key: parsed.key, version: parsed.version ?? null, emittedAt: parsed.t ?? Date.now() });
       } catch { /* ignore */ }
     });
     storageBound = true;
@@ -57,8 +75,15 @@ function ensureTransport() {
         "postgres_changes",
         { event: "*", schema: "public", table: "app_settings" },
         (payload) => {
-          const row = (payload.new ?? payload.old) as { key?: string } | null;
-          if (row?.key) fanout(row.key);
+          const row = (payload.new ?? payload.old) as
+            | { key?: string; version?: number; updated_by?: string | null }
+            | null;
+          if (row?.key) {
+            fanout(
+              { key: row.key, version: row.version ?? null, emittedAt: Date.now() },
+              { updated_by: row.updated_by ?? null },
+            );
+          }
         },
       )
       .subscribe();
@@ -68,11 +93,11 @@ function ensureTransport() {
 /** Subscribe to remote app_settings changes for one or more keys. */
 export function subscribeAppSettings(
   keys: string[],
-  onChange: (key: string) => void,
+  onChange: (key: string, change?: AppSettingsChange) => void,
 ): () => void {
   ensureTransport();
-  const listener: Listener = (key) => {
-    if (keys.includes(key)) onChange(key);
+  const listener: Listener = (change) => {
+    if (keys.includes(change.key)) onChange(change.key, change);
   };
   listeners.add(listener);
   return () => {
@@ -80,16 +105,12 @@ export function subscribeAppSettings(
   };
 }
 
-/**
- * Subscribe to every app_settings key change. Used by the global
- * QueryClient binder so any admin edit (not just friendly_sites_widget)
- * propagates instantly to every subscriber in every tab / device.
- */
+/** Subscribe to every app_settings key change. */
 export function subscribeAllAppSettings(
-  onChange: (key: string) => void,
+  onChange: (key: string, change?: AppSettingsChange) => void,
 ): () => void {
   ensureTransport();
-  const listener: Listener = (key) => onChange(key);
+  const listener: Listener = (change) => onChange(change.key, change);
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -100,48 +121,37 @@ export function subscribeAllAppSettings(
  * Broadcast a local settings change to every tab (this one included) and
  * every device. Call after a successful write to `app_settings`.
  */
-export function broadcastAppSettingsChange(key: string): void {
+export function broadcastAppSettingsChange(key: string, version: number | null = null): void {
   ensureTransport();
-  fanout(key); // same tab
-  try { bc?.postMessage({ key }); } catch { /* ignore */ }
+  const emittedAt = Date.now();
+  fanout({ key, version, emittedAt }); // same tab
+  try { bc?.postMessage({ key, version, emittedAt }); } catch { /* ignore */ }
   try {
-    // Writing then removing triggers the "storage" event on other tabs.
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ key, t: Date.now() }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ key, version, t: emittedAt }));
   } catch { /* ignore */ }
 }
 
-/**
- * Convenience helper: wires a QueryClient so any change to `key` invalidates
- * `['app_settings', key]` and the umbrella `['app_settings']` list.
- */
 export function bindAppSettingsToQueryClient(
   qc: QueryClient,
   keys: string[],
 ): () => void {
-  return subscribeAppSettings(keys, (key) => {
-    qc.invalidateQueries({ queryKey: ["app_settings", key] });
+  return subscribeAppSettings(keys, (key, change) => {
+    void qc.invalidateQueries({ queryKey: ["app_settings", key] }).then(() => {
+      if (change) reportAppSettingsLatency(key, change.emittedAt, change.version);
+    });
     qc.invalidateQueries({ queryKey: ["app_settings"] });
   });
 }
 
-/**
- * Global binder — invalidates any React Query cache entry that starts with
- * `['app_settings', <changed-key>]` when *any* app setting is edited. Wire
- * once at app boot so every admin panel reacts to every change.
- */
 export function bindAllAppSettingsToQueryClient(qc: QueryClient): () => void {
-  return subscribeAllAppSettings((key) => {
-    qc.invalidateQueries({ queryKey: ["app_settings", key] });
+  return subscribeAllAppSettings((key, change) => {
+    void qc.invalidateQueries({ queryKey: ["app_settings", key] }).then(() => {
+      if (change) reportAppSettingsLatency(key, change.emittedAt, change.version);
+    });
     qc.invalidateQueries({ queryKey: ["app_settings"] });
   });
 }
 
-/**
- * Atomic patch-upsert via the deterministic-merge RPC. Simultaneous admin
- * edits deep-merge server-side (patch wins on collision, other admin's
- * untouched fields survive) so every tab converges to the same value.
- * Broadcasts on success so subscribers refresh immediately.
- */
 export async function applyAppSettingsPatch(
   key: string,
   patch: Record<string, unknown>,
@@ -154,10 +164,20 @@ export async function applyAppSettingsPatch(
   });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
-  broadcastAppSettingsChange(key);
+  const version = (row?.version ?? 0) as number;
+  const merged = Boolean(row?.merged);
+  // Track locally for the debug/audit view before broadcasting.
+  lastObserved.set(key, {
+    key,
+    version,
+    emittedAt: Date.now(),
+    updated_by: lastObserved.get(key)?.updated_by ?? null,
+    merged,
+  });
+  broadcastAppSettingsChange(key, version);
   return {
     value: (row?.value ?? {}) as Record<string, unknown>,
-    version: (row?.version ?? 0) as number,
-    merged: Boolean(row?.merged),
+    version,
+    merged,
   };
 }
