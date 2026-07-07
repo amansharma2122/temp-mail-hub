@@ -62,6 +62,63 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+/**
+ * Localized Speed <select> with inline validation and a "Reset to defaults"
+ * action. Kept inline (not extracted) so it stays close to the settings
+ * object it edits.
+ */
+function CelebrationSpeedField({
+  value,
+  disabled,
+  onChange,
+  onReset,
+}: {
+  value: 'slower' | 'normal' | 'faster' | undefined;
+  disabled: boolean;
+  onChange: (v: 'slower' | 'normal' | 'faster') => void;
+  onReset: () => void;
+}) {
+  const { language } = useLanguage();
+  const L = getCelebrationSpeedLabels(language);
+  const safe = normalizeCelebrationSpeed(value);
+  const invalid = value !== undefined && !CELEBRATION_SPEEDS.includes(value as never);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs" htmlFor="celebration-speed">{L.label}</Label>
+        <button
+          type="button"
+          onClick={onReset}
+          disabled={disabled}
+          className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+          data-testid="celebration-speed-reset"
+        >
+          {L.reset}
+        </button>
+      </div>
+      <Select
+        value={safe}
+        onValueChange={(v: string) => onChange(normalizeCelebrationSpeed(v))}
+        disabled={disabled}
+      >
+        <SelectTrigger id="celebration-speed" data-testid="celebration-speed-select" aria-invalid={invalid || undefined}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="slower">{L.slower}</SelectItem>
+          <SelectItem value="normal">{L.normal}</SelectItem>
+          <SelectItem value="faster">{L.faster}</SelectItem>
+        </SelectContent>
+      </Select>
+      {invalid && (
+        <p className="text-[10px] text-destructive" data-testid="celebration-speed-error">
+          Invalid value — was reset to “{L.normal}”.
+        </p>
+      )}
+    </div>
+  );
+}
+
 interface FriendlyWebsite {
   id: string;
   name: string;
