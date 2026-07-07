@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import LucideIconPicker from "@/components/admin/LucideIconPicker";
+import { ClickBurst } from "@/components/FriendlyWebsitesWidget";
 import FriendlyWidgetAnalytics from "@/components/admin/FriendlyWidgetAnalytics";
 import FriendlyWidgetRateLimitSettings from "@/components/admin/FriendlyWidgetRateLimitSettings";
 import { Button } from "@/components/ui/button";
