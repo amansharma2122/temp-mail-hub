@@ -75,4 +75,30 @@ describe("stats + quick tips section text contrast", () => {
     const bg = over(DARK.muted, DARK.background, 0.6);
     expect(contrast(DARK.mutedForeground, bg)).toBeGreaterThanOrEqual(4.5);
   });
+
+  // Admin-configurable bg colors (via app_settings.stats_section_bg).
+  // Verify a handful of common admin choices still meet WCAG AA against
+  // the foreground token that renders inside the section.
+  const hexToRgb = (hex: string): RGB => {
+    const h = hex.replace("#", "");
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16),
+    ];
+  };
+
+  const ADMIN_BG_LIGHT_SAFE = ["#f5f5f7", "#e5efff", "#f7f5ff"];
+  const ADMIN_BG_DARK_SAFE = ["#111827", "#1f2937", "#0f172a"];
+
+  ADMIN_BG_LIGHT_SAFE.forEach((hex) => {
+    it(`meets WCAG AA on custom admin light bg ${hex}`, () => {
+      expect(contrast(LIGHT.foreground, hexToRgb(hex))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+  ADMIN_BG_DARK_SAFE.forEach((hex) => {
+    it(`meets WCAG AA on custom admin dark bg ${hex}`, () => {
+      expect(contrast(DARK.foreground, hexToRgb(hex))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
 });
