@@ -160,6 +160,37 @@ const StatsHealthWidget = () => {
         </div>
 
         <div>
+          <div className="text-xs font-medium text-muted-foreground mb-2">
+            Counters &middot; last IST reset / update
+          </div>
+          {counters.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No counter data yet.</div>
+          ) : (
+            <ul className="text-sm divide-y divide-border/50">
+              {Object.keys(COUNTER_LABELS).map((key) => {
+                const c = counters.find((x) => x.stat_key === key);
+                return (
+                  <li key={key} className="flex items-center justify-between py-1.5 gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{COUNTER_LABELS[key]}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {key === "emails_today_ist"
+                          ? `Resets daily at IST midnight${c?.stat_date ? ` · date: ${c.stat_date}` : ""}`
+                          : "Monotonic (never resets)"}
+                        {c?.updated_at && ` · updated ${new Date(c.updated_at).toLocaleString()}`}
+                      </div>
+                    </div>
+                    <div className="tabular-nums font-semibold">
+                      {(c?.stat_value ?? 0).toLocaleString()}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div>
           <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
             <HardDrive className="w-3 h-3" /> Mailbox storage (sequential failover kicks in when a mailbox is full)
           </div>
