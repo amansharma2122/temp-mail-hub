@@ -888,6 +888,10 @@ const AdminFriendlyWebsites = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4 mt-4">
+          <FriendlyWidgetAnalytics days={30} />
+        </TabsContent>
       </Tabs>
 
       {/* Add Website Dialog */}
