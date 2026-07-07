@@ -13,8 +13,12 @@ import {
   Palette,
   Maximize2,
   ArrowLeftRight,
-  Smartphone
+  Smartphone,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import LucideIconPicker from "@/components/admin/LucideIconPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +54,7 @@ interface FriendlyWebsite {
   name: string;
   url: string;
   icon_url: string | null;
+  icon_name?: string | null;
   description: string | null;
   display_order: number;
   is_active: boolean;
@@ -66,7 +71,15 @@ interface WidgetSettings {
   size: 'small' | 'medium' | 'large';
   position: 'left' | 'right';
   showOnMobile: boolean;
-  animationType: 'slide' | 'fade' | 'bounce';
+  animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
+  attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring';
+  buttonLabel: string;
+  tooltipText: string;
+  showBadge: boolean;
+  badgeText: string;
+  triggerIcon: string;
+  autoOpenDelayMs: number;
+  showLabelOnTrigger: boolean;
 }
 
 const defaultSettings: WidgetSettings = {
@@ -78,6 +91,14 @@ const defaultSettings: WidgetSettings = {
   position: 'right',
   showOnMobile: true,
   animationType: 'slide',
+  attentionEffect: 'pulse',
+  buttonLabel: 'Partner Sites',
+  tooltipText: 'Explore our partner sites',
+  showBadge: true,
+  badgeText: '',
+  triggerIcon: 'Sparkles',
+  autoOpenDelayMs: 0,
+  showLabelOnTrigger: true,
 };
 
 // Sortable Website Card Component
@@ -224,6 +245,7 @@ const AdminFriendlyWebsites = () => {
     name: '',
     url: '',
     icon_url: '',
+    icon_name: '',
     description: '',
     open_in_new_tab: true,
   });
@@ -338,16 +360,17 @@ const AdminFriendlyWebsites = () => {
           name: formData.name,
           url: formData.url,
           icon_url: formData.icon_url || null,
+          icon_name: formData.icon_name || null,
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
           display_order: maxOrder + 1,
-        });
+        } as any);
 
       if (error) throw error;
 
       toast.success('Website added successfully');
       setAddDialogOpen(false);
-      setFormData({ name: '', url: '', icon_url: '', description: '', open_in_new_tab: true });
+      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
       fetchData();
     } catch (error) {
       console.error('Error adding website:', error);
@@ -365,16 +388,17 @@ const AdminFriendlyWebsites = () => {
           name: formData.name,
           url: formData.url,
           icon_url: formData.icon_url || null,
+          icon_name: formData.icon_name || null,
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
-        })
+        } as any)
         .eq('id', editingWebsite.id);
 
       if (error) throw error;
 
       toast.success('Website updated successfully');
       setEditingWebsite(null);
-      setFormData({ name: '', url: '', icon_url: '', description: '', open_in_new_tab: true });
+      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
       fetchData();
     } catch (error) {
       console.error('Error updating website:', error);
@@ -457,6 +481,7 @@ const AdminFriendlyWebsites = () => {
       name: website.name,
       url: website.url,
       icon_url: website.icon_url || '',
+      icon_name: website.icon_name || '',
       description: website.description || '',
       open_in_new_tab: website.open_in_new_tab,
     });
