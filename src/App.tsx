@@ -127,6 +127,7 @@ const AdminGeoBlocking = lazyWithRetry(() => import("./pages/admin/AdminGeoBlock
 const AdminStatsVerification = lazyWithRetry(() => import("./pages/admin/AdminStatsVerification"));
 const AdminFriendlyWidgetPreview = lazyWithRetry(() => import("./pages/admin/AdminFriendlyWidgetPreview"));
 const AdminFriendlyWidgetTelemetry = lazyWithRetry(() => import("./pages/admin/AdminFriendlyWidgetTelemetry"));
+const AdminFriendlyWidgetEffectDrilldown = lazyWithRetry(() => import("./pages/admin/AdminFriendlyWidgetEffectDrilldown"));
 
 // Consolidated hub pages (6-group sidebar). Each hub renders the existing
 // admin pages inside tabs so all legacy URLs keep working while sidebar
@@ -371,6 +372,7 @@ const App = () => (
                             <Route path="stats-verification" element={<AdminStatsVerification />} />
                             <Route path="friendly-widget-preview" element={<AdminFriendlyWidgetPreview />} />
                             <Route path="friendly-widget-telemetry" element={<AdminFriendlyWidgetTelemetry />} />
+                            <Route path="friendly-widget-telemetry/effect" element={<AdminFriendlyWidgetEffectDrilldown />} />
 
                             {/* Consolidated hub routes (6-group sidebar) */}
                             <Route path="hub/users" element={<UsersHub />} />
