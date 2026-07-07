@@ -29,6 +29,27 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startedAt = Date.now();
+  const logHealth = async (
+    client: ReturnType<typeof createClient> | null,
+    status: 'ok' | 'partial' | 'error',
+    details: Record<string, unknown>,
+    errorMessage?: string,
+  ) => {
+    if (!client) return;
+    try {
+      await client.from('stats_health_log').insert({
+        status,
+        source: 'get-public-stats',
+        duration_ms: Date.now() - startedAt,
+        error_message: errorMessage ?? null,
+        details,
+      });
+    } catch (e) {
+      console.error('[get-public-stats] Failed to log health:', e);
+    }
+  };
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -42,29 +63,48 @@ serve(async (req) => {
     const istNow = new Date(Date.now() + IST_OFFSET_MS);
     const istTodayStr = istNow.toISOString().slice(0, 10);
 
-    // Fetch all monotonic counters from email_stats plus live counts for active/domains
-    const [
-      statsRowsResult,
-      activeAddressesResult,
-      totalDomainsResult,
-    ] = await Promise.all([
-      supabase
-        .from('email_stats')
-        .select('stat_key, stat_value, stat_date')
-        .in('stat_key', [
-          'total_emails_generated',
-          'total_inboxes_created',
-          'total_emails_received',
-          'emails_today_ist',
-        ]),
-      supabase
-        .from('temp_emails')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true),
-      supabase
-        .from('domains')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true),
+    // Fetch each source independently so a single failure degrades gracefully
+    const failures: Record<string, string> = {};
+    const safe = async <T>(name: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await fn();
+      } catch (e) {
+        failures[name] = e instanceof Error ? e.message : String(e);
+        console.error(`[get-public-stats] ${name} failed:`, e);
+        return fallback;
+      }
+    };
+
+    const [statsRowsResult, activeAddressesResult, totalDomainsResult] = await Promise.all([
+      safe('email_stats', async () => {
+        const r = await supabase
+          .from('email_stats')
+          .select('stat_key, stat_value, stat_date')
+          .in('stat_key', [
+            'total_emails_generated',
+            'total_inboxes_created',
+            'total_emails_received',
+            'emails_today_ist',
+          ]);
+        if (r.error) throw r.error;
+        return r;
+      }, { data: [] as any[] } as any),
+      safe('active_addresses', async () => {
+        const r = await supabase
+          .from('temp_emails')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true);
+        if (r.error) throw r.error;
+        return r;
+      }, { count: 0 } as any),
+      safe('domains', async () => {
+        const r = await supabase
+          .from('domains')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true);
+        if (r.error) throw r.error;
+        return r;
+      }, { count: 0 } as any),
     ]);
 
     const statMap = new Map<string, { value: number; date: string | null }>();
@@ -104,12 +144,27 @@ serve(async (req) => {
 
     console.log('[get-public-stats] Returning stats:', stats);
 
+    const failureCount = Object.keys(failures).length;
+    await logHealth(
+      supabase,
+      failureCount === 0 ? 'ok' : 'partial',
+      { failures, stats },
+      failureCount ? `Partial failure: ${Object.keys(failures).join(', ')}` : undefined,
+    );
+
     return new Response(JSON.stringify(stats), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Error in get-public-stats:', error);
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      );
+      await logHealth(supabase, 'error', {}, error instanceof Error ? error.message : String(error));
+    } catch { /* ignore */ }
     return new Response(JSON.stringify({ 
       error: error instanceof Error ? error.message : 'Failed to fetch stats',
       // Return default stats on error
