@@ -713,6 +713,7 @@ export type Database = {
           created_at: string
           event_type: string
           id: string
+          sample_ms: number | null
           session_id: string | null
           user_id: string | null
           website_id: string | null
@@ -722,6 +723,7 @@ export type Database = {
           created_at?: string
           event_type: string
           id?: string
+          sample_ms?: number | null
           session_id?: string | null
           user_id?: string | null
           website_id?: string | null
@@ -731,6 +733,7 @@ export type Database = {
           created_at?: string
           event_type?: string
           id?: string
+          sample_ms?: number | null
           session_id?: string | null
           user_id?: string | null
           website_id?: string | null
