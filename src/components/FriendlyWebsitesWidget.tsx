@@ -114,6 +114,19 @@ const FriendlyWebsitesWidget = () => {
     return true;
   };
 
+  // Auto-open once per session if admin configured a delay > 0.
+  useEffect(() => {
+    const delay = settings.autoOpenDelayMs ?? 0;
+    if (!delay || hasAutoOpened || isOpen) return;
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('nullsto:friendly-auto-opened')) return;
+    const t = setTimeout(() => {
+      setIsOpen(true);
+      setHasAutoOpened(true);
+      try { sessionStorage.setItem('nullsto:friendly-auto-opened', '1'); } catch { /* ignore */ }
+    }, Math.max(500, delay));
+    return () => clearTimeout(t);
+  }, [settings.autoOpenDelayMs, hasAutoOpened, isOpen]);
+
   if (isLoading || !isVisible()) return null;
 
   const sizeClasses = {
