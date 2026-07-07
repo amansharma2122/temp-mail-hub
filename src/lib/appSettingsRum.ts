@@ -87,3 +87,31 @@ export function reportAppSettingsLatency(
 export function __appSettingsRumInternals() {
   return { BUFFER, flush, lastSampledAt };
 }
+
+// -----------------------------------------------------------------------
+// Admin cross-tab UPDATE-TOAST telemetry
+// -----------------------------------------------------------------------
+//
+// Emits a separate RUM event whenever the admin sees the cross-tab
+// "settings updated in another tab" toast. Payload includes:
+//   - whether the update was remote (vs skipped/local)
+//   - the applied merged version
+//   - end-to-end delay from emit to toast display
+
+export interface AppSettingsToastRum {
+  key: string;
+  remote: boolean;
+  version: number | null;
+  delay_ms: number;
+}
+
+export function reportAppSettingsToastEvent(sample: AppSettingsToastRum): void {
+  BUFFER.push({
+    key: `toast:${sample.key}:${sample.remote ? "remote" : "local"}`,
+    version: sample.version,
+    latency_ms: Math.max(0, sample.delay_ms),
+    observed_at: new Date().toISOString(),
+  });
+  if (BUFFER.length >= MAX_BUFFER) void flush();
+  else scheduleFlush();
+}
