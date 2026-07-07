@@ -89,9 +89,14 @@ describe("Tooltip open + outside click does not interfere with celebration overl
     fireEvent.click(celebrate);
 
     const burst = await waitFor(() => {
-      const el = document.querySelector('[data-testid="friendly-widget-click-burst"]');
-      if (!el) throw new Error("no burst");
-      return el as HTMLElement;
+      // A trigger-click burst may still be exiting; the last one mounted is
+      // the celebration overlay.
+      const els = document.querySelectorAll('[data-testid="friendly-widget-click-burst"]');
+      const el = els[els.length - 1] as HTMLElement | undefined;
+      if (!el || el.getAttribute("data-variant") !== "confetti") {
+        throw new Error("celebration burst not mounted yet");
+      }
+      return el;
     });
     expect(burst.getAttribute("data-variant")).toBe("confetti");
 
