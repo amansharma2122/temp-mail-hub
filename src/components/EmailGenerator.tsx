@@ -608,7 +608,8 @@ const EmailGenerator = () => {
                       <EmailExpiryTimer 
                         expiresAt={currentEmail.expires_at} 
                         onExpired={() => {
-                          toast.info("Email expired. Generate a new one!");
+                          setExpiredAddress(currentEmail.address);
+                          setShowExpiredModal(true);
                         }}
                       />
                     </motion.div>
