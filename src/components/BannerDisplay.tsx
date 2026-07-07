@@ -221,8 +221,8 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     banners.forEach((banner) => trackView(banner.id));
   }, [banners]);
 
-  // Don't render anything if no banners AND realtime hasn't fallen back — avoids layout shift.
-  if (banners.length === 0 && realtimeMode !== "polling") return null;
+  // Don't render anything if no banners — avoids layout shift.
+  if (banners.length === 0) return null;
 
   const positionStyles: Record<string, string> = {
     header: "w-full py-2",
