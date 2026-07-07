@@ -26,7 +26,18 @@ interface BannerDisplayProps {
 }
 
 const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const cacheKey = `nullsto:banner-cache:${position}`;
+  const readCache = (): Banner[] => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(cacheKey) : null;
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as { at: number; data: Banner[] };
+      // Discard cache older than 24h to avoid stale ads lingering forever.
+      if (!parsed?.data || Date.now() - (parsed.at || 0) > 24 * 60 * 60_000) return [];
+      return parsed.data;
+    } catch { return []; }
+  };
+  const [banners, setBanners] = useState<Banner[]>(() => readCache());
   const [isLoading, setIsLoading] = useState(true);
   const [realtimeMode, setRealtimeMode] = useState<"live" | "polling" | "connecting">("connecting");
   const { isAdmin } = useAdminRole();
@@ -67,6 +78,9 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
       }) as Banner[];
 
       setBanners(activeBanners);
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), data: activeBanners }));
+      } catch { /* quota / private mode */ }
       setIsLoading(false);
     } catch (err: any) {
       console.error("Failed to fetch banners:", err);

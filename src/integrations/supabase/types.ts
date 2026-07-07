@@ -1653,6 +1653,20 @@ export type Database = {
         Args: { p_mailbox_id: string }
         Returns: string
       }
+      get_mailboxes_nearing_quota: {
+        Args: { p_threshold_pct?: number }
+        Returns: {
+          id: string
+          is_full: boolean
+          is_primary: boolean
+          name: string
+          percent_used: number
+          recommended_action: string
+          storage_bytes_limit: number
+          storage_bytes_used: number
+          suggested_rotate_at: string
+        }[]
+      }
       get_registration_ip: { Args: never; Returns: string }
       get_suspended_users: {
         Args: never
