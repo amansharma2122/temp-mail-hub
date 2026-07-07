@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, Mail, Settings, Server, Shield, Megaphone,
+  LayoutDashboard, Users, Mail, Settings, Server, Shield, Megaphone, Activity,
   FileWarning, Palette, CreditCard, Newspaper, type LucideIcon,
 } from "lucide-react";
 
@@ -75,6 +75,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         keywords: ["themes", "seo", "languages"] },
       { title: "Automation", url: "/admin/hub/automation", icon: Server,
         keywords: ["cron", "alerts", "maintenance", "status"] },
+      { title: "Stats Verification", url: "/admin/stats-verification", icon: Activity,
+        keywords: ["counters", "ist", "reset", "reconcile", "health"] },
       { title: "Logs", url: "/admin/hub/logs", icon: FileWarning,
         keywords: ["audit", "errors"] },
     ],
