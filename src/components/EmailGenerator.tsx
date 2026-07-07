@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { tooltips } from "@/lib/tooltips";
 import EmailLimitBanner from "@/components/EmailLimitBanner";
 import EmailLimitModal from "@/components/EmailLimitModal";
+import EmailExpiredModal from "@/components/EmailExpiredModal";
 import { usePremiumFeatures } from "@/hooks/usePremiumFeatures";
 
 interface RateLimitSettings {
@@ -73,6 +74,8 @@ const EmailGenerator = () => {
   const [selectedCustomDomain, setSelectedCustomDomain] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showExpiredModal, setShowExpiredModal] = useState(false);
+  const [expiredAddress, setExpiredAddress] = useState<string | undefined>(undefined);
   const [rateLimitSettings, setRateLimitSettings] = useState<RateLimitSettings>({
     max_requests: 30,
     window_minutes: 60,
