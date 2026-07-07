@@ -48,22 +48,17 @@ export default function NewEmailNotificationSettings() {
 
   const save = async () => {
     setSaving(true);
-    const [{ error: e1 }, { error: e2 }] = await Promise.all([
-      supabase.from("app_settings").upsert(
-        { key: "new_email_notification_style", value: style } as any,
-        { onConflict: "key" },
-      ),
-      supabase.from("app_settings").upsert(
-        { key: "new_email_sound_admin_enabled", value: soundEnabled } as any,
-        { onConflict: "key" },
-      ),
-    ]);
-    const error = e1 || e2;
-    setSaving(false);
-    if (error) {
-      toast.error("Save failed", { description: error.message });
+    try {
+      await Promise.all([
+        saveAppSetting("new_email_notification_style", style),
+        saveAppSetting("new_email_sound_admin_enabled", soundEnabled),
+      ]);
+    } catch (error: any) {
+      setSaving(false);
+      toast.error("Save failed", { description: error?.message });
       return;
     }
+    setSaving(false);
     setNewEmailNotificationStyleCache(style);
     setNewEmailSoundAdminEnabledCache(soundEnabled);
     toast.success("Notification style saved");
