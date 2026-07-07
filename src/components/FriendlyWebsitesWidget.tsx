@@ -146,6 +146,7 @@ const FriendlyWebsitesWidget = ({
   // Burst effect triggered when the user clicks the trigger — a lightweight
   // site-wide sparkle overlay that respects reduced-motion.
   const [burstAt, setBurstAt] = useState<number | null>(null);
+  const [burstVariant, setBurstVariant] = useState<NonNullable<WidgetSettings['clickEffect']> | NonNullable<WidgetSettings['celebrationEffect']>>('sparkle');
   // Track OS-level reduce-motion. Updates live if the user toggles it.
   const [reducedMotion, setReducedMotion] = useState<boolean>(() => prefersReducedMotion());
   // Consistent live-region message. We derive it from state transitions in a
@@ -434,7 +435,10 @@ const FriendlyWebsitesWidget = ({
     setIsOpen(next);
     if (next) {
       const rmBlocks = effectiveReducedMotion;
-      if (!rmBlocks) setBurstAt(Date.now());
+      if (!rmBlocks) {
+        setBurstVariant(settings.clickEffect ?? 'sparkle');
+        setBurstAt(Date.now());
+      }
       recordFriendlyWidgetEvent('manual_open', {
         attention_effect: settings.attentionEffect ?? null,
       });
@@ -450,7 +454,10 @@ const FriendlyWebsitesWidget = ({
 
   const handleCelebrate = () => {
     const rmBlocks = effectiveReducedMotion;
-    if (!rmBlocks) setBurstAt(Date.now());
+    if (!rmBlocks) {
+      setBurstVariant(settings.celebrationEffect ?? 'confetti');
+      setBurstAt(Date.now());
+    }
     recordFriendlyWidgetEvent('celebrate_click', {
       attention_effect: settings.celebrationEffect ?? null,
     });
@@ -486,7 +493,7 @@ const FriendlyWebsitesWidget = ({
         {burstAt && !effectiveReducedMotion && (
           <ClickBurst
             key={burstAt}
-            variant={settings.clickEffect ?? 'sparkle'}
+            variant={burstVariant as BurstVariant}
             onDone={() => setBurstAt(null)}
           />
         )}
