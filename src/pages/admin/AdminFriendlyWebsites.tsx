@@ -88,6 +88,10 @@ interface WidgetSettings {
   celebrationEnabled?: boolean;
   celebrationLabel?: string;
   celebrationEffect?: 'sparkle' | 'confetti' | 'bomb' | 'fireworks' | 'hearts' | 'stars' | 'rainbow-burst';
+  celebrationIntensity?: 'subtle' | 'normal' | 'lively';
+  celebrationDurationMs?: number;
+  celebrationParticleCount?: number;
+  celebrationSoundEnabled?: boolean;
   buttonLabel: string;
   tooltipText: string;
   showBadge: boolean;
@@ -114,6 +118,10 @@ const defaultSettings: WidgetSettings = {
   celebrationEnabled: true,
   celebrationLabel: 'Click Me 🎉',
   celebrationEffect: 'confetti',
+  celebrationIntensity: 'normal',
+  celebrationDurationMs: 4200,
+  celebrationParticleCount: 0,
+  celebrationSoundEnabled: false,
   buttonLabel: 'Partner Sites',
   tooltipText: 'Explore our partner sites',
   showBadge: true,
