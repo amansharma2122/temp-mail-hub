@@ -672,6 +672,19 @@ const FriendlyWebsitesWidget = ({
             {/* Decorative orbs */}
             <div aria-hidden className="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
             <div aria-hidden className="pointer-events-none absolute -top-6 -left-6 h-20 w-20 rounded-full bg-accent/20 blur-2xl" />
+
+            {(settings.celebrationEnabled ?? true) && (
+              <button
+                type="button"
+                onClick={handleCelebrate}
+                data-testid="friendly-widget-celebrate"
+                aria-label={settings.celebrationLabel || 'Celebrate'}
+                className="mt-3 relative w-full inline-flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-gradient-to-r from-primary/90 via-accent/90 to-primary/90 px-3 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              >
+                <Sparkles className="w-4 h-4" aria-hidden />
+                <span>{settings.celebrationLabel || 'Click Me 🎉'}</span>
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
