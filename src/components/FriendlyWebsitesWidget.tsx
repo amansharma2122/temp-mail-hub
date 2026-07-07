@@ -741,7 +741,23 @@ export default memo(FriendlyWebsitesWidget);
 // -------------------- Click Burst (full-screen decorative effect) ----------
 type BurstVariant = NonNullable<WidgetSettings['clickEffect']>;
 
-export function ClickBurst({ variant, onDone }: { variant: BurstVariant; onDone: () => void }) {
+export function ClickBurst({
+  variant,
+  onDone,
+  reducedMotion = false,
+  intensity = 'normal',
+  durationMs,
+  countScale = 0,
+}: {
+  variant: BurstVariant;
+  onDone: () => void;
+  reducedMotion?: boolean;
+  intensity?: 'subtle' | 'normal' | 'lively';
+  /** Overrides overlay lifetime (ms). */
+  durationMs?: number;
+  /** Overrides preset particle count; 0 = use preset default. */
+  countScale?: number;
+}) {
   if (variant === 'none') { setTimeout(onDone, 0); return null; }
   // Rain-style presets: particles start above the viewport and fall the
   // full screen height. Slower & softer than the old burst so it doesn't
@@ -756,32 +772,41 @@ export function ClickBurst({ variant, onDone }: { variant: BurstVariant; onDone:
     'rainbow-burst':{ count: 60, glyph: (i) => (i % 8 === 0 ? '🌈' : ''), colors: ['#ef4444','#f97316','#facc15','#22c55e','#3b82f6','#a855f7'] },
   };
   const p = presets[variant];
-  // Total overlay duration: give the shower time to reach the bottom on
-  // large screens without keeping the veil around too long.
-  const OVERLAY_MS = 4200;
+  // Intensity multiplier tunes count + duration together.
+  const iMul = intensity === 'subtle' ? 0.6 : intensity === 'lively' ? 1.4 : 1;
+  // Reduced-motion: hard cap to a gentle few-particle shower and short overlay.
+  const rmCount = 6;
+  const rmMs = 900;
+  const baseCount = countScale > 0 ? countScale : Math.round(p.count * iMul);
+  const effectiveCount = reducedMotion ? rmCount : Math.max(4, Math.min(220, baseCount));
+  const OVERLAY_MS = reducedMotion
+    ? rmMs
+    : Math.max(800, Math.min(8000, Math.round((durationMs ?? 4200) * iMul)));
+  const speedMul = reducedMotion ? 0.5 : 1 / iMul; // lively = faster fall
   return (
     <motion.div
       className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
       data-testid="friendly-widget-click-burst"
       data-variant={variant}
+      data-reduced-motion={reducedMotion ? 'true' : 'false'}
       initial={{ opacity: 1 }}
-      animate={{ opacity: 1 }}
+      animate={{ opacity: reducedMotion ? 0.55 : 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+      transition={{ duration: reducedMotion ? 0.2 : 0.4, ease: 'easeOut' }}
       onAnimationComplete={() => { setTimeout(onDone, OVERLAY_MS); }}
       aria-hidden
     >
-      {Array.from({ length: p.count }).map((_, i) => {
+      {Array.from({ length: effectiveCount }).map((_, i) => {
         // Even horizontal spread with a small jitter so it doesn't line up.
-        const leftPct = ((i + 0.5) / p.count) * 100 + (Math.random() * 6 - 3);
+        const leftPct = ((i + 0.5) / effectiveCount) * 100 + (Math.random() * 6 - 3);
         const glyph = p.glyph(i);
         const color = p.colors.length ? p.colors[i % p.colors.length] : undefined;
         const size = glyph ? 18 + Math.random() * 14 : 8 + Math.random() * 8;
         // Slower fall: 2.4s – 3.4s per particle, staggered start so it
         // feels like a shower, not a burst.
-        const dur = 2400 + Math.random() * 1000;
-        const delay = Math.random() * 900;
-        const rot = Math.round((Math.random() * 720) - 360);
+        const dur = (2400 + Math.random() * 1000) * speedMul;
+        const delay = (reducedMotion ? Math.random() * 150 : Math.random() * 900);
+        const rot = reducedMotion ? 0 : Math.round((Math.random() * 720) - 360);
         return (
           <span
             key={i}
