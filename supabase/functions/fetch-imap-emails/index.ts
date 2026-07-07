@@ -276,9 +276,10 @@ serve(async (req: Request): Promise<Response> => {
       const { data: dbMailboxes, error: mailboxesError } = await supabase
         .from("mailboxes")
         .select(
-          "id,name,imap_host,imap_port,imap_user,is_active,is_primary,priority,last_error_at,last_error"
+          "id,name,imap_host,imap_port,imap_user,is_active,is_primary,priority,last_error_at,last_error,is_full,storage_bytes_used,storage_bytes_limit"
         )
         .eq("is_active", true)
+        .eq("is_full", false)
         .not("imap_host", "is", null)
         .not("imap_user", "is", null)
         .order("is_primary", { ascending: false })
