@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { storage } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { Search, Save, Code, FileCode, FileText, TrendingUp, AlertTriangle, CheckCircle, XCircle, Lightbulb, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -259,19 +260,14 @@ const AdminSEO = () => {
       const settingsJson = JSON.parse(JSON.stringify(settings));
 
       await saveAppSetting('seo', settingsJson);
-      if (error) {
-        console.error('Error saving to database:', error);
-        toast.error('Settings saved locally but failed to sync to database');
-      } else {
-        // Clear ALL SEO-related caches from localStorage
-        localStorage.removeItem('trashmails_seo_settings');
-        localStorage.removeItem(SEO_SETTINGS_KEY);
-        
-        // Dispatch a global event to notify all components to refetch
-        window.dispatchEvent(new CustomEvent('seo-settings-updated', { detail: settings }));
-        
-        toast.success("SEO settings saved successfully!");
-      }
+      // Clear ALL SEO-related caches from localStorage
+      localStorage.removeItem('trashmails_seo_settings');
+      localStorage.removeItem(SEO_SETTINGS_KEY);
+      
+      // Dispatch a global event to notify all components to refetch
+      window.dispatchEvent(new CustomEvent('seo-settings-updated', { detail: settings }));
+      
+      toast.success("SEO settings saved successfully!");
     } catch (e) {
       console.error('Error saving settings:', e);
       toast.error('Failed to save settings');

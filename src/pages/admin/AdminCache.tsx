@@ -67,6 +67,7 @@ const AdminCache = () => {
   const saveSettings = async () => {
     try {
       // First check if the setting exists
+      const settingsValue = JSON.parse(JSON.stringify(settings));
       await saveAppSetting("cache_settings", settingsValue);
       toast.success("Cache settings saved");
     } catch (error) {

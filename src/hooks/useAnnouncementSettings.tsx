@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+import { saveAppSetting } from "@/lib/appSettingsSync";
 export interface AnnouncementSettings {
   isEnabled: boolean;
   badgeText: string;
@@ -81,6 +82,7 @@ export const useAnnouncementSettings = () => {
     const updatedSettings = { ...settings, ...newSettings };
     
     try {
+      const settingsJson = JSON.parse(JSON.stringify(updatedSettings));
       await saveAppSetting('announcement_settings', settingsJson);
       setSettings(updatedSettings);
       return { success: true };

@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { storage } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { Sparkles } from "lucide-react";
 import { Users, Save } from "lucide-react";
 
@@ -85,13 +86,9 @@ const AdminUserSettings = () => {
     try {
       storage.set(USER_SETTINGS_KEY, settings);
       
+      const settingsJson = JSON.parse(JSON.stringify(settings));
       await saveAppSetting('user_settings', settingsJson);
-      if (error) {
-        console.error('Error saving to database:', error);
-        toast.error('Settings saved locally but failed to sync to database');
-      } else {
-        toast.success("User settings saved!");
-      }
+      toast.success("User settings saved!");
     } catch (e) {
       console.error('Error saving settings:', e);
       toast.error('Failed to save settings');

@@ -147,13 +147,8 @@ const AdminRateLimits = () => {
     setIsSaving(true);
     
     // First check if record exists
+    const jsonValue = JSON.parse(JSON.stringify(config));
     await saveAppSetting("rate_limits_config", jsonValue);
-    if (error) {
-      toast.error("Failed to save settings: " + error.message);
-      setIsSaving(false);
-      return;
-    }
-
     // Reset all rate limits if option is enabled
     if (resetOnSave) {
       const { error: clearError } = await supabase

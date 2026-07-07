@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { CreditCard, Save, AlertTriangle, CheckCircle, ExternalLink, Key, Wallet, MessageCircle } from "lucide-react";
 import { api } from "@/lib/api";
 

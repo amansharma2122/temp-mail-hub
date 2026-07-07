@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { storage, generateId } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { Languages, Plus, Trash2, Save, Check } from "lucide-react";
 import {
   Table,
@@ -85,6 +86,7 @@ const AdminLanguages = () => {
     setLanguages(updated);
 
     try {
+      const languagesJson = JSON.parse(JSON.stringify(languages));
       await saveAppSetting('languages', languagesJson);
     } catch (e) {
       console.error('Error saving languages to database:', e);

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { storage } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { Settings, Save, AlertTriangle, Eye } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useLimitModalSettings, defaultLimitModalConfig, LimitModalConfig } from "@/hooks/useLimitModalSettings";
@@ -105,16 +106,12 @@ const AdminGeneralSettings = () => {
       storage.set(GENERAL_SETTINGS_KEY, settings);
       
       // Also save to Supabase app_settings for persistence
+      const settingsJson = JSON.parse(JSON.stringify(settings));
       await saveAppSetting('general', settingsJson);
-      if (error) {
-        console.error('Error saving to database:', error);
-        toast.error('Settings saved locally but failed to sync to database');
-      } else {
-        // Immediately refetch global settings so changes apply everywhere
-        await refetchGlobalSettings();
-        markClean();
-        toast.success("General settings saved successfully!");
-      }
+      // Immediately refetch global settings so changes apply everywhere
+      await refetchGlobalSettings();
+      markClean();
+      toast.success("General settings saved successfully!");
     } catch (e) {
       console.error('Error saving settings:', e);
       toast.error('Failed to save settings');

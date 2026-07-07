@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+import { saveAppSetting } from "@/lib/appSettingsSync";
 interface SidebarIconsMap {
   [key: string]: string; // url path -> icon class
 }

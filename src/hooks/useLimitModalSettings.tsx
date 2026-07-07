@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+import { saveAppSetting } from "@/lib/appSettingsSync";
 export interface LimitModalConfig {
   enabled: boolean;
   title: string;
@@ -51,11 +52,8 @@ export const useLimitModalSettings = () => {
   const saveConfig = async (newConfig: LimitModalConfig) => {
     setIsSaving(true);
     try {
+      const configJson = JSON.parse(JSON.stringify(newConfig));
       await saveAppSetting('limit_modal_config', configJson);
-      if (error) {
-        throw error;
-      }
-
       setConfig(newConfig);
       return true;
     } catch (err) {

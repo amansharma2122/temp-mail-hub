@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+import { saveAppSetting } from "@/lib/appSettingsSync";
 export interface RegistrationSettings {
   allowRegistration: boolean;
   registrationMessage: string;
@@ -50,6 +51,7 @@ export const useRegistrationSettings = () => {
     const updatedSettings = { ...settings, ...newSettings };
     
     try {
+      const settingsJson = JSON.parse(JSON.stringify(updatedSettings));
       await saveAppSetting('registration_settings', settingsJson);
       setSettings(updatedSettings);
       return { success: true };

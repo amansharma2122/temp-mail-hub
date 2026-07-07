@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import {
   Dialog,
   DialogContent,
@@ -142,6 +143,7 @@ const AdminPricing = () => {
     setIsSaving(true);
     console.log('[AdminPricing] Saving content:', content);
     try {
+      const contentJson = JSON.parse(JSON.stringify(content));
       await saveAppSetting("pricing_content", contentJson);
       toast.success("Pricing content saved");
       queryClient.invalidateQueries({ queryKey: ["app_settings"] });

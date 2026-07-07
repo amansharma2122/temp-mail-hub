@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { toast } from 'sonner';
 
 export interface CaptchaSettings {
@@ -58,6 +59,7 @@ export const useCaptchaSettings = () => {
     mutationFn: async (newSettings: Partial<CaptchaSettings>) => {
       const updatedSettings = { ...settings, ...newSettings };
       
+      const settingsJson = JSON.parse(JSON.stringify(updatedSettings));
       await saveAppSetting(SETTINGS_KEY, settingsJson);
       return updatedSettings;
     },
