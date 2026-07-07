@@ -12,6 +12,21 @@ import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.t
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? Deno.env.get("VITE_SUPABASE_URL");
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+// Deterministic seed for CI reproducibility. When SMOKE_SEED is set (e.g. by the
+// GitHub Actions workflow) the synthetic mailbox tag is derived from it so
+// failures reproduce locally with the same value. Falls back to a random UUID
+// slice for ad-hoc local runs.
+const SMOKE_SEED = Deno.env.get("SMOKE_SEED");
+function seededTag(prefix: string): string {
+  if (!SMOKE_SEED) return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  // FNV-1a 32-bit — tiny, deterministic, no deps.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < SMOKE_SEED.length; i++) {
+    h ^= SMOKE_SEED.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return `${prefix}-${h.toString(16).padStart(8, "0")}`;
+}
 
 const runIt = SUPABASE_URL && SERVICE_KEY;
 
@@ -23,7 +38,7 @@ Deno.test({
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const tag = `smoke-${crypto.randomUUID().slice(0, 8)}`;
+    const tag = seededTag("smoke");
     const mkMailbox = (i: number, opts: Partial<Record<string, unknown>> = {}) => ({
       name: `${tag}-mb-${i}`,
       smtp_host: "smoke.invalid",

@@ -4,6 +4,7 @@ import { ExternalLink, RadioTower, RefreshCw } from "lucide-react";
 import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { reportRealtimeStatus, clearRealtimeStatus } from "@/lib/realtimeHealth";
+import { recordBannerTelemetry } from "@/lib/bannerTelemetry";
 import { useAdminRole } from "@/hooks/useAdminRole";
 
 interface Banner {
@@ -135,6 +136,7 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     const startPolling = () => {
       if (pollingId) return;
       setRealtimeMode("polling");
+      recordBannerTelemetry("polling_started", position);
       pollingId = setInterval(() => {
         if (!cancelled) fetchBanners();
       }, 30_000);
@@ -166,6 +168,10 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
               setRealtimeMode("live");
             } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
               reportRealtimeStatus(healthKey, channelName, status === "TIMED_OUT" ? "timed_out" : "error", err);
+              recordBannerTelemetry("realtime_failure", position, {
+                status,
+                error: err instanceof Error ? err.message : err ? String(err) : null,
+              });
               startPolling();
               scheduleRetry();
             } else if (status === "CLOSED") {
@@ -175,6 +181,10 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
       } catch (err) {
         console.warn("[BannerDisplay] Realtime subscription failed, using polling fallback:", err);
         reportRealtimeStatus(healthKey, channelName, "error", err);
+        recordBannerTelemetry("realtime_failure", position, {
+          status: "exception",
+          error: err instanceof Error ? err.message : err ? String(err) : null,
+        });
         startPolling();
         scheduleRetry();
       }
@@ -264,6 +274,7 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
 
   const manualRefresh = async () => {
     setManualRefreshing(true);
+    recordBannerTelemetry("manual_refresh", position, { mode: realtimeMode });
     try { await fetchBanners(); } finally { setManualRefreshing(false); }
   };
 
