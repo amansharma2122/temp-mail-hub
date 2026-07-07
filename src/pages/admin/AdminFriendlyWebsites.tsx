@@ -107,6 +107,27 @@ const defaultSettings: WidgetSettings = {
   showLabelOnTrigger: true,
 };
 
+const emptyForm = {
+  name: '',
+  url: '',
+  icon_url: '',
+  icon_name: '',
+  description: '',
+  open_in_new_tab: true,
+  attention_effect: '' as '' | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring',
+  badge_enabled: true,
+  badge_text: '',
+  auto_open_override: 'inherit' as 'inherit' | 'force_on' | 'force_off',
+  max_badge_per_day: 0,
+};
+
+function toAutoOpenValue(v: 'inherit' | 'force_on' | 'force_off'): boolean | null {
+  return v === 'force_on' ? true : v === 'force_off' ? false : null;
+}
+function fromAutoOpenValue(v: boolean | null | undefined): 'inherit' | 'force_on' | 'force_off' {
+  return v === true ? 'force_on' : v === false ? 'force_off' : 'inherit';
+}
+
 // Sortable Website Card Component
 const SortableWebsiteCard = ({ 
   website, 
