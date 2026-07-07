@@ -34,9 +34,7 @@ export default function NewEmailNotificationSettings() {
           .eq("key", "new_email_sound_admin_enabled")
           .maybeSingle(),
       ]);
-      const _ = await Promise.resolve({ data: null } as any); void _; // no-op to keep TS calm
-      const data = styleRow as any;
-      const raw = (data as any)?.value;
+      const raw = (styleRow as any)?.value;
       const val: NewEmailToastStyle =
         raw === "slide_glow" || raw === "bounce_confetti" || raw === "both"
           ? raw : (raw?.style ?? "bounce_confetti");
