@@ -72,6 +72,8 @@ interface WidgetSettings {
   celebrationIntensity?: 'subtle' | 'normal' | 'lively';
   celebrationDurationMs?: number;   // 800..8000, overrides OVERLAY_MS
   celebrationParticleCount?: number; // 0 = use preset default
+  /** Celebration playback speed — scales duration + per-particle fall time. */
+  celebrationSpeed?: 'slower' | 'normal' | 'faster';
   /** Play a short chime when the celebrate button is clicked. */
   celebrationSoundEnabled?: boolean;
 }
@@ -105,6 +107,7 @@ const defaultSettings: WidgetSettings = {
   celebrationIntensity: 'normal',
   celebrationDurationMs: 4200,
   celebrationParticleCount: 0,
+  celebrationSpeed: 'normal',
   celebrationSoundEnabled: false,
 };
 
