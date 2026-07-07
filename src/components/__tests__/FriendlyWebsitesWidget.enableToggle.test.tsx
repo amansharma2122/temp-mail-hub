@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import React from "react";
 
 // --------------------------------------------------------------------------
@@ -81,8 +82,14 @@ function makeClient() {
   });
 }
 
-function Wrapper({ children }: { children: React.ReactNode }) {
-  return <QueryClientProvider client={makeClient()}>{children}</QueryClientProvider>;
+function renderWithClient(qc: QueryClient) {
+  return render(
+    <QueryClientProvider client={qc}>
+      <TooltipProvider>
+        <FriendlyWebsitesWidget />
+      </TooltipProvider>
+    </QueryClientProvider>,
+  );
 }
 
 describe("FriendlyWebsitesWidget enable/disable toggle", () => {
@@ -92,11 +99,7 @@ describe("FriendlyWebsitesWidget enable/disable toggle", () => {
 
   it("mounts a visible trigger when enabled and unmounts when the admin disables it via broadcast", async () => {
     const qc = makeClient();
-    const { container } = render(
-      <QueryClientProvider client={qc}>
-        <FriendlyWebsitesWidget />
-      </QueryClientProvider>,
-    );
+    const { container } = renderWithClient(qc);
     // Wait for the initial fetch to settle and the trigger to render.
     await waitFor(() => {
       expect(container.querySelector("button")).toBeTruthy();
@@ -116,11 +119,7 @@ describe("FriendlyWebsitesWidget enable/disable toggle", () => {
 
   it("survives rapid enable/disable churn without leaking DOM nodes", async () => {
     const qc = makeClient();
-    const { container } = render(
-      <QueryClientProvider client={qc}>
-        <FriendlyWebsitesWidget />
-      </QueryClientProvider>,
-    );
+    const { container } = renderWithClient(qc);
     await waitFor(() => expect(container.querySelector("button")).toBeTruthy());
 
     for (let i = 0; i < 6; i++) {
