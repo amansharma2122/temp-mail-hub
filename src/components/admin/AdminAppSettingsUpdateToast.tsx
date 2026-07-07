@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   subscribeAllAppSettings,
@@ -21,7 +21,7 @@ const AdminAppSettingsUpdateToast = () => {
   const { t, isRTL } = useLanguage();
   const navigate = useNavigate();
 
-  const openSettingRoute = (route: string) => {
+  const openSettingRoute = useCallback((route: string) => {
     navigate(route);
     const hash = route.split("#")[1];
     if (!hash) return;
@@ -34,7 +34,7 @@ const AdminAppSettingsUpdateToast = () => {
         el.focus({ preventScroll: true });
       }
     }, 50);
-  };
+  }, [navigate]);
 
   useEffect(() => {
     const off = subscribeAllAppSettings((key, change) => {
@@ -76,10 +76,6 @@ const AdminAppSettingsUpdateToast = () => {
         // what actually flips the toast layout — including here as a data
         // attribute so tests can assert per-toast direction.
         className: `app-settings-update-toast max-w-full break-words ${isRTL ? "rtl" : "ltr"}`,
-        ariaProps: {
-          role: "status",
-          "aria-live": "polite",
-        },
         action: route
           ? {
               label: t("adminSettingsUpdatedOpen"),
@@ -93,6 +89,9 @@ const AdminAppSettingsUpdateToast = () => {
       // after sonner commits the DOM node.
       const measureVisible = () => {
         const visibleAt = Date.now();
+        const toastEl = document.querySelector(".app-settings-update-toast");
+        toastEl?.setAttribute("role", "status");
+        toastEl?.setAttribute("aria-live", "polite");
         reportAppSettingsToastEvent({
           key,
           remote: true,
@@ -108,7 +107,7 @@ const AdminAppSettingsUpdateToast = () => {
       }
     });
     return off;
-  }, [t, isRTL, navigate]);
+  }, [t, isRTL, openSettingRoute]);
 
   return null;
 };
