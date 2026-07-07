@@ -53,7 +53,7 @@ export const useAnnouncementSettings = () => {
 
     // Real-time subscription for instant updates across all tabs
     const channel = supabase
-      .channel()
+      .channel(`announcement-admin-settings-changes-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
