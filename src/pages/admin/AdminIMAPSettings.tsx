@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import IMAPHealthTable from "@/components/admin/IMAPHealthTable";
 import IMAPTestWorkflow from "@/components/admin/IMAPTestWorkflow";
+import NewEmailNotificationSettings from "@/components/admin/NewEmailNotificationSettings";
 import {
   Select,
   SelectContent,
@@ -624,6 +625,9 @@ const AdminIMAPSettings = () => {
 
       {/* Test Workflow */}
       <IMAPTestWorkflow />
+
+      {/* New-email notification appearance */}
+      <NewEmailNotificationSettings />
 
       {/* Automatic Polling Info */}
       <Card>

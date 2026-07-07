@@ -1,6 +1,11 @@
 import { useEffect, useCallback, useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { NewEmailToast } from "@/components/NewEmailToast";
+import {
+  getNewEmailNotificationStyle,
+  getNewEmailNotificationStyleSync,
+} from "@/lib/newEmailNotificationStyle";
 
 interface ReceivedEmail {
   id: string;
@@ -147,10 +152,21 @@ export const useRealtimeEmails = (options: UseRealtimeEmailsOptions = {}) => {
 
           // Show toast notification
           if (showToast) {
-            toast.success('New Email Received!', {
-              description: `From: ${newEmail.from_address}\nSubject: ${newEmail.subject || '(No Subject)'}`,
-              duration: 5000,
-            });
+            const style = getNewEmailNotificationStyleSync();
+            toast.custom(
+              (t) => (
+                <NewEmailToast
+                  from={newEmail.from_address}
+                  subject={newEmail.subject || ""}
+                  style={style}
+                  onClose={() => toast.dismiss(t)}
+                />
+              ),
+              { duration: 5000 },
+            );
+            // Refresh style cache in the background so future toasts pick up
+            // admin changes without waiting for a page reload.
+            void getNewEmailNotificationStyle();
           }
 
           // Play sound using the callback from parent
