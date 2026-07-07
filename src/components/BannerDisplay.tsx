@@ -232,7 +232,16 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
   };
 
   return (
-    <div className={`${positionStyles[position]} ${className}`}>
+    <div className={`${positionStyles[position]} ${className} relative`}>
+      {isAdmin && realtimeMode === "polling" && (
+        <div
+          className="absolute top-1 right-1 z-10 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 flex items-center gap-1 pointer-events-none"
+          title="Realtime channel unavailable — refreshing every 30s"
+        >
+          <RadioTower className="w-3 h-3" />
+          Live updates paused — polling
+        </div>
+      )}
       {banners.map((banner, index) => (
         <motion.div
           key={banner.id}
