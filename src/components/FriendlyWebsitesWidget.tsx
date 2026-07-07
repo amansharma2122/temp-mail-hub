@@ -493,7 +493,7 @@ const FriendlyWebsitesWidget = ({
         {burstAt && !effectiveReducedMotion && (
           <ClickBurst
             key={burstAt}
-            variant={burstVariant as BurstVariant}
+            variant={burstVariant as NonNullable<WidgetSettings['clickEffect']>}
             onDone={() => setBurstAt(null)}
           />
         )}
