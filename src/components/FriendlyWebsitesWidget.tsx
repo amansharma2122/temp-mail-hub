@@ -72,6 +72,8 @@ interface WidgetSettings {
   celebrationIntensity?: 'subtle' | 'normal' | 'lively';
   celebrationDurationMs?: number;   // 800..8000, overrides OVERLAY_MS
   celebrationParticleCount?: number; // 0 = use preset default
+  /** Celebration playback speed — scales duration + per-particle fall time. */
+  celebrationSpeed?: 'slower' | 'normal' | 'faster';
   /** Play a short chime when the celebrate button is clicked. */
   celebrationSoundEnabled?: boolean;
 }
@@ -105,6 +107,7 @@ const defaultSettings: WidgetSettings = {
   celebrationIntensity: 'normal',
   celebrationDurationMs: 4200,
   celebrationParticleCount: 0,
+  celebrationSpeed: 'normal',
   celebrationSoundEnabled: false,
 };
 
@@ -528,6 +531,7 @@ const FriendlyWebsitesWidget = ({
             intensity={settings.celebrationIntensity ?? 'normal'}
             durationMs={settings.celebrationDurationMs ?? 4200}
             countScale={settings.celebrationParticleCount ?? 0}
+            speed={settings.celebrationSpeed ?? 'normal'}
             onDone={() => setBurstAt(null)}
           />
         )}
@@ -748,6 +752,7 @@ export function ClickBurst({
   intensity = 'normal',
   durationMs,
   countScale = 0,
+  speed = 'normal',
 }: {
   variant: BurstVariant;
   onDone: () => void;
@@ -757,6 +762,8 @@ export function ClickBurst({
   durationMs?: number;
   /** Overrides preset particle count; 0 = use preset default. */
   countScale?: number;
+  /** Playback speed multiplier — 'slower' | 'normal' | 'faster'. */
+  speed?: 'slower' | 'normal' | 'faster';
 }) {
   if (variant === 'none') { setTimeout(onDone, 0); return null; }
   // Rain-style presets: particles start above the viewport and fall the
@@ -774,6 +781,8 @@ export function ClickBurst({
   const p = presets[variant];
   // Intensity multiplier tunes count + duration together.
   const iMul = intensity === 'subtle' ? 0.6 : intensity === 'lively' ? 1.4 : 1;
+  // Speed multiplier — >1 stretches (slower), <1 compresses (faster).
+  const sMul = speed === 'slower' ? 1.5 : speed === 'faster' ? 0.6 : 1;
   // Reduced-motion: hard cap to a gentle few-particle shower and short overlay.
   const rmCount = 6;
   const rmMs = 900;
@@ -781,14 +790,16 @@ export function ClickBurst({
   const effectiveCount = reducedMotion ? rmCount : Math.max(4, Math.min(220, baseCount));
   const OVERLAY_MS = reducedMotion
     ? rmMs
-    : Math.max(800, Math.min(8000, Math.round((durationMs ?? 4200) * iMul)));
-  const speedMul = reducedMotion ? 0.5 : 1 / iMul; // lively = faster fall
+    : Math.max(800, Math.min(12000, Math.round((durationMs ?? 4200) * iMul * sMul)));
+  const speedMul = reducedMotion ? 0.5 : (1 / iMul) * sMul; // lively/faster = quicker fall
   return (
     <motion.div
       className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
       data-testid="friendly-widget-click-burst"
       data-variant={variant}
       data-reduced-motion={reducedMotion ? 'true' : 'false'}
+      data-speed={speed}
+      data-overlay-ms={OVERLAY_MS}
       initial={{ opacity: 1 }}
       animate={{ opacity: reducedMotion ? 0.55 : 1 }}
       exit={{ opacity: 0 }}
