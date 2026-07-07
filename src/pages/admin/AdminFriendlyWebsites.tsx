@@ -405,13 +405,18 @@ const AdminFriendlyWebsites = () => {
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
           display_order: maxOrder + 1,
+          attention_effect: formData.attention_effect || null,
+          badge_enabled: formData.badge_enabled,
+          badge_text: formData.badge_text || null,
+          auto_open_override: toAutoOpenValue(formData.auto_open_override),
+          max_badge_per_day: formData.max_badge_per_day,
         } as any);
 
       if (error) throw error;
 
       toast.success('Website added successfully');
       setAddDialogOpen(false);
-      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
+      setFormData({ ...emptyForm });
       fetchData();
     } catch (error) {
       console.error('Error adding website:', error);
@@ -432,6 +437,11 @@ const AdminFriendlyWebsites = () => {
           icon_name: formData.icon_name || null,
           description: formData.description || null,
           open_in_new_tab: formData.open_in_new_tab,
+          attention_effect: formData.attention_effect || null,
+          badge_enabled: formData.badge_enabled,
+          badge_text: formData.badge_text || null,
+          auto_open_override: toAutoOpenValue(formData.auto_open_override),
+          max_badge_per_day: formData.max_badge_per_day,
         } as any)
         .eq('id', editingWebsite.id);
 
@@ -439,7 +449,7 @@ const AdminFriendlyWebsites = () => {
 
       toast.success('Website updated successfully');
       setEditingWebsite(null);
-      setFormData({ name: '', url: '', icon_url: '', icon_name: '', description: '', open_in_new_tab: true });
+      setFormData({ ...emptyForm });
       fetchData();
     } catch (error) {
       console.error('Error updating website:', error);
@@ -525,6 +535,11 @@ const AdminFriendlyWebsites = () => {
       icon_name: website.icon_name || '',
       description: website.description || '',
       open_in_new_tab: website.open_in_new_tab,
+      attention_effect: (website.attention_effect ?? '') as typeof emptyForm.attention_effect,
+      badge_enabled: website.badge_enabled ?? true,
+      badge_text: website.badge_text ?? '',
+      auto_open_override: fromAutoOpenValue(website.auto_open_override ?? null),
+      max_badge_per_day: website.max_badge_per_day ?? 0,
     });
   };
 
