@@ -527,17 +527,13 @@ const FriendlyWebsitesWidget = ({
 
       {/* User-visible sync indicator when both realtime + fetches fail. */}
       {hasSyncError && !isOpen && (
-        <button
-          type="button"
-          data-testid="friendly-widget-sync-error"
-          onClick={() => { refetchSettings(); refetchSites(); }}
-          className={`fixed top-1/2 mt-14 -translate-y-1/2 z-40 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 shadow-sm hover:bg-amber-500/25 transition ${settings.position === 'right' ? 'right-2' : 'left-2'}`}
-          aria-label="Widget sync failed — click to retry"
-          title="Widget sync failed — click to retry"
-        >
-          <AlertCircle className="w-3 h-3" />
-          <span>Sync issue — retry</span>
-        </button>
+        <SyncErrorPill
+          position={settings.position}
+          attempt={syncAttempt}
+          nextRetrySec={nextRetrySec}
+          onRetry={manualRetry}
+          offsetTop
+        />
       )}
 
       {/* Sidebar Panel */}
