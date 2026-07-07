@@ -24,6 +24,8 @@ type ImapCandidate = {
   username: string;
   password: string;
   last_error_at?: string | null;
+  storageBytesLimit?: number;
+  storageBytesUsed?: number;
 };
 
 const EMAIL_REGEX = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
@@ -276,9 +278,10 @@ serve(async (req: Request): Promise<Response> => {
       const { data: dbMailboxes, error: mailboxesError } = await supabase
         .from("mailboxes")
         .select(
-          "id,name,imap_host,imap_port,imap_user,is_active,is_primary,priority,last_error_at,last_error"
+          "id,name,imap_host,imap_port,imap_user,is_active,is_primary,priority,last_error_at,last_error,is_full,storage_bytes_used,storage_bytes_limit"
         )
         .eq("is_active", true)
+        .eq("is_full", false)
         .not("imap_host", "is", null)
         .not("imap_user", "is", null)
         .order("is_primary", { ascending: false })
@@ -339,6 +342,8 @@ serve(async (req: Request): Promise<Response> => {
           username,
           password,
           last_error_at: m.last_error_at,
+          storageBytesLimit: Number(m.storage_bytes_limit ?? 10737418240),
+          storageBytesUsed: Number(m.storage_bytes_used ?? 0),
         });
       }
 
@@ -500,6 +505,50 @@ serve(async (req: Request): Promise<Response> => {
         const selectResponse = await sendCommand("SELECT INBOX", tagNum++);
         if (!selectResponse.includes("OK")) {
           throw new Error("Failed to select INBOX: " + selectResponse);
+        }
+
+        // Storage quota check: prefer IMAP QUOTA, fall back to manual cap.
+        let effectiveLimit = candidate.storageBytesLimit ?? 10737418240;
+        let currentUsed = candidate.storageBytesUsed ?? 0;
+        let quotaSource: "imap" | "manual" = "manual";
+        try {
+          const quotaRootResp = await sendCommand(`GETQUOTAROOT "INBOX"`, tagNum++);
+          // Parse: * QUOTA "" (STORAGE <used> <limit>)  — units are KB per RFC 2087
+          const qm = quotaRootResp.match(/\*\s+QUOTA\s+\S+\s*\(\s*STORAGE\s+(\d+)\s+(\d+)\s*\)/i);
+          if (qm) {
+            const usedKb = parseInt(qm[1], 10);
+            const limitKb = parseInt(qm[2], 10);
+            if (Number.isFinite(usedKb) && Number.isFinite(limitKb) && limitKb > 0) {
+              currentUsed = usedKb * 1024;
+              effectiveLimit = limitKb * 1024;
+              quotaSource = "imap";
+            }
+          }
+        } catch (qErr) {
+          console.warn(`[IMAP] QUOTA not supported / failed for ${candidate.mailboxName || candidate.host}:`, qErr);
+        }
+
+        if (candidate.mailboxId) {
+          try {
+            await supabase.from("mailboxes").update({
+              storage_bytes_used: currentUsed,
+              last_quota_check_at: new Date().toISOString(),
+            }).eq("id", candidate.mailboxId);
+          } catch { /* ignore */ }
+        }
+
+        if (currentUsed >= effectiveLimit) {
+          if (candidate.mailboxId) {
+            try {
+              await supabase.from("mailboxes").update({
+                is_full: true,
+                storage_bytes_used: currentUsed,
+                last_error: `Mailbox full (${quotaSource}): ${currentUsed}/${effectiveLimit} bytes`,
+                last_error_at: new Date().toISOString(),
+              }).eq("id", candidate.mailboxId);
+            } catch { /* ignore */ }
+          }
+          throw new Error(`MAILBOX_FULL: ${candidate.mailboxName || candidate.host} at ${currentUsed}/${effectiveLimit} bytes — failing over`);
         }
 
         const existsMatch = selectResponse.match(/\* (\d+) EXISTS/);
@@ -718,6 +767,10 @@ serve(async (req: Request): Promise<Response> => {
               continue;
             }
 
+            const bodyBytes = new TextEncoder().encode(finalTextBody || "").length;
+            const htmlBytes = new TextEncoder().encode(finalHtmlBody || "").length;
+            const rawSize = bodyBytes + htmlBytes;
+
             const { error: insertError } = await supabase.from("received_emails").insert({
               temp_email_id: matchedTempEmailId,
               from_address: fromAddress,
@@ -726,6 +779,8 @@ serve(async (req: Request): Promise<Response> => {
               html_body: finalHtmlBody ? finalHtmlBody.substring(0, 50000) : null,
               is_read: false,
               received_at: receivedAtIso,
+              mailbox_id: candidate.mailboxId ?? null,
+              raw_size_bytes: rawSize,
             });
 
             if (insertError) {
@@ -736,6 +791,15 @@ serve(async (req: Request): Promise<Response> => {
               }
             } else {
               storedCount.success++;
+              // Increment cached usage; mark full if we've crossed the manual cap.
+              if (candidate.mailboxId) {
+                currentUsed += rawSize;
+                try {
+                  const patch: Record<string, unknown> = { storage_bytes_used: currentUsed };
+                  if (currentUsed >= effectiveLimit) patch.is_full = true;
+                  await supabase.from("mailboxes").update(patch).eq("id", candidate.mailboxId);
+                } catch { /* ignore */ }
+              }
             }
 
             await sendCommand(`STORE ${msgId} +FLAGS (\\Seen)`, tagNum++);

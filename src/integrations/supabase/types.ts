@@ -734,12 +734,14 @@ export type Database = {
           imap_port: number | null
           imap_user: string | null
           is_active: boolean | null
+          is_full: boolean
           is_primary: boolean | null
           last_day_reset: string | null
           last_error: string | null
           last_error_at: string | null
           last_hour_reset: string | null
           last_polled_at: string | null
+          last_quota_check_at: string | null
           last_sent_at: string | null
           name: string
           priority: number | null
@@ -750,6 +752,8 @@ export type Database = {
           smtp_password_encrypted: string | null
           smtp_port: number | null
           smtp_user: string | null
+          storage_bytes_limit: number
+          storage_bytes_used: number
           storage_limit_bytes: number | null
           storage_used_bytes: number | null
           updated_at: string
@@ -768,12 +772,14 @@ export type Database = {
           imap_port?: number | null
           imap_user?: string | null
           is_active?: boolean | null
+          is_full?: boolean
           is_primary?: boolean | null
           last_day_reset?: string | null
           last_error?: string | null
           last_error_at?: string | null
           last_hour_reset?: string | null
           last_polled_at?: string | null
+          last_quota_check_at?: string | null
           last_sent_at?: string | null
           name: string
           priority?: number | null
@@ -784,6 +790,8 @@ export type Database = {
           smtp_password_encrypted?: string | null
           smtp_port?: number | null
           smtp_user?: string | null
+          storage_bytes_limit?: number
+          storage_bytes_used?: number
           storage_limit_bytes?: number | null
           storage_used_bytes?: number | null
           updated_at?: string
@@ -802,12 +810,14 @@ export type Database = {
           imap_port?: number | null
           imap_user?: string | null
           is_active?: boolean | null
+          is_full?: boolean
           is_primary?: boolean | null
           last_day_reset?: string | null
           last_error?: string | null
           last_error_at?: string | null
           last_hour_reset?: string | null
           last_polled_at?: string | null
+          last_quota_check_at?: string | null
           last_sent_at?: string | null
           name?: string
           priority?: number | null
@@ -818,6 +828,8 @@ export type Database = {
           smtp_password_encrypted?: string | null
           smtp_port?: number | null
           smtp_user?: string | null
+          storage_bytes_limit?: number
+          storage_bytes_used?: number
           storage_limit_bytes?: number | null
           storage_used_bytes?: number | null
           updated_at?: string
@@ -934,6 +946,8 @@ export type Database = {
           id: string
           is_encrypted: boolean | null
           is_read: boolean
+          mailbox_id: string | null
+          raw_size_bytes: number | null
           received_at: string
           subject: string | null
           temp_email_id: string
@@ -946,6 +960,8 @@ export type Database = {
           id?: string
           is_encrypted?: boolean | null
           is_read?: boolean
+          mailbox_id?: string | null
+          raw_size_bytes?: number | null
           received_at?: string
           subject?: string | null
           temp_email_id: string
@@ -958,11 +974,20 @@ export type Database = {
           id?: string
           is_encrypted?: boolean | null
           is_read?: boolean
+          mailbox_id?: string | null
+          raw_size_bytes?: number | null
           received_at?: string
           subject?: string | null
           temp_email_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "received_emails_mailbox_id_fkey"
+            columns: ["mailbox_id"]
+            isOneToOne: false
+            referencedRelation: "mailboxes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "received_emails_temp_email_id_fkey"
             columns: ["temp_email_id"]
@@ -1037,6 +1062,36 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      stats_health_log: {
+        Row: {
+          created_at: string
+          details: Json | null
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          source: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          source?: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          source?: string
+          status?: string
         }
         Relationships: []
       }
@@ -1662,6 +1717,9 @@ export type Database = {
         }
         Returns: string
       }
+      prune_stats_health_log: { Args: never; Returns: undefined }
+      reconcile_email_stats: { Args: never; Returns: Json }
+      reconcile_mailbox_storage: { Args: never; Returns: Json }
       record_mailbox_error: {
         Args: { p_error: string; p_mailbox_id: string }
         Returns: undefined

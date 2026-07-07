@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import SubscriptionStatsWidget from "@/components/admin/SubscriptionStatsWidget";
 import PaymentStatsWidget from "@/components/admin/PaymentStatsWidget";
 import RealtimeHealthWidget from "@/components/admin/RealtimeHealthWidget";
+import StatsHealthWidget from "@/components/admin/StatsHealthWidget";
 
 interface Stats {
   totalUsers: number;
@@ -372,6 +373,9 @@ const AdminDashboard = () => {
 
       {/* Realtime Subscription Health */}
       <RealtimeHealthWidget />
+
+      {/* Public stats + mailbox storage health */}
+      <StatsHealthWidget />
 
       {/* Recent Activity */}
       <motion.div
