@@ -78,6 +78,24 @@ export const useRecaptcha = () => {
       }
     };
 
+    // Google emits an unhandled "Invalid site key" / "Invalid domain for
+    // site key" error on `window` when the current hostname is not in the
+    // reCAPTCHA console allowlist. Detect it and surface a clear admin
+    // hint (with the exact hostname to whitelist) so the fail-safe path
+    // in executeRecaptcha kicks in without leaving a scary Google banner
+    // in the corner.
+    const onWindowError = (e: ErrorEvent) => {
+      const msg = (e?.message || "").toString();
+      if (/recaptcha/i.test(msg) && /invalid/i.test(msg)) {
+        setLoadError(`reCAPTCHA misconfigured: ${msg}`);
+        console.warn(
+          `[reCAPTCHA] Site key is not authorized for "${window.location.hostname}". ` +
+          `Add this hostname in the Google reCAPTCHA console (Admin → Site key → Domains).`,
+        );
+      }
+    };
+    window.addEventListener("error", onWindowError);
+
     script.onerror = () => {
       setIsScriptLoading(false);
       setLoadError('Failed to load reCAPTCHA script');
@@ -96,6 +114,7 @@ export const useRecaptcha = () => {
 
     return () => {
       clearTimeout(timeout);
+      window.removeEventListener("error", onWindowError);
     };
   }, [settings.enabled, settings.provider, settings.siteKey, isLoading, isEnabled, isReady, loadError]);
 

@@ -4,6 +4,8 @@ import {
   subscribeAllAppSettings,
   isLocalAppSettingsWrite,
 } from "@/lib/appSettingsSync";
+import { reportAppSettingsToastEvent } from "@/lib/appSettingsRum";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /**
  * Renders nothing. Listens for `app_settings` changes that did NOT
@@ -14,12 +16,23 @@ import {
 const AdminAppSettingsUpdateToast = () => {
   // Coalesce rapid bursts on the same key so we don't spam the admin.
   const lastShown = useRef<Map<string, number>>(new Map());
+  const { t, isRTL } = useLanguage();
 
   useEffect(() => {
     const off = subscribeAllAppSettings((key, change) => {
       if (!change) return;
-      // Skip local writes so admins only see cross-tab / cross-device edits.
-      if (isLocalAppSettingsWrite(key, change.version)) return;
+      const isLocal = isLocalAppSettingsWrite(key, change.version);
+      if (isLocal) {
+        // Emit a local-skip RUM sample so we can measure signal-to-noise
+        // ratio across sessions, then drop the toast itself.
+        reportAppSettingsToastEvent({
+          key,
+          remote: false,
+          version: change.version ?? null,
+          delay_ms: Date.now() - change.emittedAt,
+        });
+        return;
+      }
 
       const now = Date.now();
       const last = lastShown.current.get(key) ?? 0;
@@ -27,14 +40,31 @@ const AdminAppSettingsUpdateToast = () => {
       lastShown.current.set(key, now);
 
       const versionLabel =
-        change.version != null ? `v${change.version}` : "latest version";
-      toast(`Settings updated in another tab`, {
-        description: `"${key}" merged and applied (${versionLabel}).`,
+        change.version != null
+          ? `v${change.version}`
+          : t("adminSettingsUpdatedVersionFallback");
+      const description = t("adminSettingsUpdatedDescription")
+        .replace("{key}", key)
+        .replace("{version}", versionLabel);
+
+      toast(t("adminSettingsUpdatedTitle"), {
+        description,
         duration: 4000,
+        // The document-level `dir` attribute (set by LanguageProvider) is
+        // what actually flips the toast layout — including here as a data
+        // attribute so tests can assert per-toast direction.
+        className: isRTL ? "rtl" : "ltr",
+      });
+
+      reportAppSettingsToastEvent({
+        key,
+        remote: true,
+        version: change.version ?? null,
+        delay_ms: now - change.emittedAt,
       });
     });
     return off;
-  }, []);
+  }, [t, isRTL]);
 
   return null;
 };

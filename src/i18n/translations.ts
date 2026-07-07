@@ -137,6 +137,11 @@ export const translations = {
     liveChat: 'Live Chat',
     location: 'Location',
     businessHours: 'Business Hours',
+
+    // Admin: cross-tab app_settings update toast
+    adminSettingsUpdatedTitle: 'Settings updated in another tab',
+    adminSettingsUpdatedDescription: '"{key}" merged and applied ({version}).',
+    adminSettingsUpdatedVersionFallback: 'latest version',
   },
   
   ar: {
@@ -201,6 +206,11 @@ export const translations = {
     backToSite: 'العودة للموقع',
     totalUsers: 'إجمالي المستخدمين',
     totalEmails: 'إجمالي الرسائل',
+
+    // Admin: cross-tab app_settings update toast
+    adminSettingsUpdatedTitle: 'تم تحديث الإعدادات في علامة تبويب أخرى',
+    adminSettingsUpdatedDescription: 'تم دمج "{key}" وتطبيقه ({version}).',
+    adminSettingsUpdatedVersionFallback: 'أحدث إصدار',
   },
   
   es: {
@@ -245,6 +255,11 @@ export const translations = {
     pages: 'Páginas',
     themes: 'Temas',
     backToSite: 'Volver al Sitio',
+
+    // Admin: cross-tab app_settings update toast
+    adminSettingsUpdatedTitle: 'Configuración actualizada en otra pestaña',
+    adminSettingsUpdatedDescription: '"{key}" fusionado y aplicado ({version}).',
+    adminSettingsUpdatedVersionFallback: 'última versión',
   },
   
   fr: {
@@ -276,6 +291,11 @@ export const translations = {
     pages: 'Pages',
     themes: 'Thèmes',
     backToSite: 'Retour au Site',
+
+    // Admin: cross-tab app_settings update toast
+    adminSettingsUpdatedTitle: 'Paramètres mis à jour dans un autre onglet',
+    adminSettingsUpdatedDescription: '« {key} » fusionné et appliqué ({version}).',
+    adminSettingsUpdatedVersionFallback: 'dernière version',
   },
 };
 
