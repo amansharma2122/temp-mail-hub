@@ -916,6 +916,22 @@ const AdminFriendlyWebsites = () => {
                       </Select>
                     </div>
                     <div className="space-y-1">
+                      <Label className="text-xs">Speed</Label>
+                      <Select
+                        value={settings.celebrationSpeed ?? 'normal'}
+                        onValueChange={(v: 'slower'|'normal'|'faster') =>
+                          setSettings({ ...settings, celebrationSpeed: v })}
+                        disabled={!(settings.celebrationEnabled ?? true)}
+                      >
+                        <SelectTrigger data-testid="celebration-speed-select"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="slower">Slower</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="faster">Faster</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
                       <Label className="text-xs">Duration (ms)</Label>
                       <Input
                         type="number" min={800} max={8000} step={100}
@@ -976,6 +992,7 @@ const AdminFriendlyWebsites = () => {
                       intensity={settings.celebrationIntensity ?? 'normal'}
                       durationMs={settings.celebrationDurationMs ?? 4200}
                       countScale={settings.celebrationParticleCount ?? 0}
+                      speed={settings.celebrationSpeed ?? 'normal'}
                       onDone={() => setPreviewBurstAt(null)}
                     />
                   )}
