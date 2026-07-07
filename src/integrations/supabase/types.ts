@@ -94,19 +94,25 @@ export type Database = {
           id: string
           key: string
           updated_at: string
+          updated_by: string | null
           value: Json
+          version: number
         }
         Insert: {
           id?: string
           key: string
           updated_at?: string
+          updated_by?: string | null
           value?: Json
+          version?: number
         }
         Update: {
           id?: string
           key?: string
           updated_at?: string
+          updated_by?: string | null
           value?: Json
+          version?: number
         }
         Relationships: []
       }
@@ -1775,6 +1781,7 @@ export type Database = {
       }
       is_ip_blocked: { Args: { p_ip_address: string }; Returns: boolean }
       is_user_suspended: { Args: { check_user_id: string }; Returns: boolean }
+      jsonb_deep_merge: { Args: { a: Json; b: Json }; Returns: Json }
       log_admin_access: {
         Args: {
           p_action: string
@@ -1847,6 +1854,17 @@ export type Database = {
         Returns: boolean
       }
       unsuspend_user: { Args: { target_user_id: string }; Returns: boolean }
+      upsert_app_setting: {
+        Args: { p_base_version?: number; p_key: string; p_patch: Json }
+        Returns: {
+          id: string
+          key: string
+          merged: boolean
+          updated_at: string
+          value: Json
+          version: number
+        }[]
+      }
       validate_email_access_from_headers: {
         Args: { p_temp_email_id: string }
         Returns: boolean
