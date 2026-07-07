@@ -137,6 +137,11 @@ export const translations = {
     liveChat: 'Live Chat',
     location: 'Location',
     businessHours: 'Business Hours',
+
+    // Admin: cross-tab app_settings update toast
+    adminSettingsUpdatedTitle: 'Settings updated in another tab',
+    adminSettingsUpdatedDescription: '"{key}" merged and applied ({version}).',
+    adminSettingsUpdatedVersionFallback: 'latest version',
   },
   
   ar: {
