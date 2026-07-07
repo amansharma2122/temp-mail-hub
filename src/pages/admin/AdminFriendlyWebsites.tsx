@@ -38,6 +38,13 @@ import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { getAppSettingsRowId } from "@/lib/appSettingsKeyRoutes";
 import {
+  getCelebrationSpeedLabels,
+  normalizeCelebrationSpeed,
+  CELEBRATION_SPEEDS,
+  DEFAULT_CELEBRATION_SPEED,
+} from "@/lib/celebrationSpeedLabels";
+import { useLanguage } from "@/contexts/LanguageContext";
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -915,22 +922,18 @@ const AdminFriendlyWebsites = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Speed</Label>
-                      <Select
-                        value={settings.celebrationSpeed ?? 'normal'}
-                        onValueChange={(v: 'slower'|'normal'|'faster') =>
-                          setSettings({ ...settings, celebrationSpeed: v })}
-                        disabled={!(settings.celebrationEnabled ?? true)}
-                      >
-                        <SelectTrigger data-testid="celebration-speed-select"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="slower">Slower</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                          <SelectItem value="faster">Faster</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                     <CelebrationSpeedField
+                       value={settings.celebrationSpeed}
+                       disabled={!(settings.celebrationEnabled ?? true)}
+                       onChange={(v) => setSettings({ ...settings, celebrationSpeed: v })}
+                       onReset={() => setSettings({
+                         ...settings,
+                         celebrationSpeed: DEFAULT_CELEBRATION_SPEED,
+                         celebrationIntensity: 'normal',
+                         celebrationDurationMs: 4200,
+                         celebrationParticleCount: 0,
+                       })}
+                     />
                     <div className="space-y-1">
                       <Label className="text-xs">Duration (ms)</Label>
                       <Input
