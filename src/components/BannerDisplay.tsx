@@ -262,6 +262,11 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
   // Don't render anything if no banners — avoids layout shift.
   if (banners.length === 0) return null;
 
+  const manualRefresh = async () => {
+    setManualRefreshing(true);
+    try { await fetchBanners(); } finally { setManualRefreshing(false); }
+  };
+
   const positionStyles: Record<string, string> = {
     header: "w-full py-2",
     sidebar: "w-full",
@@ -271,23 +276,31 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
 
   return (
     <div className={`${positionStyles[position]} ${className} relative`}>
-      {isAdmin && realtimeMode === "polling" && (
+      {realtimeMode === "polling" && (
         <div
-          className="absolute top-1 right-1 z-10 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30 flex items-center gap-1 pointer-events-none"
-          title="Realtime channel unavailable — refreshing every 30s"
-        >
-          <RadioTower className="w-3 h-3" />
-          Live updates paused — polling
-        </div>
-      )}
-      {!isAdmin && realtimeMode === "polling" && (
-        <div
-          className="absolute top-1 right-1 z-10 text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/50 flex items-center gap-1 pointer-events-none opacity-70"
-          title="Temporarily syncing — content refreshes every 30 seconds"
+          className={`absolute top-1 right-1 z-10 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 ${
+            isAdmin
+              ? "bg-amber-500/15 text-amber-600 border border-amber-500/30"
+              : "bg-muted text-muted-foreground border border-border/50 opacity-70"
+          }`}
+          title={
+            isAdmin
+              ? "Realtime channel unavailable — refreshing every 30s"
+              : "Temporarily syncing — content refreshes every 30 seconds"
+          }
           aria-live="polite"
         >
-          <RadioTower className="w-3 h-3 animate-pulse" />
-          Temporarily syncing…
+          <RadioTower className={`w-3 h-3 ${!isAdmin ? "animate-pulse" : ""}`} />
+          {isAdmin ? "Live updates paused — polling" : "Temporarily syncing…"}
+          <button
+            type="button"
+            onClick={manualRefresh}
+            disabled={manualRefreshing}
+            aria-label="Refresh banners now"
+            className="ml-1 -mr-1 rounded-full p-0.5 hover:bg-foreground/10 focus:outline-none focus:ring-1 focus:ring-current pointer-events-auto disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${manualRefreshing ? "animate-spin" : ""}`} />
+          </button>
         </div>
       )}
       {banners.map((banner, index) => (
