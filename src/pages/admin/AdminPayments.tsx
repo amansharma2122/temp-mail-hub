@@ -98,9 +98,9 @@ const AdminPayments = () => {
       if (isPhpBackend) {
         await api.admin.updateSettings('payment_settings', settingsJson);
       } else {
-        const { error } = await saveAppSetting('payment_settings', settingsJson, updated_at: new Date().toISOString());
-
-        if (error) {
+        try {
+          await saveAppSetting('payment_settings', settingsJson);
+        } catch (error) {
           console.error('Error saving settings:', error);
           toast.error('Failed to save settings');
           return;
