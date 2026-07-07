@@ -83,6 +83,7 @@ interface WidgetSettings {
   showOnMobile: boolean;
   animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
   attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring' | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
+  clickEffect?: 'none' | 'sparkle' | 'confetti' | 'bomb' | 'fireworks' | 'hearts' | 'stars' | 'rainbow-burst';
   buttonLabel: string;
   tooltipText: string;
   showBadge: boolean;
@@ -105,6 +106,7 @@ const defaultSettings: WidgetSettings = {
   showOnMobile: true,
   animationType: 'slide',
   attentionEffect: 'pulse',
+  clickEffect: 'sparkle',
   buttonLabel: 'Partner Sites',
   tooltipText: 'Explore our partner sites',
   showBadge: true,
