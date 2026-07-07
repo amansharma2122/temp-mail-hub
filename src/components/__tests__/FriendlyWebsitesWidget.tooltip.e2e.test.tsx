@@ -71,7 +71,7 @@ vi.mock("@/integrations/supabase/client", () => {
     }
     return { insert: async () => ({ data: null, error: null }) };
   };
-  return { supabase: { from, auth: { getUser: async () => ({ data: { user: null } }) } } };
+  return { supabase: { from, channel: () => ({ on() { return this; }, subscribe() { return this; } }), removeChannel: () => {}, auth: { getUser: async () => ({ data: { user: null } }), getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) } } };
 });
 
 import FriendlyWebsitesWidget from "@/components/FriendlyWebsitesWidget";
