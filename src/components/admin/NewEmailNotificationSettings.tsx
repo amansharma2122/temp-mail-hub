@@ -4,45 +4,69 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { BellRing, Loader2, Save, Sparkles } from "lucide-react";
+import { BellRing, Loader2, Save, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { NewEmailToast, type NewEmailToastStyle } from "@/components/NewEmailToast";
-import { setNewEmailNotificationStyleCache } from "@/lib/newEmailNotificationStyle";
+import {
+  setNewEmailNotificationStyleCache,
+  setNewEmailSoundAdminEnabledCache,
+} from "@/lib/newEmailNotificationStyle";
 
 export default function NewEmailNotificationSettings() {
   const [style, setStyle] = useState<NewEmailToastStyle>("bounce_confetti");
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", "new_email_notification_style")
-        .maybeSingle();
+      const [{ data: styleRow }, { data: soundRow }] = await Promise.all([
+        supabase
+          .from("app_settings")
+          .select("value")
+          .eq("key", "new_email_notification_style")
+          .maybeSingle(),
+        supabase
+          .from("app_settings")
+          .select("value")
+          .eq("key", "new_email_sound_admin_enabled")
+          .maybeSingle(),
+      ]);
+      const _ = await Promise.resolve({ data: null } as any); void _; // no-op to keep TS calm
+      const data = styleRow as any;
       const raw = (data as any)?.value;
       const val: NewEmailToastStyle =
         raw === "slide_glow" || raw === "bounce_confetti" || raw === "both"
           ? raw : (raw?.style ?? "bounce_confetti");
       setStyle(val);
+      const rawSound = (soundRow as any)?.value;
+      setSoundEnabled(!(rawSound === false || rawSound === "false" || rawSound?.enabled === false));
       setLoading(false);
     })();
   }, []);
 
   const save = async () => {
     setSaving(true);
-    const { error } = await supabase.from("app_settings").upsert(
-      { key: "new_email_notification_style", value: style } as any,
-      { onConflict: "key" },
-    );
+    const [{ error: e1 }, { error: e2 }] = await Promise.all([
+      supabase.from("app_settings").upsert(
+        { key: "new_email_notification_style", value: style } as any,
+        { onConflict: "key" },
+      ),
+      supabase.from("app_settings").upsert(
+        { key: "new_email_sound_admin_enabled", value: soundEnabled } as any,
+        { onConflict: "key" },
+      ),
+    ]);
+    const error = e1 || e2;
     setSaving(false);
     if (error) {
       toast.error("Save failed", { description: error.message });
       return;
     }
     setNewEmailNotificationStyleCache(style);
+    setNewEmailSoundAdminEnabledCache(soundEnabled);
     toast.success("Notification style saved");
   };
 
@@ -75,6 +99,24 @@ export default function NewEmailNotificationSettings() {
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Save
           </Button>
+        </div>
+
+        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+          <div className="flex items-start gap-3">
+            {soundEnabled ? (
+              <Volume2 className="w-5 h-5 text-primary mt-0.5" />
+            ) : (
+              <VolumeX className="w-5 h-5 text-muted-foreground mt-0.5" />
+            )}
+            <div>
+              <Label className="text-sm">Site-wide new-email sound</Label>
+              <p className="text-xs text-muted-foreground">
+                Master switch for the sound played on realtime new-email arrivals.
+                Users can still silence sounds individually via their preferences.
+              </p>
+            </div>
+          </div>
+          <Switch checked={soundEnabled} onCheckedChange={setSoundEnabled} disabled={loading} />
         </div>
 
         <div className="pt-2 border-t space-y-2">
