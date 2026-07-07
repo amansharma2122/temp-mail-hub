@@ -798,6 +798,8 @@ export function ClickBurst({
       data-testid="friendly-widget-click-burst"
       data-variant={variant}
       data-reduced-motion={reducedMotion ? 'true' : 'false'}
+      data-speed={speed}
+      data-overlay-ms={OVERLAY_MS}
       initial={{ opacity: 1 }}
       animate={{ opacity: reducedMotion ? 0.55 : 1 }}
       exit={{ opacity: 0 }}
