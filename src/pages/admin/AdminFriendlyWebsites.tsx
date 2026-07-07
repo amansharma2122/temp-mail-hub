@@ -83,6 +83,7 @@ interface WidgetSettings {
   showOnMobile: boolean;
   animationType: 'slide' | 'fade' | 'bounce' | 'flip' | 'zoom';
   attentionEffect: 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring' | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
+  clickEffect?: 'none' | 'sparkle' | 'confetti' | 'bomb' | 'fireworks' | 'hearts' | 'stars' | 'rainbow-burst';
   buttonLabel: string;
   tooltipText: string;
   showBadge: boolean;
@@ -105,6 +106,7 @@ const defaultSettings: WidgetSettings = {
   showOnMobile: true,
   animationType: 'slide',
   attentionEffect: 'pulse',
+  clickEffect: 'sparkle',
   buttonLabel: 'Partner Sites',
   tooltipText: 'Explore our partner sites',
   showBadge: true,
@@ -803,6 +805,31 @@ const AdminFriendlyWebsites = () => {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">Makes the widget more noticeable while closed.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Click Effect
+                  </Label>
+                  <Select
+                    value={settings.clickEffect ?? 'sparkle'}
+                    onValueChange={(v: NonNullable<WidgetSettings['clickEffect']>) =>
+                      setSettings({ ...settings, clickEffect: v })
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="sparkle">Sparkle ✨</SelectItem>
+                      <SelectItem value="confetti">Confetti 🎉</SelectItem>
+                      <SelectItem value="bomb">Bomb 💥</SelectItem>
+                      <SelectItem value="fireworks">Fireworks 🎆</SelectItem>
+                      <SelectItem value="hearts">Hearts ❤️</SelectItem>
+                      <SelectItem value="stars">Stars ⭐</SelectItem>
+                      <SelectItem value="rainbow-burst">Rainbow Burst 🌈</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Plays once when a visitor opens the widget. Respects reduced-motion.</p>
                 </div>
 
                 <div className="space-y-2">

@@ -44,6 +44,10 @@ interface WidgetSettings {
   attentionEffect?:
     | 'none' | 'pulse' | 'glow' | 'wiggle' | 'bounce' | 'ring'
     | 'sparkle' | 'confetti' | 'ripple' | 'rainbow' | 'magnet';
+  /** Fired once when the user clicks/opens the trigger. Purely decorative. */
+  clickEffect?:
+    | 'none' | 'sparkle' | 'confetti' | 'bomb' | 'fireworks'
+    | 'hearts' | 'stars' | 'rainbow-burst';
   buttonLabel?: string;
   tooltipText?: string;
   showBadge?: boolean;
@@ -82,6 +86,7 @@ const defaultSettings: WidgetSettings = {
   animationIntensity: 'subtle',
   disableEffectsOnReducedMotion: true,
   reducedMotionMode: 'respect_user',
+  clickEffect: 'sparkle',
 };
 
 // -------- Module-scoped constants (do NOT depend on component state) -------
@@ -453,33 +458,20 @@ const FriendlyWebsitesWidget = ({
         @keyframes fw-rainbow{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
         @keyframes fw-magnet{0%,100%{transform:translateY(-50%) translateX(0)}50%{transform:translateY(-50%) translateX(-4px)}}
         @keyframes fw-burst{0%{transform:translate(-50%,-50%) scale(0);opacity:.9}100%{transform:translate(-50%,-50%) scale(3.2);opacity:0}}
+        @keyframes fw-particle{0%{transform:translate(-50%,-50%) translate(0,0) scale(1);opacity:1}100%{transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(.3);opacity:0}}
+        @keyframes fw-shockwave{0%{transform:translate(-50%,-50%) scale(0);opacity:.55}100%{transform:translate(-50%,-50%) scale(6);opacity:0}}
+        @keyframes fw-float-up{0%{transform:translate(-50%,-50%) translateY(0);opacity:1}100%{transform:translate(-50%,-50%) translateY(-160px);opacity:0}}
+        @keyframes fw-panel-glow{0%,100%{opacity:.35}50%{opacity:.7}}
       `}</style>
 
       {/* Site-wide sparkle burst on open. Purely decorative, pointer-events:none. */}
       <AnimatePresence>
         {burstAt && !effectiveReducedMotion && (
-          <motion.div
+          <ClickBurst
             key={burstAt}
-            className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 0 }}
-            transition={{ duration: 1.4, ease: 'easeOut' }}
-            onAnimationComplete={() => setBurstAt(null)}
-            aria-hidden
-          >
-            {Array.from({ length: 14 }).map((_, i) => (
-              <span
-                key={i}
-                className="absolute w-2 h-2 rounded-full bg-primary/70"
-                style={{
-                  top: `${50 + (Math.sin(i) * 30)}%`,
-                  left: `${50 + (Math.cos(i) * 30)}%`,
-                  animation: `fw-burst 1.2s ease-out forwards`,
-                  animationDelay: `${(i % 5) * 60}ms`,
-                }}
-              />
-            ))}
-          </motion.div>
+            variant={settings.clickEffect ?? 'sparkle'}
+            onDone={() => setBurstAt(null)}
+          />
         )}
       </AnimatePresence>
 
@@ -575,72 +567,94 @@ const FriendlyWebsitesWidget = ({
                  sample_ms: dur,
                });
              }}
-            className={`fixed top-1/2 -translate-y-1/2 z-50 ${positionClasses} ${sizeClasses[settings.size]} ${colorClasses[settings.colorScheme]} border p-4 shadow-xl ${settings.showOnMobile ? '' : 'hidden md:block'}`}
+            className={`fixed top-1/2 -translate-y-1/2 z-50 ${positionClasses} ${sizeClasses[settings.size]} ${settings.showOnMobile ? '' : 'hidden md:block'} overflow-hidden border border-primary/25 bg-card/80 backdrop-blur-2xl p-4 shadow-[0_20px_60px_-20px_hsl(var(--primary)/0.55)]`}
           >
+            {/* Animated gradient sheen behind the panel */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-accent/15" />
+              <div
+                className="absolute -inset-8 bg-[conic-gradient(from_0deg,hsl(var(--primary)/0.35),transparent_35%,hsl(var(--accent)/0.35),transparent_70%,hsl(var(--primary)/0.35))] blur-2xl"
+                style={{ animation: 'fw-panel-glow 4.5s ease-in-out infinite' }}
+              />
+            </div>
+
             {/* Close button */}
             <button
               onClick={() => setIsOpen(false)}
-              className="absolute top-2 right-2 p-1 rounded-full hover:bg-background/50 transition-colors"
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-background/40 backdrop-blur hover:bg-background/80 hover:rotate-90 transition-all duration-300"
               aria-label="Close panel"
             >
               <X className="w-4 h-4 text-muted-foreground" />
             </button>
 
             {/* Header */}
-            <h3 className="font-semibold text-foreground mb-4 pr-6 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              {label}
-            </h3>
+            <div className="mb-4 pr-6">
+              <h3 className="flex items-center gap-2 text-base font-bold tracking-tight">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-gradient-to-br from-primary to-accent" />
+                </span>
+                <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+                  {label}
+                </span>
+              </h3>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {websites.length} handpicked {websites.length === 1 ? 'site' : 'sites'} you'll love
+              </p>
+            </div>
 
             {/* Website list */}
-            <div className="space-y-2 max-h-80 overflow-y-auto">
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1 [scrollbar-width:thin]">
               {websites.map((website, index) => (
                 <motion.a
                   key={website.id}
                   href={website.url}
                   target={website.open_in_new_tab ? '_blank' : '_self'}
                   rel={website.open_in_new_tab ? 'noopener noreferrer' : undefined}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-background/50 border border-border/50 hover:border-primary/30 hover:bg-background/80 transition-all duration-200 group"
+                  className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-border/40 bg-background/60 p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-background/90 hover:shadow-lg hover:shadow-primary/10 group"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: effectiveReducedMotion ? 0 : index * 0.05 }}
-                  whileHover={effectiveReducedMotion ? undefined : { x: 4 }}
                   onClick={() => handleSiteClick(website)}
                 >
+                  <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-primary/0 via-primary/10 to-accent/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   {website.icon_name && renderLucide(website.icon_name, 'w-8 h-8 p-1.5 rounded-lg bg-primary/15 text-primary') ? (
-                    renderLucide(website.icon_name, 'w-8 h-8 p-1.5 rounded-lg bg-primary/15 text-primary')
+                    <span className="shrink-0 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 p-0.5 ring-1 ring-primary/20 transition-transform duration-300 group-hover:scale-110">
+                      {renderLucide(website.icon_name, 'w-8 h-8 p-1.5 rounded-lg text-primary')}
+                    </span>
                   ) : website.icon_url ? (
                     <img 
                       src={website.icon_url} 
                       alt={website.name}
-                      className="w-8 h-8 rounded-lg object-cover"
+                      className="w-9 h-9 rounded-lg object-cover ring-1 ring-primary/20 transition-transform duration-300 group-hover:scale-110"
                       loading="lazy"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                      <span className="text-primary font-semibold text-sm">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 ring-1 ring-primary/20 transition-transform duration-300 group-hover:scale-110">
+                      <span className="text-sm font-bold text-primary">
                         {website.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                    <p className="truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
                       {website.name}
                     </p>
                     {website.description && (
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="truncate text-[11px] leading-tight text-muted-foreground">
                         {website.description}
                       </p>
                     )}
                   </div>
-                  <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ExternalLink className="w-4 h-4 shrink-0 text-primary opacity-0 -translate-x-1 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100" />
                 </motion.a>
               ))}
             </div>
 
-            {/* Decorative elements */}
-            <div className="absolute -bottom-2 -right-2 w-16 h-16 bg-primary/10 rounded-full blur-xl" />
+            {/* Decorative orbs */}
+            <div aria-hidden className="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
+            <div aria-hidden className="pointer-events-none absolute -top-6 -left-6 h-20 w-20 rounded-full bg-accent/20 blur-2xl" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -652,6 +666,71 @@ const FriendlyWebsitesWidget = ({
 // (overrideSettings/overrideWebsites) are unchanged. React Query caches keep
 // internal state stable, so parent renders shouldn't propagate down here.
 export default memo(FriendlyWebsitesWidget);
+
+// -------------------- Click Burst (full-screen decorative effect) ----------
+type BurstVariant = NonNullable<WidgetSettings['clickEffect']>;
+
+function ClickBurst({ variant, onDone }: { variant: BurstVariant; onDone: () => void }) {
+  if (variant === 'none') { setTimeout(onDone, 0); return null; }
+  // Preset palettes & glyphs per effect.
+  const presets: Record<Exclude<BurstVariant, 'none'>, { count: number; glyph: (i: number) => string; colors: string[]; spread: number; anim: 'burst' | 'float' }> = {
+    sparkle:        { count: 22, glyph: () => '✨', colors: ['#fde68a', '#fbbf24'], spread: 260, anim: 'burst' },
+    confetti:       { count: 40, glyph: (i) => ['🎉','🎊','⭐','💫'][i % 4], colors: [], spread: 320, anim: 'burst' },
+    bomb:           { count: 60, glyph: () => '', colors: ['hsl(var(--destructive))','hsl(var(--primary))','#f97316','#facc15'], spread: 420, anim: 'burst' },
+    fireworks:      { count: 48, glyph: () => '', colors: ['#f43f5e','#3b82f6','#a855f7','#22d3ee','#facc15'], spread: 380, anim: 'burst' },
+    hearts:         { count: 18, glyph: () => '❤️', colors: [], spread: 200, anim: 'float' },
+    stars:          { count: 24, glyph: () => '⭐', colors: [], spread: 260, anim: 'burst' },
+    'rainbow-burst':{ count: 36, glyph: () => '', colors: ['#ef4444','#f97316','#facc15','#22c55e','#3b82f6','#a855f7'], spread: 340, anim: 'burst' },
+  };
+  const p = presets[variant];
+  return (
+    <motion.div
+      className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 0 }}
+      transition={{ duration: 1.6, ease: 'easeOut' }}
+      onAnimationComplete={onDone}
+      aria-hidden
+    >
+      {(variant === 'bomb' || variant === 'fireworks') && (
+        <span
+          className="absolute left-1/2 top-1/2 h-6 w-6 rounded-full bg-white/70"
+          style={{ animation: 'fw-shockwave 0.9s ease-out forwards' }}
+        />
+      )}
+      {Array.from({ length: p.count }).map((_, i) => {
+        const angle = (i / p.count) * Math.PI * 2 + (i * 0.13);
+        const distance = p.spread * (0.55 + Math.random() * 0.6);
+        const dx = Math.cos(angle) * distance;
+        const dy = Math.sin(angle) * distance;
+        const glyph = p.glyph(i);
+        const color = p.colors.length ? p.colors[i % p.colors.length] : undefined;
+        const size = glyph ? 18 + Math.random() * 10 : 8 + Math.random() * 6;
+        const delay = (i % 6) * 40;
+        return (
+          <span
+            key={i}
+            className="absolute left-1/2 top-1/2 select-none font-bold"
+            style={{
+              ['--dx' as any]: `${dx}px`,
+              '--dy': `${dy}px`,
+              fontSize: `${size}px`,
+              width: glyph ? undefined : `${size}px`,
+              height: glyph ? undefined : `${size}px`,
+              borderRadius: glyph ? undefined : '9999px',
+              background: glyph ? undefined : color,
+              color,
+              animation: `${p.anim === 'float' ? 'fw-float-up' : 'fw-particle'} ${1000 + Math.random() * 400}ms cubic-bezier(.2,.7,.3,1) forwards`,
+              animationDelay: `${delay}ms`,
+            } as React.CSSProperties}
+          >
+            {glyph}
+          </span>
+        );
+      })}
+    </motion.div>
+  );
+}
 
 // -------------------- Sync-error pill w/ backoff + Retry now ---------------
 
