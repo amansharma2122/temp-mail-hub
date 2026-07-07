@@ -44,14 +44,9 @@ async function flush() {
     // Best-effort — swallow failures so RUM never breaks UX.
     await supabase.from("friendly_widget_events").insert(
       batch.map((e) => ({
-        event_name: e.event_type,
-        payload: {
-          surface: e.surface,
-          temp_email_id: e.temp_email_id ?? null,
-          latency_ms: e.latency_ms ?? null,
-          missed_count: e.missed_count ?? null,
-          observed_at: e.observed_at,
-        },
+        event_type: e.event_type,
+        sample_ms: e.latency_ms ?? e.missed_count ?? 0,
+        attention_effect: `${e.surface}:${e.temp_email_id ?? "none"}`,
       })),
     );
   } catch (err) {
