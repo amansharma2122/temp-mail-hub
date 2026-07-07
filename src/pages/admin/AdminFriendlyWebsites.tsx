@@ -151,7 +151,16 @@ const SortableWebsiteCard = ({
             </TooltipContent>
           </Tooltip>
 
-          {website.icon_url ? (
+          {website.icon_name && (LucideIcons as any)[website.icon_name] ? (
+            (() => {
+              const Icon = (LucideIcons as any)[website.icon_name!];
+              return (
+                <div className="w-10 h-10 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+                  <Icon className="w-5 h-5" />
+                </div>
+              );
+            })()
+          ) : website.icon_url ? (
             <img 
               src={website.icon_url} 
               alt={website.name}
