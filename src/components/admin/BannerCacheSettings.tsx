@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 
 const KEY = "banner_cache_ttl_minutes";
 const DEFAULT_TTL = 24 * 60; // 24h
@@ -32,10 +33,7 @@ const BannerCacheSettings = () => {
     setSaving(true);
     try {
       const value = { minutes: Math.max(1, Math.floor(ttl)) };
-      const { error } = await supabase
-        .from("app_settings")
-        .upsert({ key: KEY, value }, { onConflict: "key" });
-      if (error) throw error;
+      await saveAppSetting(KEY, value);
       toast.success("Banner cache TTL saved");
     } catch (e: any) {
       toast.error(e?.message || "Save failed");

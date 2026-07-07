@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { CreditCard, Save, AlertTriangle, CheckCircle, ExternalLink, Key, Wallet, MessageCircle } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -98,14 +99,9 @@ const AdminPayments = () => {
       if (isPhpBackend) {
         await api.admin.updateSettings('payment_settings', settingsJson);
       } else {
-        const { error } = await supabase
-          .from('app_settings')
-          .upsert(
-            { key: 'payment_settings', value: settingsJson, updated_at: new Date().toISOString() },
-            { onConflict: 'key' }
-          );
-
-        if (error) {
+        try {
+          await saveAppSetting('payment_settings', settingsJson);
+        } catch (error) {
           console.error('Error saving settings:', error);
           toast.error('Failed to save settings');
           return;

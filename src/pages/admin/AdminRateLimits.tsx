@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { Gauge, Save, RefreshCw, Trash2, RotateCcw, AlertTriangle, Users, User, Mail, LogIn, UserPlus, Key, Globe } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -146,34 +147,8 @@ const AdminRateLimits = () => {
     setIsSaving(true);
     
     // First check if record exists
-    const { data: existing } = await supabase
-      .from("app_settings")
-      .select("id")
-      .eq("key", "rate_limits_config")
-      .single();
-
-    let error;
     const jsonValue = JSON.parse(JSON.stringify(config));
-    
-    if (existing) {
-      const result = await supabase
-        .from("app_settings")
-        .update({ value: jsonValue, updated_at: new Date().toISOString() })
-        .eq("key", "rate_limits_config");
-      error = result.error;
-    } else {
-      const result = await supabase
-        .from("app_settings")
-        .insert([{ key: "rate_limits_config", value: jsonValue }]);
-      error = result.error;
-    }
-
-    if (error) {
-      toast.error("Failed to save settings: " + error.message);
-      setIsSaving(false);
-      return;
-    }
-
+    await saveAppSetting("rate_limits_config", jsonValue);
     // Reset all rate limits if option is enabled
     if (resetOnSave) {
       const { error: clearError } = await supabase

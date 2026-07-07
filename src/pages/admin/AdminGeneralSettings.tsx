@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { storage } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { Settings, Save, AlertTriangle, Eye } from "lucide-react";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useLimitModalSettings, defaultLimitModalConfig, LimitModalConfig } from "@/hooks/useLimitModalSettings";
@@ -105,43 +106,12 @@ const AdminGeneralSettings = () => {
       storage.set(GENERAL_SETTINGS_KEY, settings);
       
       // Also save to Supabase app_settings for persistence
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'general')
-        .maybeSingle();
-
       const settingsJson = JSON.parse(JSON.stringify(settings));
-
-      let error;
-      if (existing) {
-        const result = await supabase
-          .from('app_settings')
-          .update({
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', 'general');
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('app_settings')
-          .insert([{
-            key: 'general',
-            value: settingsJson,
-          }]);
-        error = result.error;
-      }
-
-      if (error) {
-        console.error('Error saving to database:', error);
-        toast.error('Settings saved locally but failed to sync to database');
-      } else {
-        // Immediately refetch global settings so changes apply everywhere
-        await refetchGlobalSettings();
-        markClean();
-        toast.success("General settings saved successfully!");
-      }
+      await saveAppSetting('general', settingsJson);
+      // Immediately refetch global settings so changes apply everywhere
+      await refetchGlobalSettings();
+      markClean();
+      toast.success("General settings saved successfully!");
     } catch (e) {
       console.error('Error saving settings:', e);
       toast.error('Failed to save settings');

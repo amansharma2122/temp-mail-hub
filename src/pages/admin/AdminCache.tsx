@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Database, Trash2, RefreshCw, Clock, Settings, Zap, HardDrive, Mail, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,37 +67,8 @@ const AdminCache = () => {
   const saveSettings = async () => {
     try {
       // First check if the setting exists
-      const { data: existing } = await supabase
-        .from("app_settings")
-        .select("id")
-        .eq("key", "cache_settings")
-        .single();
-
       const settingsValue = JSON.parse(JSON.stringify(settings));
-
-      if (existing) {
-        // Update existing
-        const { error } = await supabase
-          .from("app_settings")
-          .update({
-            value: settingsValue,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("key", "cache_settings");
-
-        if (error) throw error;
-      } else {
-        // Insert new
-        const { error } = await supabase
-          .from("app_settings")
-          .insert({
-            key: "cache_settings",
-            value: settingsValue,
-          });
-
-        if (error) throw error;
-      }
-      
+      await saveAppSetting("cache_settings", settingsValue);
       toast.success("Cache settings saved");
     } catch (error) {
       toast.error("Failed to save settings");

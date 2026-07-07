@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import {
   Dialog,
   DialogContent,
@@ -142,32 +143,8 @@ const AdminPricing = () => {
     setIsSaving(true);
     console.log('[AdminPricing] Saving content:', content);
     try {
-      const { data: existing } = await supabase
-        .from("app_settings")
-        .select("id")
-        .eq("key", "pricing_content")
-        .maybeSingle();
-
-      console.log('[AdminPricing] Existing record:', existing);
       const contentJson = JSON.parse(JSON.stringify(content));
-
-      if (existing) {
-        const { error, data } = await supabase
-          .from("app_settings")
-          .update({ value: contentJson, updated_at: new Date().toISOString() })
-          .eq("key", "pricing_content")
-          .select();
-        console.log('[AdminPricing] Update result:', { error, data });
-        if (error) throw error;
-      } else {
-        const { error, data } = await supabase
-          .from("app_settings")
-          .insert([{ key: "pricing_content", value: contentJson }])
-          .select();
-        console.log('[AdminPricing] Insert result:', { error, data });
-        if (error) throw error;
-      }
-
+      await saveAppSetting("pricing_content", contentJson);
       toast.success("Pricing content saved");
       queryClient.invalidateQueries({ queryKey: ["app_settings"] });
     } catch (error) {

@@ -20,6 +20,19 @@ const FLUSH_MS = 15_000;
 const MAX_BUFFER = 40;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
+// Sampling + per-key throttling keeps this pipeline light: we never emit
+// more than one sample per key per THROTTLE_MS window, and only SAMPLE_RATE
+// of qualifying samples make it into the buffer at all. Both can be tuned
+// via `configureAppSettingsRum` (used by tests).
+let SAMPLE_RATE = 0.25; // 25% of events
+let THROTTLE_MS = 2_000; // one sample per key per 2s
+const lastSampledAt = new Map<string, number>();
+
+export function configureAppSettingsRum(opts: { sampleRate?: number; throttleMs?: number }) {
+  if (typeof opts.sampleRate === "number") SAMPLE_RATE = Math.min(1, Math.max(0, opts.sampleRate));
+  if (typeof opts.throttleMs === "number") THROTTLE_MS = Math.max(0, opts.throttleMs);
+}
+
 function scheduleFlush() {
   if (timer) return;
   timer = setTimeout(() => {
@@ -51,6 +64,16 @@ export function reportAppSettingsLatency(
   version: number | null,
 ): void {
   const latency = Math.max(0, Date.now() - emittedAt);
+
+  // Per-key throttle window — drop repeat noise.
+  const now = Date.now();
+  const last = lastSampledAt.get(key) ?? 0;
+  if (now - last < THROTTLE_MS) return;
+
+  // Random sampling — keep pipeline cheap on high-volume tabs.
+  if (Math.random() >= SAMPLE_RATE) return;
+  lastSampledAt.set(key, now);
+
   BUFFER.push({
     key,
     version,
@@ -62,5 +85,5 @@ export function reportAppSettingsLatency(
 }
 
 export function __appSettingsRumInternals() {
-  return { BUFFER, flush };
+  return { BUFFER, flush, lastSampledAt };
 }

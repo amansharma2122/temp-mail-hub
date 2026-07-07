@@ -181,3 +181,25 @@ export async function applyAppSettingsPatch(
     merged,
   };
 }
+
+/**
+ * Convenience wrapper used by admin write paths that historically did an
+ * `existing? update : insert` on `public.app_settings`. Routes through the
+ * deterministic `upsert_app_setting` RPC so that concurrent admin edits
+ * deep-merge and every write instantly broadcasts to every tab/device.
+ *
+ * `value` may be any JSON — for scalar/array values the RPC replaces the
+ * row's value (deep-merge only recurses on objects), which matches the
+ * previous overwrite semantics of the raw `.upsert`/`.update` calls.
+ */
+export async function saveAppSetting(
+  key: string,
+  value: unknown,
+  baseVersion?: number | null,
+): Promise<{ value: unknown; version: number; merged: boolean }> {
+  return applyAppSettingsPatch(
+    key,
+    value as Record<string, unknown>,
+    baseVersion,
+  );
+}

@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { storage } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
+import { saveAppSetting } from "@/lib/appSettingsSync";
 import { Search, Save, Code, FileCode, FileText, TrendingUp, AlertTriangle, CheckCircle, XCircle, Lightbulb, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -258,45 +259,15 @@ const AdminSEO = () => {
     try {
       const settingsJson = JSON.parse(JSON.stringify(settings));
 
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'seo')
-        .maybeSingle();
-
-      let error;
-      if (existing) {
-        const result = await supabase
-          .from('app_settings')
-          .update({
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', 'seo');
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('app_settings')
-          .insert([{
-            key: 'seo',
-            value: settingsJson,
-          }]);
-        error = result.error;
-      }
-
-      if (error) {
-        console.error('Error saving to database:', error);
-        toast.error('Settings saved locally but failed to sync to database');
-      } else {
-        // Clear ALL SEO-related caches from localStorage
-        localStorage.removeItem('trashmails_seo_settings');
-        localStorage.removeItem(SEO_SETTINGS_KEY);
-        
-        // Dispatch a global event to notify all components to refetch
-        window.dispatchEvent(new CustomEvent('seo-settings-updated', { detail: settings }));
-        
-        toast.success("SEO settings saved successfully!");
-      }
+      await saveAppSetting('seo', settingsJson);
+      // Clear ALL SEO-related caches from localStorage
+      localStorage.removeItem('trashmails_seo_settings');
+      localStorage.removeItem(SEO_SETTINGS_KEY);
+      
+      // Dispatch a global event to notify all components to refetch
+      window.dispatchEvent(new CustomEvent('seo-settings-updated', { detail: settings }));
+      
+      toast.success("SEO settings saved successfully!");
     } catch (e) {
       console.error('Error saving settings:', e);
       toast.error('Failed to save settings');
