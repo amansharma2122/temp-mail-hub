@@ -122,7 +122,9 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     let pollingId: ReturnType<typeof setInterval> | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let retryCount = 0;
-    const MAX_RETRIES = 3;
+    // No hard cap — we keep trying with exponential backoff and jitter so the
+    // UI eventually reconnects to realtime after transient network issues.
+    // Polling stays active until we're SUBSCRIBED, so users always see fresh data.
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const doFetch = async () => {
@@ -191,9 +193,13 @@ const BannerDisplay = ({ position, className = "" }: BannerDisplayProps) => {
     };
 
     const scheduleRetry = () => {
-      if (cancelled || retryCount >= MAX_RETRIES) return;
+      if (cancelled) return;
       retryCount += 1;
-      const delay = 60_000; // 60s between retries
+      // Exponential backoff: 2s, 4s, 8s, 16s, 32s, capped at 60s + up to 25% jitter.
+      const base = Math.min(2000 * Math.pow(2, retryCount - 1), 60_000);
+      const jitter = Math.floor(Math.random() * base * 0.25);
+      const delay = base + jitter;
+      console.log(`[BannerDisplay] Realtime retry #${retryCount} in ${Math.round(delay / 1000)}s`);
       if (retryTimer) clearTimeout(retryTimer);
       retryTimer = setTimeout(() => {
         if (cancelled) return;
