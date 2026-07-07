@@ -50,31 +50,7 @@ export const useRegistrationSettings = () => {
     const updatedSettings = { ...settings, ...newSettings };
     
     try {
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'registration_settings')
-        .maybeSingle();
-
-      const settingsJson = JSON.parse(JSON.stringify(updatedSettings));
-
-      if (existing) {
-        await supabase
-          .from('app_settings')
-          .update({
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', 'registration_settings');
-      } else {
-        await supabase
-          .from('app_settings')
-          .insert([{
-            key: 'registration_settings',
-            value: settingsJson,
-          }]);
-      }
-
+      await saveAppSetting('registration_settings', settingsJson);
       setSettings(updatedSettings);
       return { success: true };
     } catch (e) {

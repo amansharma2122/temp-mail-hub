@@ -85,30 +85,7 @@ const AdminLanguages = () => {
     setLanguages(updated);
 
     try {
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'languages')
-        .maybeSingle();
-
-      const languagesJson = JSON.parse(JSON.stringify(updated));
-
-      if (existing) {
-        await supabase
-          .from('app_settings')
-          .update({
-            value: languagesJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', 'languages');
-      } else {
-        await supabase
-          .from('app_settings')
-          .insert([{
-            key: 'languages',
-            value: languagesJson,
-          }]);
-      }
+      await saveAppSetting('languages', languagesJson);
     } catch (e) {
       console.error('Error saving languages to database:', e);
     }

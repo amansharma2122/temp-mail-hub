@@ -98,12 +98,7 @@ const AdminPayments = () => {
       if (isPhpBackend) {
         await api.admin.updateSettings('payment_settings', settingsJson);
       } else {
-        const { error } = await supabase
-          .from('app_settings')
-          .upsert(
-            { key: 'payment_settings', value: settingsJson, updated_at: new Date().toISOString() },
-            { onConflict: 'key' }
-          );
+        const { error } = await saveAppSetting('payment_settings', settingsJson, updated_at: new Date().toISOString());
 
         if (error) {
           console.error('Error saving settings:', error);

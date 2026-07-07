@@ -58,35 +58,7 @@ export const useCaptchaSettings = () => {
     mutationFn: async (newSettings: Partial<CaptchaSettings>) => {
       const updatedSettings = { ...settings, ...newSettings };
       
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', SETTINGS_KEY)
-        .maybeSingle();
-
-      const settingsJson = JSON.parse(JSON.stringify(updatedSettings));
-
-      if (existing) {
-        const { error } = await supabase
-          .from('app_settings')
-          .update({
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', SETTINGS_KEY);
-        
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('app_settings')
-          .insert([{
-            key: SETTINGS_KEY,
-            value: settingsJson,
-          }]);
-        
-        if (error) throw error;
-      }
-
+      await saveAppSetting(SETTINGS_KEY, settingsJson);
       return updatedSettings;
     },
     onSuccess: (data) => {

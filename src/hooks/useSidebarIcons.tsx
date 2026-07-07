@@ -47,23 +47,7 @@ export const useSidebarIcons = () => {
     
     try {
       // Check if setting exists
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', STORAGE_KEY)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from('app_settings')
-          .update({ value: newIcons, updated_at: new Date().toISOString() })
-          .eq('key', STORAGE_KEY);
-      } else {
-        await supabase
-          .from('app_settings')
-          .insert({ key: STORAGE_KEY, value: newIcons });
-      }
-
+      await saveAppSetting(STORAGE_KEY, newIcons);
       setIcons(newIcons);
       return true;
     } catch (err) {

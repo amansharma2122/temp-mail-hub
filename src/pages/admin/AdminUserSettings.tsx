@@ -85,34 +85,7 @@ const AdminUserSettings = () => {
     try {
       storage.set(USER_SETTINGS_KEY, settings);
       
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'user_settings')
-        .maybeSingle();
-
-      const settingsJson = JSON.parse(JSON.stringify(settings));
-
-      let error;
-      if (existing) {
-        const result = await supabase
-          .from('app_settings')
-          .update({
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', 'user_settings');
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from('app_settings')
-          .insert([{
-            key: 'user_settings',
-            value: settingsJson,
-          }]);
-        error = result.error;
-      }
-
+      await saveAppSetting('user_settings', settingsJson);
       if (error) {
         console.error('Error saving to database:', error);
         toast.error('Settings saved locally but failed to sync to database');

@@ -81,31 +81,7 @@ export const useAnnouncementSettings = () => {
     const updatedSettings = { ...settings, ...newSettings };
     
     try {
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('id')
-        .eq('key', 'announcement_settings')
-        .maybeSingle();
-
-      const settingsJson = JSON.parse(JSON.stringify(updatedSettings));
-
-      if (existing) {
-        await supabase
-          .from('app_settings')
-          .update({
-            value: settingsJson,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('key', 'announcement_settings');
-      } else {
-        await supabase
-          .from('app_settings')
-          .insert([{
-            key: 'announcement_settings',
-            value: settingsJson,
-          }]);
-      }
-
+      await saveAppSetting('announcement_settings', settingsJson);
       setSettings(updatedSettings);
       return { success: true };
     } catch (e) {
