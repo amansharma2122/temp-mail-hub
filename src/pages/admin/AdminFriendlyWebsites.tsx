@@ -865,6 +865,22 @@ const AdminFriendlyWebsites = () => {
               />
             </div>
             <div className="space-y-2">
+              <Label>Icon (from library, overrides URL)</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <LucideIconPicker
+                    value={formData.icon_name}
+                    onChange={(name) => setFormData({ ...formData, icon_name: name })}
+                  />
+                </div>
+                {formData.icon_name && (
+                  <Button variant="ghost" size="sm" onClick={() => setFormData({ ...formData, icon_name: '' })}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label>Description (optional)</Label>
               <Textarea
                 placeholder="Brief description of the website"
@@ -920,6 +936,22 @@ const AdminFriendlyWebsites = () => {
                 value={formData.icon_url}
                 onChange={(e) => setFormData({ ...formData, icon_url: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Icon (from library, overrides URL)</Label>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <LucideIconPicker
+                    value={formData.icon_name}
+                    onChange={(name) => setFormData({ ...formData, icon_name: name })}
+                  />
+                </div>
+                {formData.icon_name && (
+                  <Button variant="ghost" size="sm" onClick={() => setFormData({ ...formData, icon_name: '' })}>
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Description (optional)</Label>
