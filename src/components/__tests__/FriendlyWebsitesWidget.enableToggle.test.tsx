@@ -9,24 +9,45 @@ import React from "react";
 
 let currentSettings: any = { enabled: true, visibleToPublic: true, visibleToLoggedIn: true };
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: (table: string) => ({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () =>
-            table === "app_settings"
-              ? { data: { value: currentSettings }, error: null }
-              : { data: null, error: null },
-          order: () => ({
-            limit: async () => ({ data: [], error: null }),
-          }),
-        }),
-        order: () => ({
-          limit: async () => ({ data: [], error: null }),
-        }),
-      }),
-    }),
+const FAKE_WEBSITES = [
+  {
+    id: "w1",
+    name: "Partner",
+    url: "https://partner.example",
+    icon_url: null,
+    icon_name: "Sparkles",
+    description: null,
+    display_order: 0,
+    is_active: true,
+    open_in_new_tab: true,
+    attention_effect: null,
+    badge_enabled: false,
+    badge_text: null,
+    auto_open_override: null,
+    max_badge_per_day: 0,
+  },
+];
+
+vi.mock("@/integrations/supabase/client", () => {
+  function fromApi(table: string) {
+    const builder: any = {
+      _resolve: async () =>
+        table === "friendly_websites"
+          ? { data: FAKE_WEBSITES, error: null }
+          : table === "app_settings"
+            ? { data: { value: currentSettings }, error: null }
+            : { data: null, error: null },
+      select() { return builder; },
+      eq() { return builder; },
+      order() { return builder; },
+      limit() { return builder._resolve(); },
+      maybeSingle: async () => builder._resolve(),
+      then(res: any, rej: any) { return builder._resolve().then(res, rej); },
+    };
+    return builder;
+  }
+  return { supabase: {
+    from: fromApi,
     channel: () => ({
       on: function () { return this; },
       subscribe: function () { return this; },
@@ -36,8 +57,8 @@ vi.mock("@/integrations/supabase/client", () => ({
       getSession: async () => ({ data: { session: null } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
     },
-  },
-}));
+  } };
+});
 
 vi.mock("@/hooks/useSupabaseAuth", () => ({
   useAuth: () => ({ user: null }),
